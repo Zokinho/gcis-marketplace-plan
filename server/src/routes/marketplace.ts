@@ -17,6 +17,8 @@ router.get('/products', async (req: Request, res: Response) => {
     cbdMin, cbdMax,
     priceMin, priceMax,
     availability,
+    cbdThcRatio,
+    ratioTolerance,
     search,
     page = '1',
     limit = '20',
@@ -59,6 +61,37 @@ router.get('/products', async (req: Request, res: Response) => {
     where.gramsAvailable = { gt: 0 };
   } else if (availability === 'upcoming') {
     where.upcomingQty = { gt: 0 };
+  }
+
+  // CBD:THC ratio filter — e.g. "1:1", "2:1", "1:2"
+  if (cbdThcRatio) {
+    const [cbdPart, thcPart] = cbdThcRatio.split(':').map(Number);
+    if (cbdPart > 0 && thcPart > 0) {
+      const targetRatio = cbdPart / thcPart; // CBD / THC
+      const tolerance = ratioTolerance ? parseFloat(ratioTolerance) / 100 : 0.25; // default 25%
+      const lowerRatio = targetRatio * (1 - tolerance);
+      const upperRatio = targetRatio * (1 + tolerance);
+
+      // Both CBD and THC must be present (non-null, > 0)
+      // Then: lowerRatio <= cbdMax/thcMax <= upperRatio
+      // Rewritten to avoid division: lowerRatio * thcMax <= cbdMax <= upperRatio * thcMax
+      where.thcMax = { ...((where.thcMax as any) || {}), gt: 0 };
+      where.cbdMax = { ...((where.cbdMax as any) || {}), gt: 0 };
+
+      // We need raw filtering since Prisma can't do cross-column math.
+      // We'll get IDs from a raw query and add them as an IN filter.
+      const ratioProductIds: { id: string }[] = await prisma.$queryRawUnsafe(
+        `SELECT id FROM "Product" WHERE "isActive" = true AND "thcMax" > 0 AND "cbdMax" > 0 AND ("cbdMax" / "thcMax") BETWEEN $1 AND $2`,
+        lowerRatio,
+        upperRatio,
+      );
+      const ids = ratioProductIds.map((r) => r.id);
+      if (ids.length === 0) {
+        // No products match — short-circuit
+        return res.json({ products: [], pagination: { page: 1, limit: limitNum, total: 0, totalPages: 0 } });
+      }
+      where.id = { in: ids };
+    }
   }
 
   if (search) {

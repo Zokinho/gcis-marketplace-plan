@@ -151,8 +151,15 @@ export default function MyListings() {
   );
 }
 
+const SOURCE_BADGES: Record<string, { label: string; class: string }> = {
+  zoho: { label: 'Zoho', class: 'bg-blue-50 text-blue-600' },
+  manual: { label: 'Manual', class: 'bg-violet-50 text-violet-600' },
+  'coa-email': { label: 'CoA Email', class: 'bg-cyan-50 text-cyan-600' },
+};
+
 function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: () => void }) {
   const [editing, setEditing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -160,11 +167,15 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
   const [price, setPrice] = useState(String(listing.pricePerUnit ?? ''));
   const [grams, setGrams] = useState(String(listing.gramsAvailable ?? ''));
   const [upcoming, setUpcoming] = useState(String(listing.upcomingQty ?? ''));
+  const [minQty, setMinQty] = useState(String(listing.minQtyRequest ?? ''));
+  const [desc, setDesc] = useState(listing.description ?? '');
 
   function resetFields() {
     setPrice(String(listing.pricePerUnit ?? ''));
     setGrams(String(listing.gramsAvailable ?? ''));
     setUpcoming(String(listing.upcomingQty ?? ''));
+    setMinQty(String(listing.minQtyRequest ?? ''));
+    setDesc(listing.description ?? '');
     setEditError(null);
   }
 
@@ -172,14 +183,17 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     setSaving(true);
     setEditError(null);
     try {
-      const updates: Record<string, number> = {};
+      const updates: Record<string, number | string> = {};
       const newPrice = parseFloat(price);
       const newGrams = parseFloat(grams);
       const newUpcoming = parseFloat(upcoming);
+      const newMinQty = parseFloat(minQty);
 
       if (!isNaN(newPrice) && newPrice !== listing.pricePerUnit) updates.pricePerUnit = newPrice;
       if (!isNaN(newGrams) && newGrams !== listing.gramsAvailable) updates.gramsAvailable = newGrams;
       if (!isNaN(newUpcoming) && newUpcoming !== listing.upcomingQty) updates.upcomingQty = newUpcoming;
+      if (!isNaN(newMinQty) && newMinQty !== listing.minQtyRequest) updates.minQtyRequest = newMinQty;
+      if (desc.trim() !== (listing.description ?? '')) updates.description = desc.trim();
 
       if (Object.keys(updates).length === 0) {
         setEditing(false);
@@ -214,6 +228,20 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       ? { label: 'Active', class: 'bg-green-100 text-green-700' }
       : { label: 'Paused', class: 'bg-gray-100 text-gray-500' };
 
+  const sourceBadge = SOURCE_BADGES[listing.source] || { label: listing.source, class: 'bg-gray-50 text-gray-500' };
+
+  const thcDisplay = listing.thcMin != null && listing.thcMax != null && listing.thcMin !== listing.thcMax
+    ? `${listing.thcMin}–${listing.thcMax}%`
+    : listing.thcMax != null
+      ? `${listing.thcMax}%`
+      : null;
+
+  const cbdDisplay = listing.cbdMin != null && listing.cbdMax != null && listing.cbdMin !== listing.cbdMax
+    ? `${listing.cbdMin}–${listing.cbdMax}%`
+    : listing.cbdMax != null
+      ? `${listing.cbdMax}%`
+      : null;
+
   return (
     <div className="rounded-xl border bg-white p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -232,6 +260,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
 
         {/* Left: product info */}
         <div className="min-w-0 flex-1">
+          {/* Header row: name + badges */}
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold text-gray-900">{listing.name}</h3>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.class}`}>
@@ -242,6 +271,14 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 {listing.type}
               </span>
             )}
+            {listing.category && (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                {listing.category}
+              </span>
+            )}
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sourceBadge.class}`}>
+              {sourceBadge.label}
+            </span>
             {listing.pendingBids > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
                 <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
@@ -252,24 +289,68 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
             )}
           </div>
 
-          {/* Stats row */}
+          {/* Stats / Edit form */}
           {!editing ? (
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-              <Stat label="Price" value={listing.pricePerUnit != null ? `$${listing.pricePerUnit.toFixed(2)}/g` : '—'} />
-              <Stat label="Available" value={listing.gramsAvailable != null ? `${listing.gramsAvailable.toLocaleString()}g` : '—'} />
-              <Stat label="Upcoming" value={listing.upcomingQty != null ? `${listing.upcomingQty.toLocaleString()}g` : '—'} />
-              <Stat label="THC" value={listing.thcMax != null ? `${listing.thcMax}%` : '—'} />
-              <Stat label="Total Bids" value={String(listing.totalBids)} />
-              {(listing as any).matchCount > 0 && (
-                <Stat label="Matches" value={String((listing as any).matchCount)} />
+            <>
+              {/* Primary stats row */}
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                <Stat label="Price" value={listing.pricePerUnit != null ? `$${listing.pricePerUnit.toFixed(2)}/g` : '—'} />
+                <Stat label="Available" value={listing.gramsAvailable != null ? `${listing.gramsAvailable.toLocaleString()}g` : '—'} />
+                <Stat label="Upcoming" value={listing.upcomingQty != null ? `${listing.upcomingQty.toLocaleString()}g` : '—'} />
+                {thcDisplay && <Stat label="THC" value={thcDisplay} />}
+                {cbdDisplay && <Stat label="CBD" value={cbdDisplay} />}
+                <Stat label="Total Bids" value={String(listing.totalBids)} />
+                {(listing as any).matchCount > 0 && (
+                  <Stat label="Matches" value={String((listing as any).matchCount)} />
+                )}
+              </div>
+
+              {/* Expandable details */}
+              {expanded && (
+                <div className="mt-3 border-t pt-3">
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm sm:grid-cols-3">
+                    {listing.licensedProducer && <Stat label="LP" value={listing.licensedProducer} />}
+                    {listing.lineage && <Stat label="Lineage" value={listing.lineage} />}
+                    {listing.dominantTerpene && <Stat label="Terpene" value={listing.dominantTerpene} />}
+                    {listing.certification && <Stat label="Cert" value={listing.certification} />}
+                    {listing.minQtyRequest != null && <Stat label="Min QTY" value={`${listing.minQtyRequest.toLocaleString()}g`} />}
+                    {listing.harvestDate && (
+                      <Stat label="Harvest" value={new Date(listing.harvestDate).toLocaleDateString()} />
+                    )}
+                    {listing.lastSyncedAt && (
+                      <Stat label="Last Sync" value={new Date(listing.lastSyncedAt).toLocaleDateString()} />
+                    )}
+                  </div>
+                  {listing.description && (
+                    <p className="mt-2 text-xs leading-relaxed text-gray-500">{listing.description}</p>
+                  )}
+                </div>
               )}
-            </div>
+
+              {/* Expand/collapse toggle */}
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="mt-1.5 text-xs font-medium text-brand-blue hover:underline"
+              >
+                {expanded ? 'Show less' : 'Show more'}
+              </button>
+            </>
           ) : (
             <div className="mt-2 space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <EditField label="Price ($/g)" value={price} onChange={setPrice} step="0.01" />
                 <EditField label="Available (g)" value={grams} onChange={setGrams} step="1" />
                 <EditField label="Upcoming (g)" value={upcoming} onChange={setUpcoming} step="1" />
+                <EditField label="Min QTY (g)" value={minQty} onChange={setMinQty} step="1" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Description</label>
+                <textarea
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
               </div>
               {editError && <p className="text-xs text-red-600">{editError}</p>}
               <div className="flex gap-2">
@@ -300,17 +381,19 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
             >
               Edit
             </button>
-            <button
-              onClick={handleToggle}
-              disabled={toggling}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-                listing.isActive
-                  ? 'border border-amber-300 text-amber-700 hover:bg-amber-50'
-                  : 'border border-green-300 text-green-700 hover:bg-green-50'
-              }`}
-            >
-              {toggling ? '...' : listing.isActive ? 'Pause' : 'Activate'}
-            </button>
+            {!listing.requestPending && (
+              <button
+                onClick={handleToggle}
+                disabled={toggling}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                  listing.isActive
+                    ? 'border border-amber-300 text-amber-700 hover:bg-amber-50'
+                    : 'border border-green-300 text-green-700 hover:bg-green-50'
+                }`}
+              >
+                {toggling ? '...' : listing.isActive ? 'Pause' : 'Activate'}
+              </button>
+            )}
           </div>
         )}
       </div>

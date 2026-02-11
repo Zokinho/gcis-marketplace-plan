@@ -85,6 +85,14 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
         rangeMax={30}
       />
 
+      {/* CBD:THC Ratio */}
+      <RatioFilter
+        ratio={filters.cbdThcRatio}
+        tolerance={filters.ratioTolerance}
+        onChangeRatio={(v) => update({ cbdThcRatio: v })}
+        onChangeTolerance={(v) => update({ ratioTolerance: v })}
+      />
+
       {/* Price Range */}
       <RangeFilter
         label="Price ($/g)"
@@ -217,6 +225,79 @@ function RangeFilter({
           className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
         />
       </div>
+    </div>
+  );
+}
+
+const RATIO_PRESETS = [
+  { label: '1:1', value: '1:1', desc: 'Equal CBD & THC' },
+  { label: '2:1 CBD', value: '2:1', desc: 'Double CBD vs THC' },
+  { label: '1:2 CBD', value: '1:2', desc: 'Half CBD vs THC' },
+];
+
+function RatioFilter({
+  ratio,
+  tolerance,
+  onChangeRatio,
+  onChangeTolerance,
+}: {
+  ratio?: string;
+  tolerance?: number;
+  onChangeRatio: (v: string | undefined) => void;
+  onChangeTolerance: (v: number | undefined) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">CBD:THC Ratio</label>
+      <div className="flex flex-wrap gap-1.5">
+        {RATIO_PRESETS.map((p) => (
+          <button
+            key={p.value}
+            onClick={() => onChangeRatio(ratio === p.value ? undefined : p.value)}
+            title={p.desc}
+            className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+              ratio === p.value
+                ? 'border-green-500 bg-green-50 text-green-700'
+                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {/* Custom ratio input */}
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="text"
+          placeholder="e.g. 3:1"
+          value={ratio && !RATIO_PRESETS.some((p) => p.value === ratio) ? ratio : ''}
+          onChange={(e) => {
+            const v = e.target.value.trim();
+            if (!v) { onChangeRatio(undefined); return; }
+            if (/^\d+:\d+$/.test(v)) onChangeRatio(v);
+          }}
+          className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-xs focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+        />
+        <span className="text-xs text-gray-400">custom</span>
+      </div>
+      {/* Tolerance slider */}
+      {ratio && (
+        <div className="mt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Tolerance</span>
+            <span className="text-xs font-medium text-gray-600">{tolerance ?? 25}%</span>
+          </div>
+          <input
+            type="range"
+            min={5}
+            max={50}
+            step={5}
+            value={tolerance ?? 25}
+            onChange={(e) => onChangeTolerance(parseInt(e.target.value))}
+            className="mt-0.5 w-full accent-green-600"
+          />
+        </div>
+      )}
     </div>
   );
 }

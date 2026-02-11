@@ -101,6 +101,8 @@ export interface ProductFilters {
   priceMin?: number;
   priceMax?: number;
   availability?: 'in_stock' | 'upcoming';
+  cbdThcRatio?: string;
+  ratioTolerance?: number;
   search?: string;
   page?: number;
   limit?: number;
@@ -208,18 +210,26 @@ export async function fetchMyBids(params?: {
 export interface SellerListing {
   id: string;
   name: string;
+  description: string | null;
   category: string | null;
   type: string | null;
+  licensedProducer: string | null;
+  lineage: string | null;
+  dominantTerpene: string | null;
   certification: string | null;
+  harvestDate: string | null;
   isActive: boolean;
   requestPending: boolean;
   pricePerUnit: number | null;
   gramsAvailable: number | null;
   upcomingQty: number | null;
+  minQtyRequest: number | null;
   thcMin: number | null;
   thcMax: number | null;
+  cbdMin: number | null;
   cbdMax: number | null;
   imageUrls: string[];
+  source: string;
   lastSyncedAt: string | null;
   totalBids: number;
   pendingBids: number;
@@ -232,7 +242,7 @@ export async function fetchMyListings(): Promise<SellerListing[]> {
 
 export async function updateMyListing(
   id: string,
-  updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number },
+  updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number; minQtyRequest?: number; description?: string },
 ): Promise<void> {
   await api.patch(`/my-listings/${id}`, updates);
 }

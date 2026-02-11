@@ -100,7 +100,7 @@ export async function fetchMarketplaceContacts(): Promise<any[]> {
  */
 export async function pushProductUpdate(
   productId: string,
-  updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number },
+  updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number; minQtyRequest?: number; description?: string },
 ) {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) throw new Error(`Product ${productId} not found`);
@@ -116,6 +116,8 @@ export async function pushProductUpdate(
   if (updates.pricePerUnit !== undefined) zohoFields.Min_Request_G_Including_5_markup = updates.pricePerUnit;
   if (updates.gramsAvailable !== undefined) zohoFields.Grams_Available_When_submitted = updates.gramsAvailable;
   if (updates.upcomingQty !== undefined) zohoFields.Upcoming_QTY_3_Months = updates.upcomingQty;
+  if (updates.minQtyRequest !== undefined) zohoFields.Min_QTY_Request = updates.minQtyRequest;
+  if (updates.description !== undefined) zohoFields.Description = updates.description;
 
   if (Object.keys(zohoFields).length > 0) {
     await zohoRequest('PUT', `/Products/${product.zohoProductId}`, {

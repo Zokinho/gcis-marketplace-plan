@@ -213,18 +213,26 @@ router.get('/', async (req: Request, res: Response) => {
     select: {
       id: true,
       name: true,
+      description: true,
       category: true,
       type: true,
+      licensedProducer: true,
+      lineage: true,
+      dominantTerpene: true,
       certification: true,
+      harvestDate: true,
       isActive: true,
       requestPending: true,
       pricePerUnit: true,
       gramsAvailable: true,
       upcomingQty: true,
+      minQtyRequest: true,
       thcMin: true,
       thcMax: true,
+      cbdMin: true,
       cbdMax: true,
       imageUrls: true,
+      source: true,
       lastSyncedAt: true,
       _count: {
         select: { bids: true },
@@ -273,21 +281,25 @@ router.patch('/:id', async (req: Request<{ id: string }>, res: Response) => {
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  const { pricePerUnit, gramsAvailable, upcomingQty } = req.body as {
+  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description } = req.body as {
     pricePerUnit?: number;
     gramsAvailable?: number;
     upcomingQty?: number;
+    minQtyRequest?: number;
+    description?: string;
   };
 
   // Validate — at least one field must be provided
-  if (pricePerUnit === undefined && gramsAvailable === undefined && upcomingQty === undefined) {
+  if (pricePerUnit === undefined && gramsAvailable === undefined && upcomingQty === undefined && minQtyRequest === undefined && description === undefined) {
     return res.status(400).json({ error: 'No fields to update' });
   }
 
-  const updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number } = {};
+  const updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number; minQtyRequest?: number; description?: string } = {};
   if (pricePerUnit !== undefined) updates.pricePerUnit = Number(pricePerUnit);
   if (gramsAvailable !== undefined) updates.gramsAvailable = Number(gramsAvailable);
   if (upcomingQty !== undefined) updates.upcomingQty = Number(upcomingQty);
+  if (minQtyRequest !== undefined) updates.minQtyRequest = Number(minQtyRequest);
+  if (description !== undefined) updates.description = description.trim();
 
   try {
     await pushProductUpdate(productId, updates);
@@ -309,11 +321,15 @@ router.patch('/:id/toggle-active', async (req: Request<{ id: string }>, res: Res
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { id: true, sellerId: true, zohoProductId: true, isActive: true },
+    select: { id: true, sellerId: true, zohoProductId: true, isActive: true, requestPending: true },
   });
 
   if (!product || product.sellerId !== sellerId) {
     return res.status(404).json({ error: 'Product not found' });
+  }
+
+  if (product.requestPending) {
+    return res.status(400).json({ error: 'Cannot toggle a listing that is pending approval' });
   }
 
   const newActive = !product.isActive;
