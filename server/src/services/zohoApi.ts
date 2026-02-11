@@ -1,16 +1,19 @@
-import { zohoRequest } from './zohoAuth';
+import fs from 'fs';
+import FormData from 'form-data';
+import axios from 'axios';
+import { zohoRequest, getAccessToken, ZOHO_API_URL } from './zohoAuth';
 import { prisma } from '../index';
 import { calculateProximity } from '../utils/proximity';
 
 // ─── Product field list for sync ───
 
 const PRODUCT_FIELDS = [
-  'Product_Name', 'Product_Code', 'Description', 'Product_Category', 'Type',
-  'Product_Active', 'Request_pending', 'Unit_Price', 'Min_QTY_Request',
-  'Grams_Available', 'Upcoming_QTY', 'THC_min', 'THC_max', 'CBD_min', 'CBD_max',
-  'Certification', 'Harvest_Date', 'Licensed_Producer', 'Lineage', 'Growth_Medium',
+  'Product_Name', 'Product_Code', 'Description', 'Product_Category', 'Categories',
+  'Product_Active', 'Request_pending', 'Min_Request_G_Including_5_markup', 'Min_QTY_Request',
+  'Grams_Available_When_submitted', 'Upcoming_QTY_3_Months', 'THC_as_is', 'THC_max', 'CBD_as_is', 'CBD_max',
+  'Certification', 'Harvest_Date', 'Manufacturer_name', 'Lineage', 'Growth_Medium',
   'Terpen', 'Highest_Terpenes', 'Aromas',
-  'X0_1_cm_Popcorn', 'X1_2_cm_Small', 'X2_3_cm_Medium', 'X3_5_cm_Large', 'X5_cm_X_Large',
+  'cm_Popcorn', 'cm_Small', 'cm_Medium', 'cm_Large', 'cm_X_Large',
   'Contact_Name',
 ].join(',');
 
@@ -106,9 +109,9 @@ export async function pushProductUpdate(
 
   // Build Zoho update payload — only include fields that were actually changed
   const zohoFields: Record<string, any> = {};
-  if (updates.pricePerUnit !== undefined) zohoFields.Unit_Price = updates.pricePerUnit;
-  if (updates.gramsAvailable !== undefined) zohoFields.Grams_Available = updates.gramsAvailable;
-  if (updates.upcomingQty !== undefined) zohoFields.Upcoming_QTY = updates.upcomingQty;
+  if (updates.pricePerUnit !== undefined) zohoFields.Min_Request_G_Including_5_markup = updates.pricePerUnit;
+  if (updates.gramsAvailable !== undefined) zohoFields.Grams_Available_When_submitted = updates.gramsAvailable;
+  if (updates.upcomingQty !== undefined) zohoFields.Upcoming_QTY_3_Months = updates.upcomingQty;
 
   if (Object.keys(zohoFields).length > 0) {
     await zohoRequest('PUT', `/Products/${product.zohoProductId}`, {
@@ -345,26 +348,26 @@ export async function createZohoProduct(fields: {
 
   if (fields.description) zohoFields.Description = fields.description;
   if (fields.category) zohoFields.Product_Category = fields.category;
-  if (fields.type) zohoFields.Type = fields.type;
-  if (fields.licensedProducer) zohoFields.Licensed_Producer = fields.licensedProducer;
+  if (fields.type) zohoFields.Categories = [fields.type];
+  if (fields.licensedProducer) zohoFields.Manufacturer_name = fields.licensedProducer;
   if (fields.lineage) zohoFields.Lineage = fields.lineage;
   if (fields.growthMedium) zohoFields.Growth_Medium = fields.growthMedium;
   if (fields.harvestDate) zohoFields.Harvest_Date = fields.harvestDate.toISOString().split('T')[0];
-  if (fields.certification) zohoFields.Certification = fields.certification;
-  if (fields.thcMin != null) zohoFields.THC_min = fields.thcMin;
+  if (fields.certification) zohoFields.Certification = [fields.certification];
+  if (fields.thcMin != null) zohoFields.THC_as_is = fields.thcMin;
   if (fields.thcMax != null) zohoFields.THC_max = fields.thcMax;
-  if (fields.cbdMin != null) zohoFields.CBD_min = fields.cbdMin;
+  if (fields.cbdMin != null) zohoFields.CBD_as_is = fields.cbdMin;
   if (fields.cbdMax != null) zohoFields.CBD_max = fields.cbdMax;
   if (fields.dominantTerpene) zohoFields.Terpen = fields.dominantTerpene;
-  if (fields.gramsAvailable != null) zohoFields.Grams_Available = fields.gramsAvailable;
-  if (fields.upcomingQty != null) zohoFields.Upcoming_QTY = fields.upcomingQty;
+  if (fields.gramsAvailable != null) zohoFields.Grams_Available_When_submitted = fields.gramsAvailable;
+  if (fields.upcomingQty != null) zohoFields.Upcoming_QTY_3_Months = fields.upcomingQty;
   if (fields.minQtyRequest != null) zohoFields.Min_QTY_Request = fields.minQtyRequest;
-  if (fields.pricePerUnit != null) zohoFields.Unit_Price = fields.pricePerUnit;
-  if (fields.budSizePopcorn != null) zohoFields.X0_1_cm_Popcorn = fields.budSizePopcorn;
-  if (fields.budSizeSmall != null) zohoFields.X1_2_cm_Small = fields.budSizeSmall;
-  if (fields.budSizeMedium != null) zohoFields.X2_3_cm_Medium = fields.budSizeMedium;
-  if (fields.budSizeLarge != null) zohoFields.X3_5_cm_Large = fields.budSizeLarge;
-  if (fields.budSizeXLarge != null) zohoFields.X5_cm_X_Large = fields.budSizeXLarge;
+  if (fields.pricePerUnit != null) zohoFields.Min_Request_G_Including_5_markup = fields.pricePerUnit;
+  if (fields.budSizePopcorn != null) zohoFields.cm_Popcorn = fields.budSizePopcorn;
+  if (fields.budSizeSmall != null) zohoFields.cm_Small = fields.budSizeSmall;
+  if (fields.budSizeMedium != null) zohoFields.cm_Medium = fields.budSizeMedium;
+  if (fields.budSizeLarge != null) zohoFields.cm_Large = fields.budSizeLarge;
+  if (fields.budSizeXLarge != null) zohoFields.cm_X_Large = fields.budSizeXLarge;
 
   const response = await zohoRequest('POST', '/Products', {
     data: { data: [zohoFields], trigger: [] },
@@ -396,6 +399,7 @@ export async function createProductReviewTask(params: {
       Status: 'Not Started',
       Priority: 'Normal',
       What_Id: params.zohoProductId,
+      $se_module: 'Products',
       Who_Id: params.sellerZohoContactId,
       Description: [
         `Product: ${params.productName}`,
@@ -410,6 +414,80 @@ export async function createProductReviewTask(params: {
 
   const response = await zohoRequest('POST', '/Tasks', { data: taskData });
   return response?.data?.[0]?.details?.id || null;
+}
+
+// ─── File Uploads to Zoho ───
+
+/**
+ * Upload a local file to Zoho File System (ZFS).
+ * Returns the encrypted file ID for attaching to a record.
+ */
+async function uploadToZFS(filePath: string): Promise<string> {
+  const token = await getAccessToken();
+  const form = new FormData();
+  form.append('file', fs.createReadStream(filePath));
+
+  const response = await axios.post(`${ZOHO_API_URL}/files`, form, {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${token}`,
+      ...form.getHeaders(),
+    },
+    maxContentLength: 20 * 1024 * 1024,
+  });
+
+  const fileId = response.data?.data?.[0]?.details?.id;
+  if (!fileId) throw new Error('ZFS upload did not return a file ID');
+  return fileId;
+}
+
+/**
+ * Upload images and CoA files to a Zoho Product record.
+ * Images go to Image_1 through Image_4, CoAs go to CoAs and CoAs_2.
+ * Each file is uploaded to ZFS first, then attached to the record field.
+ */
+export async function uploadProductFiles(
+  zohoProductId: string,
+  imageFiles: string[],  // local file paths
+  coaFiles: string[],    // local file paths
+): Promise<void> {
+  const imageFieldNames = ['Image_1', 'Image_2', 'Image_3', 'Image_4'];
+  const coaFieldNames = ['CoAs', 'CoAs_2'];
+
+  const updatePayload: Record<string, any> = {};
+
+  // Upload images
+  for (let i = 0; i < Math.min(imageFiles.length, 4); i++) {
+    try {
+      const fileId = await uploadToZFS(imageFiles[i]);
+      updatePayload[imageFieldNames[i]] = [{ file_id: fileId }];
+    } catch (err: any) {
+      console.error(`[ZOHO] Image upload failed for ${imageFieldNames[i]}:`, err?.message);
+    }
+  }
+
+  // Upload CoAs
+  for (let i = 0; i < Math.min(coaFiles.length, 2); i++) {
+    try {
+      const fileId = await uploadToZFS(coaFiles[i]);
+      updatePayload[coaFieldNames[i]] = [{ file_id: fileId }];
+    } catch (err: any) {
+      console.error(`[ZOHO] CoA upload failed for ${coaFieldNames[i]}:`, err?.message);
+    }
+  }
+
+  // Attach all uploaded files to the product record via v2 API
+  // (v7 silently ignores file_id attachments on fileupload fields)
+  if (Object.keys(updatePayload).length > 0) {
+    const token = await getAccessToken();
+    const v2BaseUrl = ZOHO_API_URL.replace('/v7', '/v2');
+    await axios.put(`${v2BaseUrl}/Products/${zohoProductId}`, {
+      data: [updatePayload],
+      trigger: [],
+    }, {
+      headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    });
+    console.log(`[ZOHO] Uploaded ${Object.keys(updatePayload).length} files to product ${zohoProductId}`);
+  }
 }
 
 // ─── Delta Sync ───

@@ -21,6 +21,11 @@ export async function getAccessToken(): Promise<string> {
     },
   });
 
+  if (response.data.error) {
+    console.error('[ZOHO] Token refresh failed:', response.data.error);
+    throw new Error(`Zoho token refresh failed: ${response.data.error}`);
+  }
+
   accessToken = response.data.access_token;
   tokenExpiry = Date.now() + (response.data.expires_in * 1000) - 60000; // 1 min buffer
   console.log('[ZOHO] Access token refreshed');
@@ -36,14 +41,19 @@ export async function zohoRequest(
   options?: { data?: any; params?: Record<string, any> },
 ) {
   const token = await getAccessToken();
-  const response = await axios({
-    method,
-    url: `${ZOHO_API_URL}${endpoint}`,
-    headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    data: options?.data,
-    params: options?.params,
-  });
-  return response.data;
+  try {
+    const response = await axios({
+      method,
+      url: `${ZOHO_API_URL}${endpoint}`,
+      headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      data: options?.data,
+      params: options?.params,
+    });
+    return response.data;
+  } catch (err: any) {
+    console.error('[ZOHO] API error:', method, endpoint, 'status:', err?.response?.status, 'body:', JSON.stringify(err?.response?.data));
+    throw err;
+  }
 }
 
 export { ZOHO_API_URL };

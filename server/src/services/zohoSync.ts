@@ -44,35 +44,42 @@ async function resolveSellerByZohoId(zohoContactId: string | undefined): Promise
  * Map a Zoho product record to Prisma upsert data.
  */
 function mapProductFields(p: any) {
+  // Categories is a multiselectpicklist — extract first value as type
+  const categories = Array.isArray(p.Categories) ? p.Categories : [];
+  const typeValue = categories.length > 0 ? categories[0] : null;
+  // Certification is a multiselectpicklist — join as comma-separated string
+  const certArray = Array.isArray(p.Certification) ? p.Certification : [];
+  const certValue = certArray.length > 0 ? certArray.join(', ') : null;
+
   return {
     name: p.Product_Name || 'Unnamed Product',
     productCode: p.Product_Code || null,
     description: p.Description || null,
     category: p.Product_Category || null,
-    type: p.Type || null,
+    type: typeValue,
     isActive: p.Product_Active ?? false,
     requestPending: p.Request_pending ?? false,
-    pricePerUnit: p.Unit_Price != null ? Number(p.Unit_Price) : null,
+    pricePerUnit: p.Min_Request_G_Including_5_markup != null ? Number(p.Min_Request_G_Including_5_markup) : null,
     minQtyRequest: p.Min_QTY_Request != null ? Number(p.Min_QTY_Request) : null,
-    gramsAvailable: p.Grams_Available != null ? Number(p.Grams_Available) : null,
-    upcomingQty: p.Upcoming_QTY != null ? Number(p.Upcoming_QTY) : null,
-    thcMin: p.THC_min != null ? Number(p.THC_min) : null,
+    gramsAvailable: p.Grams_Available_When_submitted != null ? Number(p.Grams_Available_When_submitted) : null,
+    upcomingQty: p.Upcoming_QTY_3_Months != null ? Number(p.Upcoming_QTY_3_Months) : null,
+    thcMin: p.THC_as_is != null ? Number(p.THC_as_is) : null,
     thcMax: p.THC_max != null ? Number(p.THC_max) : null,
-    cbdMin: p.CBD_min != null ? Number(p.CBD_min) : null,
+    cbdMin: p.CBD_as_is != null ? Number(p.CBD_as_is) : null,
     cbdMax: p.CBD_max != null ? Number(p.CBD_max) : null,
-    certification: p.Certification || null,
+    certification: certValue,
     harvestDate: p.Harvest_Date ? new Date(p.Harvest_Date) : null,
-    licensedProducer: p.Licensed_Producer || null,
+    licensedProducer: p.Manufacturer_name || null,
     lineage: p.Lineage || null,
     growthMedium: p.Growth_Medium || null,
     dominantTerpene: p.Terpen || null,
     highestTerpenes: p.Highest_Terpenes || null,
     aromas: p.Aromas || null,
-    budSizePopcorn: p.X0_1_cm_Popcorn != null ? Number(p.X0_1_cm_Popcorn) : null,
-    budSizeSmall: p.X1_2_cm_Small != null ? Number(p.X1_2_cm_Small) : null,
-    budSizeMedium: p.X2_3_cm_Medium != null ? Number(p.X2_3_cm_Medium) : null,
-    budSizeLarge: p.X3_5_cm_Large != null ? Number(p.X3_5_cm_Large) : null,
-    budSizeXLarge: p.X5_cm_X_Large != null ? Number(p.X5_cm_X_Large) : null,
+    budSizePopcorn: p.cm_Popcorn != null ? Number(p.cm_Popcorn) : null,
+    budSizeSmall: p.cm_Small != null ? Number(p.cm_Small) : null,
+    budSizeMedium: p.cm_Medium != null ? Number(p.cm_Medium) : null,
+    budSizeLarge: p.cm_Large != null ? Number(p.cm_Large) : null,
+    budSizeXLarge: p.cm_X_Large != null ? Number(p.cm_X_Large) : null,
     lastSyncedAt: new Date(),
   };
 }

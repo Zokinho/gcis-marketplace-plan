@@ -4,7 +4,7 @@ import fs from 'fs';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../index';
-import { pushProductUpdate, createZohoProduct, createProductReviewTask } from '../services/zohoApi';
+import { pushProductUpdate, createZohoProduct, createProductReviewTask, uploadProductFiles } from '../services/zohoApi';
 import { zohoRequest } from '../services/zohoAuth';
 
 const router = Router();
@@ -175,6 +175,22 @@ router.post(
       }).catch((err) => {
         console.error('[MY-LISTINGS] Review task creation failed (non-critical):', err?.message);
       });
+
+      // Upload files to Zoho — fire-and-forget (non-critical)
+      const imageDiskPaths: string[] = [];
+      if (files?.coverPhoto?.[0]) imageDiskPaths.push(files.coverPhoto[0].path);
+      if (files?.images) {
+        for (const f of files.images) imageDiskPaths.push(f.path);
+      }
+      const coaDiskPaths: string[] = [];
+      if (files?.coaFiles) {
+        for (const f of files.coaFiles) coaDiskPaths.push(f.path);
+      }
+      if (imageDiskPaths.length > 0 || coaDiskPaths.length > 0) {
+        uploadProductFiles(zohoProductId, imageDiskPaths, coaDiskPaths).catch((err) => {
+          console.error('[MY-LISTINGS] Zoho file upload failed (non-critical):', err?.message);
+        });
+      }
 
       res.status(201).json({ product });
     } catch (err: any) {
