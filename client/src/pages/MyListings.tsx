@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import SellerScoreCard from '../components/SellerScoreCard';
 import ShareModal from '../components/ShareModal';
@@ -23,6 +24,14 @@ export default function MyListings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const location = useLocation();
+  const [successMsg, setSuccessMsg] = useState<string | null>(
+    (location.state as any)?.created
+      ? (location.state as any)?.pending
+        ? 'Listing submitted for approval! It will go live once the team reviews it.'
+        : 'Listing created successfully!'
+      : null,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +69,13 @@ export default function MyListings() {
         </div>
       )}
 
+      {successMsg && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3">
+          <span className="text-sm font-medium text-green-700">{successMsg}</span>
+          <button onClick={() => setSuccessMsg(null)} className="text-green-500 hover:text-green-700">&times;</button>
+        </div>
+      )}
+
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-brand-dark">My Listings</h2>
@@ -67,17 +83,28 @@ export default function MyListings() {
             {listings.length} product{listings.length !== 1 ? 's' : ''}
           </p>
         </div>
-        {listings.length > 0 && (
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-teal"
+        <div className="flex gap-2">
+          <Link
+            to="/create-listing"
+            className="flex items-center gap-1.5 rounded-lg bg-brand-teal px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-blue"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            Share Products
-          </button>
-        )}
+            Create Listing
+          </Link>
+          {listings.length > 0 && (
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-teal"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+              </svg>
+              Share Products
+            </button>
+          )}
+        </div>
       </div>
 
       {showShareModal && (
@@ -100,7 +127,16 @@ export default function MyListings() {
       {!loading && !error && listings.length === 0 && (
         <div className="rounded-xl border bg-white p-12 text-center">
           <h3 className="mb-2 text-lg font-semibold text-gray-700">No listings yet</h3>
-          <p className="text-sm text-gray-500">Your products will appear here once they're synced from Zoho CRM.</p>
+          <p className="mb-4 text-sm text-gray-500">Your products will appear here once they're synced from Zoho CRM or created manually.</p>
+          <Link
+            to="/create-listing"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-teal px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-blue"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Create Your First Listing
+          </Link>
         </div>
       )}
 

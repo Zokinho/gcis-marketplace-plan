@@ -304,6 +304,114 @@ export async function pushOnboardingMilestone(
   });
 }
 
+// ─── Manual Listing → Zoho Product ───
+
+/**
+ * Create a new Zoho Product from a manual listing.
+ * Returns the Zoho Product ID.
+ */
+export async function createZohoProduct(fields: {
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  type?: string | null;
+  licensedProducer?: string | null;
+  lineage?: string | null;
+  growthMedium?: string | null;
+  harvestDate?: Date | null;
+  certification?: string | null;
+  thcMin?: number | null;
+  thcMax?: number | null;
+  cbdMin?: number | null;
+  cbdMax?: number | null;
+  dominantTerpene?: string | null;
+  gramsAvailable?: number | null;
+  upcomingQty?: number | null;
+  minQtyRequest?: number | null;
+  pricePerUnit?: number | null;
+  budSizePopcorn?: number | null;
+  budSizeSmall?: number | null;
+  budSizeMedium?: number | null;
+  budSizeLarge?: number | null;
+  budSizeXLarge?: number | null;
+  sellerZohoContactId: string;
+}): Promise<string> {
+  const zohoFields: Record<string, any> = {
+    Product_Name: fields.name,
+    Product_Active: false,
+    Request_pending: true,
+    Contact_Name: fields.sellerZohoContactId,
+  };
+
+  if (fields.description) zohoFields.Description = fields.description;
+  if (fields.category) zohoFields.Product_Category = fields.category;
+  if (fields.type) zohoFields.Type = fields.type;
+  if (fields.licensedProducer) zohoFields.Licensed_Producer = fields.licensedProducer;
+  if (fields.lineage) zohoFields.Lineage = fields.lineage;
+  if (fields.growthMedium) zohoFields.Growth_Medium = fields.growthMedium;
+  if (fields.harvestDate) zohoFields.Harvest_Date = fields.harvestDate.toISOString().split('T')[0];
+  if (fields.certification) zohoFields.Certification = fields.certification;
+  if (fields.thcMin != null) zohoFields.THC_min = fields.thcMin;
+  if (fields.thcMax != null) zohoFields.THC_max = fields.thcMax;
+  if (fields.cbdMin != null) zohoFields.CBD_min = fields.cbdMin;
+  if (fields.cbdMax != null) zohoFields.CBD_max = fields.cbdMax;
+  if (fields.dominantTerpene) zohoFields.Terpen = fields.dominantTerpene;
+  if (fields.gramsAvailable != null) zohoFields.Grams_Available = fields.gramsAvailable;
+  if (fields.upcomingQty != null) zohoFields.Upcoming_QTY = fields.upcomingQty;
+  if (fields.minQtyRequest != null) zohoFields.Min_QTY_Request = fields.minQtyRequest;
+  if (fields.pricePerUnit != null) zohoFields.Unit_Price = fields.pricePerUnit;
+  if (fields.budSizePopcorn != null) zohoFields.X0_1_cm_Popcorn = fields.budSizePopcorn;
+  if (fields.budSizeSmall != null) zohoFields.X1_2_cm_Small = fields.budSizeSmall;
+  if (fields.budSizeMedium != null) zohoFields.X2_3_cm_Medium = fields.budSizeMedium;
+  if (fields.budSizeLarge != null) zohoFields.X3_5_cm_Large = fields.budSizeLarge;
+  if (fields.budSizeXLarge != null) zohoFields.X5_cm_X_Large = fields.budSizeXLarge;
+
+  const response = await zohoRequest('POST', '/Products', {
+    data: { data: [zohoFields], trigger: [] },
+  });
+
+  const zohoProductId = response?.data?.[0]?.details?.id;
+  if (!zohoProductId) {
+    throw new Error('Zoho did not return a Product ID');
+  }
+
+  return zohoProductId;
+}
+
+/**
+ * Create a Zoho Task for admin review of a new manual listing.
+ */
+export async function createProductReviewTask(params: {
+  zohoProductId: string;
+  sellerZohoContactId: string;
+  productName: string;
+  sellerCompany: string | null;
+  category?: string | null;
+  pricePerUnit?: number | null;
+  gramsAvailable?: number | null;
+}): Promise<string | null> {
+  const taskData = {
+    data: [{
+      Subject: `Product Review — ${params.productName} — ${params.sellerCompany || 'Unknown'}`,
+      Status: 'Not Started',
+      Priority: 'Normal',
+      What_Id: params.zohoProductId,
+      Who_Id: params.sellerZohoContactId,
+      Description: [
+        `Product: ${params.productName}`,
+        params.category ? `Category: ${params.category}` : '',
+        params.pricePerUnit != null ? `Price: $${params.pricePerUnit}/g` : '',
+        params.gramsAvailable != null ? `Available: ${params.gramsAvailable}g` : '',
+        `Source: Manual listing`,
+      ].filter(Boolean).join('\n'),
+    }],
+    trigger: [],
+  };
+
+  const response = await zohoRequest('POST', '/Tasks', { data: taskData });
+  return response?.data?.[0]?.details?.id || null;
+}
+
 // ─── Delta Sync ───
 
 /**

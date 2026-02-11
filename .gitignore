@@ -31,3 +31,6 @@ firebase-debug.log
 
 # Docker
 postgres-data/
+
+# Uploads
+uploads/

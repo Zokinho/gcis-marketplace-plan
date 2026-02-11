@@ -9,6 +9,7 @@ import Onboarding from './pages/Onboarding';
 import PendingApproval from './pages/PendingApproval';
 import NoZohoLink from './pages/NoZohoLink';
 import MyListings from './pages/MyListings';
+import CreateListing from './pages/CreateListing';
 import Orders from './pages/Orders';
 import CoaEmailQueue from './pages/CoaEmailQueue';
 import CuratedShares from './pages/CuratedShares';
@@ -106,6 +107,9 @@ export default function App() {
         } />
         <Route path="/my-listings" element={
           <RequireAuth><MarketplaceGuard><MyListings /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/create-listing" element={
+          <RequireAuth><MarketplaceGuard><CreateListing /></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/orders" element={
           <RequireAuth><MarketplaceGuard><Orders /></MarketplaceGuard></RequireAuth>

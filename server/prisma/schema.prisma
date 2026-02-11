@@ -86,9 +86,10 @@ model Product {
   cbdMax Float?
 
   // Terpenes & aromas
-  dominantTerpene  String? // Terpen field — top 5 terpenes
-  highestTerpenes  String? // Multi-line breakdown
-  aromas           String? // Multi-line scent profile
+  dominantTerpene      String? // Terpen field — top 5 terpenes
+  highestTerpenes      String? // Multi-line breakdown
+  totalTerpenePercent  Float?  // Total count of terpenes %
+  aromas               String? // Multi-line scent profile
 
   // Certification
   certification String? // GACP, GMP1, GMP2, GPP

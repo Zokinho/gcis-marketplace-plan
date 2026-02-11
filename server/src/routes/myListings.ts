@@ -1,10 +1,188 @@
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
 import { prisma } from '../index';
-import { pushProductUpdate } from '../services/zohoApi';
+import { pushProductUpdate, createZohoProduct, createProductReviewTask } from '../services/zohoApi';
 import { zohoRequest } from '../services/zohoAuth';
 
 const router = Router();
+
+// ─── Multer config for file uploads ───
+const uploadsDir = path.join(__dirname, '../../../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}-${file.originalname}`;
+    cb(null, unique);
+  },
+});
+
+const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
+  const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
+  const allowedPdf = ['application/pdf'];
+  if (file.fieldname === 'coaFiles') {
+    cb(null, allowedPdf.includes(file.mimetype));
+  } else {
+    cb(null, allowedImages.includes(file.mimetype));
+  }
+};
+
+const upload = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+
+/**
+ * POST /api/my-listings
+ * Create a new product listing manually (with file uploads).
+ */
+router.post(
+  '/',
+  upload.fields([
+    { name: 'coverPhoto', maxCount: 1 },
+    { name: 'images', maxCount: 4 },
+    { name: 'coaFiles', maxCount: 3 },
+  ]),
+  async (req: Request, res: Response) => {
+    const sellerId = req.user!.id;
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+
+    const {
+      name, description, category, type,
+      licensedProducer, lineage, growthMedium, harvestDate, certification,
+      thc, cbd, dominantTerpene, totalTerpenePercent,
+      gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
+      budSizePopcorn, budSizeSmall, budSizeMedium, budSizeLarge, budSizeXLarge,
+    } = req.body as Record<string, string>;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Product name is required' });
+    }
+
+    // Build image URLs: cover photo first, then additional images
+    const imageUrls: string[] = [];
+    if (files?.coverPhoto?.[0]) {
+      imageUrls.push(`/uploads/${files.coverPhoto[0].filename}`);
+    }
+    if (files?.images) {
+      for (const f of files.images) {
+        imageUrls.push(`/uploads/${f.filename}`);
+      }
+    }
+
+    // Build CoA URLs
+    const coaUrls: string[] = [];
+    if (files?.coaFiles) {
+      for (const f of files.coaFiles) {
+        coaUrls.push(`/uploads/${f.filename}`);
+      }
+    }
+
+    const parseFloat_ = (v: string | undefined) => v ? parseFloat(v) : undefined;
+    const thcVal = parseFloat_(thc);
+    const cbdVal = parseFloat_(cbd);
+
+    try {
+      // Look up seller's Zoho Contact ID
+      const seller = await prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { zohoContactId: true, companyName: true },
+      });
+
+      if (!seller?.zohoContactId) {
+        return res.status(400).json({ error: 'Your account is not linked to Zoho CRM. Please contact support.' });
+      }
+
+      const productFields = {
+        name: name.trim(),
+        description: description?.trim() || null,
+        category: category || null,
+        type: type || null,
+        licensedProducer: licensedProducer?.trim() || null,
+        lineage: lineage?.trim() || null,
+        growthMedium: growthMedium?.trim() || null,
+        harvestDate: harvestDate ? new Date(harvestDate) : null,
+        certification: certification || null,
+        thcMin: thcVal != null && !isNaN(thcVal) ? thcVal : null,
+        thcMax: thcVal != null && !isNaN(thcVal) ? thcVal : null,
+        cbdMin: cbdVal != null && !isNaN(cbdVal) ? cbdVal : null,
+        cbdMax: cbdVal != null && !isNaN(cbdVal) ? cbdVal : null,
+        dominantTerpene: dominantTerpene?.trim() || null,
+        gramsAvailable: parseFloat_(gramsAvailable) ?? null,
+        upcomingQty: parseFloat_(upcomingQty) ?? null,
+        minQtyRequest: parseFloat_(minQtyRequest) ?? null,
+        pricePerUnit: parseFloat_(pricePerUnit) ?? null,
+        budSizePopcorn: parseFloat_(budSizePopcorn) ?? null,
+        budSizeSmall: parseFloat_(budSizeSmall) ?? null,
+        budSizeMedium: parseFloat_(budSizeMedium) ?? null,
+        budSizeLarge: parseFloat_(budSizeLarge) ?? null,
+        budSizeXLarge: parseFloat_(budSizeXLarge) ?? null,
+        sellerZohoContactId: seller.zohoContactId,
+      };
+
+      // Create product in Zoho first — this is the approval gatekeeper
+      const zohoProductId = await createZohoProduct(productFields);
+
+      // Create local product with pending state
+      const product = await prisma.product.create({
+        data: {
+          zohoProductId,
+          name: name.trim(),
+          description: description?.trim() || null,
+          category: category || null,
+          type: type || null,
+          licensedProducer: licensedProducer?.trim() || null,
+          lineage: lineage?.trim() || null,
+          growthMedium: growthMedium?.trim() || null,
+          harvestDate: harvestDate ? new Date(harvestDate) : null,
+          certification: certification || null,
+          thcMin: thcVal != null && !isNaN(thcVal) ? thcVal : null,
+          thcMax: thcVal != null && !isNaN(thcVal) ? thcVal : null,
+          cbdMin: cbdVal != null && !isNaN(cbdVal) ? cbdVal : null,
+          cbdMax: cbdVal != null && !isNaN(cbdVal) ? cbdVal : null,
+          dominantTerpene: dominantTerpene?.trim() || null,
+          totalTerpenePercent: parseFloat_(totalTerpenePercent) ?? null,
+          gramsAvailable: parseFloat_(gramsAvailable) ?? null,
+          upcomingQty: parseFloat_(upcomingQty) ?? null,
+          minQtyRequest: parseFloat_(minQtyRequest) ?? null,
+          pricePerUnit: parseFloat_(pricePerUnit) ?? null,
+          budSizePopcorn: parseFloat_(budSizePopcorn) ?? null,
+          budSizeSmall: parseFloat_(budSizeSmall) ?? null,
+          budSizeMedium: parseFloat_(budSizeMedium) ?? null,
+          budSizeLarge: parseFloat_(budSizeLarge) ?? null,
+          budSizeXLarge: parseFloat_(budSizeXLarge) ?? null,
+          imageUrls,
+          coaUrls,
+          source: 'manual',
+          isActive: false,
+          requestPending: true,
+          sellerId,
+        },
+      });
+
+      // Create review task — fire-and-forget (non-critical)
+      createProductReviewTask({
+        zohoProductId,
+        sellerZohoContactId: seller.zohoContactId,
+        productName: name.trim(),
+        sellerCompany: seller.companyName,
+        category: category || null,
+        pricePerUnit: parseFloat_(pricePerUnit) ?? null,
+        gramsAvailable: parseFloat_(gramsAvailable) ?? null,
+      }).catch((err) => {
+        console.error('[MY-LISTINGS] Review task creation failed (non-critical):', err?.message);
+      });
+
+      res.status(201).json({ product });
+    } catch (err: any) {
+      console.error('[MY-LISTINGS] Create failed:', err?.message);
+      res.status(500).json({ error: 'Failed to create listing' });
+    }
+  },
+);
 
 /**
  * GET /api/my-listings

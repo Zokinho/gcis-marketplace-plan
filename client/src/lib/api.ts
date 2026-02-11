@@ -242,6 +242,13 @@ export async function toggleListingActive(id: string): Promise<{ isActive: boole
   return res.data;
 }
 
+export async function createListing(formData: FormData): Promise<ProductDetail> {
+  const res = await api.post('/my-listings', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.product;
+}
+
 // ─── Seller Share Links ───
 
 export interface SellerShare {

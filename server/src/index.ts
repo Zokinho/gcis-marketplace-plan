@@ -19,6 +19,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// ─── Static file serving for uploads ───
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+
 // ─── Health check (public) ───
 app.get('/api/health', async (_req, res) => {
   try {
