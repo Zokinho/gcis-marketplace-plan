@@ -148,7 +148,7 @@ const DEMO_PRODUCTS = [
     description: 'Award-winning Sensi Star with exceptionally high THC. Dense crystalline buds. Deep relaxation effects.',
   },
   {
-    name: 'Tangerine Dream', type: 'Sativa', category: 'Dried Flower', certification: 'GACP',
+    name: 'Tangerine Dream', type: 'Sativa', category: 'Dried Flower', certification: 'IMC-GAP',
     licensedProducer: 'Organigram', lineage: 'G13 × Afghan × Neville\'s A5 Haze',
     thcMin: 15, thcMax: 19, cbdMin: 0.1, cbdMax: 0.2, pricePerUnit: 2.65,
     gramsAvailable: 35000, upcomingQty: 25000, minQtyRequest: 5000,
@@ -248,7 +248,7 @@ const DEMO_PRODUCTS = [
     description: 'CBD-dominant Harlequin sativa. 2:1 CBD:THC ratio. Ideal for medical patients seeking relief without strong psychoactivity.',
   },
   {
-    name: 'Gelato', type: 'Hybrid', category: 'Dried Flower', certification: 'GMP2',
+    name: 'Gelato', type: 'Hybrid', category: 'Dried Flower', certification: 'IMC-GAP',
     licensedProducer: 'Organigram', lineage: 'Sunset Sherbet × Thin Mint GSC',
     thcMin: 20, thcMax: 25, cbdMin: 0.1, cbdMax: 0.2, pricePerUnit: 3.65,
     gramsAvailable: 22000, upcomingQty: 15000, minQtyRequest: 3000,

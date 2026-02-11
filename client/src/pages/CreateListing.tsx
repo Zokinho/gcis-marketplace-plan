@@ -24,7 +24,7 @@ const CATEGORIES = [
   'Edibles (others)',
 ];
 const TYPES = ['Sativa', 'Indica', 'Hybrid'];
-const CERTIFICATIONS = ['GACP', 'GMP1', 'GMP2', 'GPP'];
+const CERTIFICATIONS = ['GACP', 'GMP1', 'GMP2', 'GPP', 'IMC-GAP'];
 
 export default function CreateListing() {
   const navigate = useNavigate();
