@@ -27,6 +27,17 @@ const zohoFileCache = new Map<string, { data: Buffer; contentType: string; expir
 
 app.get('/api/zoho-files/:zohoProductId/:fileId', async (req, res) => {
   const { zohoProductId, fileId } = req.params;
+
+  // Validate that this product exists in our database (prevents using our
+  // server as an open proxy to download arbitrary Zoho files)
+  const product = await prisma.product.findUnique({
+    where: { zohoProductId },
+    select: { id: true },
+  });
+  if (!product) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+
   const cacheKey = `${zohoProductId}:${fileId}`;
 
   // Check in-memory cache (1 hour TTL)
