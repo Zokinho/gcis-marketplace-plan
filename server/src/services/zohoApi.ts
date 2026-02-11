@@ -65,11 +65,12 @@ export async function fetchMarketplaceContacts(): Promise<any[]> {
   let page = 1;
   let hasMore = true;
 
+  // Fetch all contacts and filter for those with a User_UID (marketplace users).
+  // Zoho v7 search doesn't support "is_not_empty" operator.
   while (hasMore) {
     try {
-      const response = await zohoRequest('GET', '/Contacts/search', {
+      const response = await zohoRequest('GET', '/Contacts', {
         params: {
-          criteria: '(User_UID:is_not_empty:true)',
           fields: CONTACT_FIELDS,
           page,
           per_page: 200,
@@ -77,7 +78,10 @@ export async function fetchMarketplaceContacts(): Promise<any[]> {
       });
 
       const contacts = response?.data || [];
-      allContacts.push(...contacts);
+      // Only include contacts that have a Clerk User_UID
+      for (const c of contacts) {
+        if (c.User_UID) allContacts.push(c);
+      }
       hasMore = response?.info?.more_records || false;
       page++;
     } catch (err: any) {
@@ -500,7 +504,8 @@ export async function fetchProductsModifiedSince(since: Date): Promise<any[]> {
   let page = 1;
   let hasMore = true;
 
-  const sinceStr = since.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  // Zoho v7 search expects datetime as yyyy-MM-ddTHH:mm:ss+HH:mm
+  const sinceStr = since.toISOString().replace(/\.\d+Z$/, '+00:00');
 
   while (hasMore) {
     try {
