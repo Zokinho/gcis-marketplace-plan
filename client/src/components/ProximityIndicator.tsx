@@ -1,61 +1,43 @@
 /**
  * Live proximity score indicator.
- * Shows how close the bid price is to the seller's asking price.
+ * Shows a simple text hint about the bid strength.
  */
 export default function ProximityIndicator({ bidPrice, sellerPrice }: { bidPrice: number; sellerPrice: number | null }) {
   if (!sellerPrice || sellerPrice <= 0 || !bidPrice || bidPrice <= 0) {
     return (
       <div className="rounded-lg border bg-gray-50 p-3 text-center text-sm text-gray-400">
-        Enter a price to see proximity score
+        Enter a price to see bid strength
       </div>
     );
   }
 
   const ratio = bidPrice / sellerPrice;
-  let score: number;
   let label: string;
   let colorClass: string;
-  let barColor: string;
+  let icon: string;
 
-  if (ratio >= 1.0) {
-    score = 100;
-    label = 'Strong offer';
-    colorClass = 'text-green-700';
-    barColor = 'bg-green-500';
-  } else if (ratio >= 0.9) {
-    score = 90;
-    label = 'Strong offer';
-    colorClass = 'text-green-700';
-    barColor = 'bg-green-500';
+  if (ratio >= 0.9) {
+    label = 'This is a strong offer';
+    colorClass = 'text-green-700 bg-green-50 border-green-200';
+    icon = '✓';
   } else if (ratio >= 0.8) {
-    score = 75;
-    label = 'Competitive';
-    colorClass = 'text-yellow-600';
-    barColor = 'bg-yellow-400';
+    label = 'Competitive offer';
+    colorClass = 'text-yellow-700 bg-yellow-50 border-yellow-200';
+    icon = '~';
   } else if (ratio >= 0.7) {
-    score = 60;
-    label = 'Below market';
-    colorClass = 'text-orange-600';
-    barColor = 'bg-orange-400';
+    label = 'Your offer may be too low';
+    colorClass = 'text-orange-700 bg-orange-50 border-orange-200';
+    icon = '!';
   } else {
-    score = Math.max(10, Math.round(ratio * 100));
-    label = 'Significantly below asking';
-    colorClass = 'text-red-600';
-    barColor = 'bg-red-400';
+    label = 'Your offer is unlikely to be accepted';
+    colorClass = 'text-red-700 bg-red-50 border-red-200';
+    icon = '✗';
   }
 
   return (
-    <div className="rounded-lg border bg-gray-50 p-3">
-      <div className="mb-1 flex items-center justify-between">
-        <span className={`text-sm font-semibold ${colorClass}`}>{label}</span>
-        <span className={`text-sm font-bold ${colorClass}`}>{score}%</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-gray-200">
-        <div
-          className={`h-full rounded-full transition-all duration-300 ${barColor}`}
-          style={{ width: `${score}%` }}
-        />
-      </div>
+    <div className={`rounded-lg border p-3 text-center text-sm font-medium ${colorClass}`}>
+      <span className="mr-1.5 inline-block font-bold">{icon}</span>
+      {label}
     </div>
   );
 }
