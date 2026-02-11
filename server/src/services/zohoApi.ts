@@ -526,6 +526,39 @@ export async function fetchProductsModifiedSince(since: Date): Promise<any[]> {
   return allProducts;
 }
 
+// ─── Deleted Products ───
+
+/**
+ * Fetch product IDs deleted from Zoho since a given timestamp.
+ */
+export async function fetchDeletedProductIds(since: Date): Promise<string[]> {
+  const ids: string[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    try {
+      const response = await zohoRequest('GET', '/Products/deleted', {
+        params: { type: 'all', page, per_page: 200 },
+      });
+
+      const records = response?.data || [];
+      for (const r of records) {
+        if (new Date(r.deleted_time) >= since) {
+          ids.push(r.id);
+        }
+      }
+      hasMore = response?.info?.more_records || false;
+      page++;
+    } catch (err: any) {
+      if (err?.response?.status === 204) break;
+      throw err;
+    }
+  }
+
+  return ids;
+}
+
 // ─── Product File URLs ───
 
 /**

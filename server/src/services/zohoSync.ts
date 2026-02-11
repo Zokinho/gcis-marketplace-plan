@@ -5,6 +5,7 @@ import {
   fetchMarketplaceContacts,
   fetchProductsModifiedSince,
   fetchProductFileUrls,
+  fetchDeletedProductIds,
 } from './zohoApi';
 
 // ─── Seller resolution cache ───
@@ -248,16 +249,56 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
       }
     }
 
+    // Remove products deleted from Zoho since last sync
+    let removed = 0;
+    try {
+      const deletedIds = await fetchDeletedProductIds(lastSync.createdAt);
+      if (deletedIds.length > 0) {
+        // Only delete products that have no bids (preserve history)
+        const productsWithBids = await prisma.bid.findMany({
+          where: { product: { zohoProductId: { in: deletedIds } } },
+          select: { productId: true },
+          distinct: ['productId'],
+        });
+        const productIdsWithBids = new Set(productsWithBids.map(b => b.productId));
+
+        // Products with bids: just deactivate
+        if (productIdsWithBids.size > 0) {
+          await prisma.product.updateMany({
+            where: { id: { in: [...productIdsWithBids] } },
+            data: { isActive: false, lastSyncedAt: new Date() },
+          });
+        }
+
+        // Products without bids: delete entirely
+        const result = await prisma.product.deleteMany({
+          where: {
+            zohoProductId: { in: deletedIds },
+            id: { notIn: [...productIdsWithBids] },
+          },
+        });
+        removed = result.count;
+        if (removed > 0) {
+          console.log(`[SYNC] Removed ${removed} products deleted from Zoho`);
+        }
+        if (productIdsWithBids.size > 0) {
+          console.log(`[SYNC] Deactivated ${productIdsWithBids.size} deleted products (have bids, preserving history)`);
+        }
+      }
+    } catch (err: any) {
+      console.error('[SYNC] Deleted products check failed (non-critical):', err?.message);
+    }
+
     await prisma.syncLog.create({
       data: {
         type: 'products-delta',
         status: errors > 0 ? 'partial' : 'success',
         recordCount: synced,
-        details: { synced, skipped, errors, total: products.length, mode: 'delta', since: lastSync.createdAt.toISOString() },
+        details: { synced, skipped, errors, removed, total: products.length, mode: 'delta', since: lastSync.createdAt.toISOString() },
       },
     });
 
-    console.log(`[SYNC] Delta sync complete: ${synced} synced, ${skipped} skipped, ${errors} errors`);
+    console.log(`[SYNC] Delta sync complete: ${synced} synced, ${skipped} skipped, ${errors} errors, ${removed} removed`);
   } catch (err: any) {
     console.error('[SYNC] Delta sync failed, falling back to full sync:', err?.message);
     const result = await syncProducts();
