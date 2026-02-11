@@ -1,0 +1,9 @@
+node_modules
+server/node_modules
+server/dist
+client/node_modules
+client/dist
+.git
+.env
+uploads
+*.log

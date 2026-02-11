@@ -11,6 +11,42 @@ services:
       - "5434:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gcis -d gcis_marketplace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: gcis-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Override DATABASE_URL to use internal Docker hostname
+      DATABASE_URL: postgresql://gcis:gcis_dev_pass@postgres:5432/gcis_marketplace
+    volumes:
+      - ./uploads:/app/uploads
+    expose:
+      - "3001"
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      args:
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+    container_name: gcis-client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "80:80"
 
 volumes:
   postgres-data:
