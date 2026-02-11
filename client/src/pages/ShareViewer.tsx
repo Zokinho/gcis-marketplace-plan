@@ -122,12 +122,6 @@ export default function ShareViewer() {
                       <span className="font-medium text-gray-700">{product.cbdMax}%</span>
                     </div>
                   )}
-                  {product.pricePerUnit != null && (
-                    <div>
-                      <span className="text-gray-400">Price:</span>{' '}
-                      <span className="font-medium text-gray-700">${product.pricePerUnit.toFixed(2)}/g</span>
-                    </div>
-                  )}
                   {product.gramsAvailable != null && (
                     <div>
                       <span className="text-gray-400">Available:</span>{' '}

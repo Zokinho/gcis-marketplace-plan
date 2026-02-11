@@ -145,9 +145,6 @@ export default function SharedProductDetail() {
                 {product.cbdMax != null && (
                   <Spec label="CBD" value={formatRange(product.cbdMin, product.cbdMax, '%')} />
                 )}
-                {product.pricePerUnit != null && (
-                  <Spec label="Price" value={`$${product.pricePerUnit.toFixed(2)}/g`} />
-                )}
                 {product.gramsAvailable != null && (
                   <Spec label="Available" value={`${product.gramsAvailable.toLocaleString()}g`} />
                 )}
