@@ -11,7 +11,7 @@ export default function Marketplace() {
   const [filters, setFilters] = useState<ProductFilters>({ page: 1, limit: 20 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [view, setView] = useState<'grid' | 'grid-lg' | 'list'>('grid-lg');
 
   const loadProducts = useCallback(async (f: ProductFilters) => {
     setLoading(true);
@@ -63,6 +63,17 @@ export default function Marketplace() {
           <div className="mb-4 flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
             {/* View toggle */}
             <div className="flex rounded-lg border border-gray-200 p-0.5">
+              {/* Large grid (2 cols) */}
+              <button
+                onClick={() => setView('grid-lg')}
+                className={`rounded-md p-1.5 transition ${view === 'grid-lg' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                aria-label="Large grid view"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h4.5A2.25 2.25 0 0 1 12.75 6v4.5a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 13.5a2.25 2.25 0 0 1 2.25-2.25H20.25A2.25 2.25 0 0 1 22.5 13.5V18a2.25 2.25 0 0 1-2.25 2.25h-4.5A2.25 2.25 0 0 1 13.5 18v-4.5Z" />
+                </svg>
+              </button>
+              {/* Compact grid (3 cols) */}
               <button
                 onClick={() => setView('grid')}
                 className={`rounded-md p-1.5 transition ${view === 'grid' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-gray-600'}`}
@@ -72,6 +83,7 @@ export default function Marketplace() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
                 </svg>
               </button>
+              {/* List view */}
               <button
                 onClick={() => setView('list')}
                 className={`rounded-md p-1.5 transition ${view === 'list' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-gray-600'}`}
@@ -138,7 +150,13 @@ export default function Marketplace() {
 
           {/* Product grid / list */}
           {!loading && !error && products.length > 0 && (
-            view === 'grid' ? (
+            view === 'grid-lg' ? (
+              <div className="grid gap-6 sm:grid-cols-2">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            ) : view === 'grid' ? (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {products.map((product) => (
                   <ProductCard key={product.id} product={product} />
