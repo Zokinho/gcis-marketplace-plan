@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { getAuth } from '@clerk/express';
 import { prisma } from '../index';
 
 const router = Router();
@@ -26,7 +27,7 @@ function getUserStatusCode(user: {
  * Requires Clerk authentication (userId injected by requireAuth).
  */
 router.get('/status', async (req: Request, res: Response) => {
-  const clerkUserId = (req as any).auth?.userId;
+  const { userId: clerkUserId } = getAuth(req);
 
   if (!clerkUserId) {
     return res.status(401).json({ error: 'Not authenticated' });

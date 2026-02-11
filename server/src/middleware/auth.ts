@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { requireAuth } from '@clerk/express';
+import { requireAuth, getAuth } from '@clerk/express';
 import { prisma } from '../index';
 
 // Extend Express Request to include user
@@ -28,7 +28,7 @@ declare global {
  * Checks: Clerk JWT → local user → Zoho link → approved → EULA → doc uploaded
  */
 export async function marketplaceAuth(req: Request, res: Response, next: NextFunction) {
-  const clerkUserId = (req as any).auth?.userId;
+  const { userId: clerkUserId } = getAuth(req);
 
   if (!clerkUserId) {
     return res.status(401).json({ error: 'Not authenticated', code: 'NOT_AUTHENTICATED' });

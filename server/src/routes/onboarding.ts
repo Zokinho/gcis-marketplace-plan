@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { getAuth } from '@clerk/express';
 import { prisma } from '../index';
 import { pushOnboardingMilestone } from '../services/zohoApi';
 
@@ -9,7 +10,7 @@ const router = Router();
  * Records that the user accepted the EULA.
  */
 router.post('/accept-eula', async (req: Request, res: Response) => {
-  const clerkUserId = (req as any).auth?.userId;
+  const { userId: clerkUserId } = getAuth(req);
 
   if (!clerkUserId) {
     return res.status(401).json({ error: 'Not authenticated' });
@@ -56,7 +57,7 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
  * For now, we just mark the flag — file upload integration comes in Phase 4.
  */
 router.post('/upload-doc', async (req: Request, res: Response) => {
-  const clerkUserId = (req as any).auth?.userId;
+  const { userId: clerkUserId } = getAuth(req);
 
   if (!clerkUserId) {
     return res.status(401).json({ error: 'Not authenticated' });
