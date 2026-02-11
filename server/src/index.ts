@@ -5,6 +5,7 @@ config({ path: path.resolve(__dirname, '../../.env') });
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 
 const app = express();
@@ -82,6 +83,44 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+// ─── Rate limiters ───
+
+// General API: 100 requests per minute per IP
+const apiLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+// Write operations (bids, listings): 20 per minute per IP
+const writeLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please slow down' },
+});
+
+// Auth/onboarding: 30 per minute per IP
+const authLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+// Public share endpoints: 60 per minute per IP
+const publicLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
 // ─── Import routes (lazy to avoid circular deps with prisma export) ───
 async function mountRoutes() {
   const { requireAuth } = await import('@clerk/express');
@@ -101,36 +140,36 @@ async function mountRoutes() {
   app.use('/api/webhooks', webhookRoutes);
 
   // User status — requires Clerk auth only (no marketplace approval check)
-  app.use('/api/user', requireAuth(), userRoutes);
+  app.use('/api/user', authLimiter, requireAuth(), userRoutes);
 
   // Onboarding — requires Clerk auth only (user may not be fully approved yet)
-  app.use('/api/onboarding', requireAuth(), onboardingRoutes);
+  app.use('/api/onboarding', authLimiter, requireAuth(), onboardingRoutes);
 
   // Admin — requires Clerk auth + marketplace auth + admin check
-  app.use('/api/admin', requireAuth(), marketplaceAuth, requireAdmin, adminRoutes);
+  app.use('/api/admin', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, adminRoutes);
 
   // CoA upload — requires Clerk auth + marketplace auth
-  app.use('/api/coa', requireAuth(), marketplaceAuth, coaRoutes);
+  app.use('/api/coa', writeLimiter, requireAuth(), marketplaceAuth, coaRoutes);
 
   // Shares admin — requires Clerk auth + marketplace auth + admin check
-  app.use('/api/shares', requireAuth(), marketplaceAuth, requireAdmin, shareRoutes);
+  app.use('/api/shares', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, shareRoutes);
 
   // Public share endpoints — NO auth (token-based access)
-  app.use('/api/shares/public', publicShareRouter);
+  app.use('/api/shares/public', publicLimiter, publicShareRouter);
 
   // Protected marketplace routes — requires full approval chain
-  app.use('/api/marketplace', requireAuth(), marketplaceAuth, marketplaceRoutes);
+  app.use('/api/marketplace', apiLimiter, requireAuth(), marketplaceAuth, marketplaceRoutes);
 
-  app.use('/api/bids', requireAuth(), marketplaceAuth, bidRoutes);
+  app.use('/api/bids', writeLimiter, requireAuth(), marketplaceAuth, bidRoutes);
 
-  app.use('/api/my-listings', requireAuth(), marketplaceAuth, requireSeller, myListingsRoutes);
+  app.use('/api/my-listings', writeLimiter, requireAuth(), marketplaceAuth, requireSeller, myListingsRoutes);
 
   // Intelligence routes (admin)
   const { adminRouter: intelAdminRoutes, buyerMatchRouter } = await import('./routes/intelligence');
-  app.use('/api/intelligence', requireAuth(), marketplaceAuth, requireAdmin, intelAdminRoutes);
+  app.use('/api/intelligence', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, intelAdminRoutes);
 
   // Buyer-facing match routes
-  app.use('/api/matches', requireAuth(), marketplaceAuth, buyerMatchRouter);
+  app.use('/api/matches', apiLimiter, requireAuth(), marketplaceAuth, buyerMatchRouter);
 }
 
 // ─── Intelligence cron scheduler ───
