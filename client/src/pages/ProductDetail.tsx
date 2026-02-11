@@ -4,7 +4,7 @@ import Layout from '../components/Layout';
 import BidForm from '../components/BidForm';
 import CoaUpload from '../components/CoaUpload';
 import TestResultsDisplay from '../components/TestResultsDisplay';
-import { fetchProductById, fetchMarketContext, type ProductDetail as ProductDetailType, type MarketContextData } from '../lib/api';
+import { fetchProductById, type ProductDetail as ProductDetailType } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -27,7 +27,6 @@ export default function ProductDetail() {
   const [canViewCoa, setCanViewCoa] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [marketCtx, setMarketCtx] = useState<MarketContextData | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
   const { data: userStatus } = useUserStatus();
   const isSeller = userStatus?.user?.contactType?.includes('Seller') ?? false;
@@ -39,9 +38,6 @@ export default function ProductDetail() {
       .then((p) => {
         setCanViewCoa(p.canViewCoa);
         setProduct(p);
-        if (p.category) {
-          fetchMarketContext(p.category).then(setMarketCtx).catch(() => {});
-        }
       })
       .catch((err) => setError(err?.response?.data?.error || 'Product not found'))
       .finally(() => setLoading(false));
