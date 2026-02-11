@@ -196,6 +196,7 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
       matchCount: true,
       createdAt: true,
       updatedAt: true,
+      sellerId: true,
       seller: {
         select: {
           avgFulfillmentScore: true,
@@ -208,7 +209,27 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  res.json({ product });
+  // CoA visibility: only product owner or admins can see CoA data
+  const isOwner = req.user?.id === product.sellerId;
+  const isSeller = req.user?.contactType?.includes('Seller') ?? false;
+  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const isAdminEmail = req.user?.email ? adminEmails.includes(req.user.email.toLowerCase()) : false;
+  const canViewCoa = isOwner || isSeller || isAdminEmail;
+
+  const { sellerId, ...productData } = product;
+
+  if (!canViewCoa) {
+    productData.coaUrls = [];
+    productData.coaPdfUrl = null;
+    productData.labName = null;
+    productData.testDate = null;
+    productData.reportNumber = null;
+    productData.testResults = null;
+    productData.coaJobId = null;
+    productData.coaProcessedAt = null;
+  }
+
+  res.json({ product: productData, canViewCoa });
 });
 
 /**

@@ -23,6 +23,7 @@ const CERT_COLORS: Record<string, string> = {
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<ProductDetailType | null>(null);
+  const [canViewCoa, setCanViewCoa] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [marketCtx, setMarketCtx] = useState<MarketContextData | null>(null);
@@ -35,6 +36,7 @@ export default function ProductDetail() {
     setLoading(true);
     fetchProductById(id)
       .then((p) => {
+        setCanViewCoa(p.canViewCoa);
         setProduct(p);
         if (p.category) {
           fetchMarketContext(p.category).then(setMarketCtx).catch(() => {});
@@ -244,8 +246,8 @@ export default function ProductDetail() {
             </div>
           )}
 
-          {/* CoA downloads */}
-          {product.coaUrls.length > 0 && (
+          {/* CoA downloads — restricted to product owner / admins */}
+          {canViewCoa && product.coaUrls.length > 0 && (
             <div className="rounded-lg border bg-white p-6">
               <h2 className="mb-3 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Certificates of Analysis</h2>
               <div className="flex flex-wrap gap-2">
@@ -267,8 +269,8 @@ export default function ProductDetail() {
             </div>
           )}
 
-          {/* CoA Test Results (from AI extraction) */}
-          {product.testResults && (
+          {/* CoA Test Results (from AI extraction) — restricted to product owner / admins */}
+          {canViewCoa && product.testResults && (
             <div className="rounded-lg border bg-white p-6">
               <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">CoA Data</h2>
               {product.coaPdfUrl && (
@@ -293,8 +295,20 @@ export default function ProductDetail() {
             </div>
           )}
 
+          {/* Restricted notice for buyers */}
+          {!canViewCoa && (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6">
+              <div className="flex items-center gap-3 text-gray-400">
+                <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+                <p className="text-sm">Certificate of Analysis documents are available to product owners and administrators.</p>
+              </div>
+            </div>
+          )}
+
           {/* CoA Upload for sellers viewing their own product */}
-          {isSeller && !product.testResults && (
+          {canViewCoa && isSeller && !product.testResults && (
             <div className="rounded-lg border bg-white p-6">
               <h2 className="mb-4 border-l-2 border-brand-sage pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Upload CoA</h2>
               <p className="mb-4 text-sm text-gray-500">

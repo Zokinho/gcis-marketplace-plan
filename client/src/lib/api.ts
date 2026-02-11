@@ -145,9 +145,9 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<{ pro
   return res.data;
 }
 
-export async function fetchProductById(id: string): Promise<ProductDetail> {
+export async function fetchProductById(id: string): Promise<ProductDetail & { canViewCoa: boolean }> {
   const res = await api.get(`/marketplace/products/${id}`);
-  return res.data.product;
+  return { ...res.data.product, canViewCoa: res.data.canViewCoa ?? true };
 }
 
 export async function fetchFilterOptions(): Promise<FilterOptions> {
