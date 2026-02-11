@@ -15,7 +15,7 @@ const CERT_COLORS: Record<string, string> = {
   'IMC-GAP': 'bg-amber-100 text-amber-700',
 };
 
-export default function ProductCard({ product }: { product: ProductCardType }) {
+export default function ProductCard({ product, large }: { product: ProductCardType; large?: boolean }) {
   const available = (product.gramsAvailable ?? 0) > 0;
   const upcoming = (product.upcomingQty ?? 0) > 0;
 
@@ -25,7 +25,7 @@ export default function ProductCard({ product }: { product: ProductCardType }) {
       className="group flex flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-sage/60"
     >
       {/* Image */}
-      <div className="flex h-40 items-center justify-center bg-gradient-to-br from-brand-sage/10 to-brand-gray/40">
+      <div className={`flex items-center justify-center bg-gradient-to-br from-brand-sage/10 to-brand-gray/40 ${large ? 'h-72' : 'h-40'}`}>
         {product.imageUrls?.[0] ? (
           <img src={product.imageUrls[0]} alt={product.name} className="h-full w-full object-cover" />
         ) : (

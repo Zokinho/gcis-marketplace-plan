@@ -153,7 +153,7 @@ export default function Marketplace() {
             view === 'grid-lg' ? (
               <div className="grid gap-6 sm:grid-cols-2">
                 {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard key={product.id} product={product} large />
                 ))}
               </div>
             ) : view === 'grid' ? (
