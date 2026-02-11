@@ -175,6 +175,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
   const [upcoming, setUpcoming] = useState(String(listing.upcomingQty ?? ''));
   const [minQty, setMinQty] = useState(String(listing.minQtyRequest ?? ''));
   const [desc, setDesc] = useState(listing.description ?? '');
+  const [cert, setCert] = useState(listing.certification ?? '');
 
   function resetFields() {
     setPrice(String(listing.pricePerUnit ?? ''));
@@ -182,6 +183,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     setUpcoming(String(listing.upcomingQty ?? ''));
     setMinQty(String(listing.minQtyRequest ?? ''));
     setDesc(listing.description ?? '');
+    setCert(listing.certification ?? '');
     setEditError(null);
   }
 
@@ -200,6 +202,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       if (!isNaN(newUpcoming) && newUpcoming !== listing.upcomingQty) updates.upcomingQty = newUpcoming;
       if (!isNaN(newMinQty) && newMinQty !== listing.minQtyRequest) updates.minQtyRequest = newMinQty;
       if (desc.trim() !== (listing.description ?? '')) updates.description = desc.trim();
+      if (cert !== (listing.certification ?? '')) updates.certification = cert;
 
       if (Object.keys(updates).length === 0) {
         setEditing(false);
@@ -352,6 +355,19 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 <EditField label="Available (g)" value={grams} onChange={setGrams} step="1" />
                 <EditField label="Upcoming (g)" value={upcoming} onChange={setUpcoming} step="1" />
                 <EditField label="Min QTY (g)" value={minQty} onChange={setMinQty} step="1" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Certification</label>
+                <select
+                  value={cert}
+                  onChange={(e) => setCert(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
+                >
+                  <option value="">None</option>
+                  {['GACP', 'GMP1', 'GMP2', 'GPP', 'IMC-GAP'].map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-500">Description</label>
