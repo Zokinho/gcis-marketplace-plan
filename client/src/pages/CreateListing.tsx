@@ -3,7 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { createListing } from '../lib/api';
 
-const CATEGORIES = ['Flower', 'Oil', 'Pre-Roll', 'Edible', 'Extract', 'Topical', 'Other'];
+const CATEGORIES = [
+  'Cannabis flowers (mix sizes)',
+  'Cannabis flowers (smalls only)',
+  'Cannabis flowers (fresh frozen)',
+  'Cannabis flowers (outdoor grown)',
+  'Milled Flower',
+  'Cannabis trimmings',
+  'Cannabis kief',
+  'Cannabis hash',
+  'Cannabis cured rosins and cured resins',
+  'Cannabis hashish',
+  'Cannabis live rosin and live resin',
+  'Cannabinoid isolates',
+  'Cannabinoid distillates',
+  "Cannabis crude oils ('resins')",
+  'Genetics',
+  'Chocolates',
+  'Gummies',
+  'Edibles (others)',
+];
 const TYPES = ['Sativa', 'Indica', 'Hybrid'];
 const CERTIFICATIONS = ['GACP', 'GMP1', 'GMP2', 'GPP'];
 
