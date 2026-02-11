@@ -12,6 +12,7 @@ const CERT_COLORS: Record<string, string> = {
   GMP1: 'bg-brand-sage/20 text-brand-teal',
   GMP2: 'bg-brand-sage/20 text-brand-teal',
   GPP: 'bg-cyan-100 text-cyan-700',
+  'IMC-GAP': 'bg-amber-100 text-amber-700',
 };
 
 export default function ProductListItem({ product }: { product: ProductCard }) {
