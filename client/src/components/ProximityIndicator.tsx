@@ -56,9 +56,6 @@ export default function ProximityIndicator({ bidPrice, sellerPrice }: { bidPrice
           style={{ width: `${score}%` }}
         />
       </div>
-      <p className="mt-1 text-xs text-gray-400">
-        Asking price: ${sellerPrice.toFixed(2)}/g
-      </p>
     </div>
   );
 }

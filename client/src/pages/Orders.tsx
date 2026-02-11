@@ -387,9 +387,6 @@ function BidCard({ bid }: { bid: BidRecord }) {
             <Stat label="Your Bid" value={`$${bid.pricePerUnit.toFixed(2)}/g`} />
             <Stat label="Qty" value={`${bid.quantity.toLocaleString()}g`} />
             <Stat label="Total" value={`$${bid.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-            {bid.product.pricePerUnit != null && (
-              <Stat label="Asking" value={`$${bid.product.pricePerUnit.toFixed(2)}/g`} />
-            )}
             {bid.proximityScore != null && (
               <span className="text-gray-500">
                 <span className="font-medium text-gray-400">Match:</span>{' '}
