@@ -14,6 +14,7 @@ export default function SharedProductDetail() {
   const [product, setProduct] = useState<SharedProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState(0);
 
   useEffect(() => {
     if (!token || !id) return;
@@ -74,6 +75,34 @@ export default function SharedProductDetail() {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left: Product info */}
           <div className="space-y-6 lg:col-span-2">
+            {/* Image Gallery */}
+            {product.imageUrls && product.imageUrls.length > 0 && (
+              <div className="rounded-xl border bg-white p-4">
+                <div className="mb-3 flex items-center justify-center overflow-hidden rounded-lg bg-gray-50" style={{ minHeight: '320px' }}>
+                  <img
+                    src={product.imageUrls[selectedImage]}
+                    alt={`${product.name} — image ${selectedImage + 1}`}
+                    className="max-h-[480px] w-full object-contain"
+                  />
+                </div>
+                {product.imageUrls.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto">
+                    {product.imageUrls.map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedImage(i)}
+                        className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 transition ${
+                          i === selectedImage ? 'border-brand-teal' : 'border-transparent hover:border-gray-300'
+                        }`}
+                      >
+                        <img src={url} alt={`Thumbnail ${i + 1}`} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Header card */}
             <div className="rounded-xl border bg-white p-6">
               <div className="mb-3 flex flex-wrap gap-2">

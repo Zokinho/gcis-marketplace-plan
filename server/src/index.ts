@@ -22,6 +22,45 @@ app.use(express.json());
 // ─── Static file serving for uploads ───
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
+// ─── Zoho file proxy (serves authenticated Zoho file downloads) ───
+const zohoFileCache = new Map<string, { data: Buffer; contentType: string; expires: number }>();
+
+app.get('/api/zoho-files/:zohoProductId/:fileId', async (req, res) => {
+  const { zohoProductId, fileId } = req.params;
+  const cacheKey = `${zohoProductId}:${fileId}`;
+
+  // Check in-memory cache (1 hour TTL)
+  const cached = zohoFileCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) {
+    res.set('Content-Type', cached.contentType);
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.send(cached.data);
+  }
+
+  try {
+    const { downloadZohoFile } = await import('./services/zohoApi');
+    const { data, contentType, fileName } = await downloadZohoFile(zohoProductId, fileId);
+
+    // Cache for 1 hour
+    zohoFileCache.set(cacheKey, { data, contentType, expires: Date.now() + 3600_000 });
+
+    // Evict old entries if cache grows too large
+    if (zohoFileCache.size > 200) {
+      const now = Date.now();
+      for (const [k, v] of zohoFileCache) {
+        if (v.expires < now) zohoFileCache.delete(k);
+      }
+    }
+
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(data);
+  } catch (err: any) {
+    console.error(`[ZOHO-FILES] Download failed for ${zohoProductId}/${fileId}:`, err?.message);
+    res.status(502).json({ error: 'Failed to fetch file from Zoho' });
+  }
+});
+
 // ─── Health check (public) ───
 app.get('/api/health', async (_req, res) => {
   try {

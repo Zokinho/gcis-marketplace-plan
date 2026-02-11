@@ -562,6 +562,30 @@ export async function fetchDeletedProductIds(since: Date): Promise<string[]> {
 // ─── Product File URLs ───
 
 /**
+ * Extract proxy URLs from a Zoho file upload field value.
+ * Zoho returns an array of objects: [{ id, File_Id__s, File_Name__s, ... }]
+ * We construct proxy URLs: /api/zoho-files/{zohoProductId}/{fileId}
+ */
+function extractFileUrls(fieldValue: any, zohoProductId: string): string[] {
+  if (!fieldValue) return [];
+
+  // Zoho file upload fields return arrays of file objects
+  const items = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
+  const urls: string[] = [];
+
+  for (const item of items) {
+    if (typeof item === 'string') {
+      urls.push(item);
+    } else if (item?.id) {
+      // Use record-level attachment id for download_fields_attachment API
+      urls.push(`/api/zoho-files/${zohoProductId}/${item.id}`);
+    }
+  }
+
+  return urls;
+}
+
+/**
  * Fetch image and CoA file URLs for a Zoho product.
  * Looks at Image_1 through Image_4 and CoAs/CoAs_2 file fields.
  */
@@ -582,32 +606,40 @@ export async function fetchProductFileUrls(
 
   const imageUrls: string[] = [];
   for (const field of imageFields) {
-    if (record[field]) {
-      // File fields contain download URLs or file IDs
-      const fileInfo = record[field];
-      if (typeof fileInfo === 'string') {
-        imageUrls.push(fileInfo);
-      } else if (fileInfo?.url) {
-        imageUrls.push(fileInfo.url);
-      } else if (fileInfo?.id) {
-        imageUrls.push(`/Products/${zohoProductId}/files/${fileInfo.id}`);
-      }
-    }
+    imageUrls.push(...extractFileUrls(record[field], zohoProductId));
   }
 
   const coaUrls: string[] = [];
   for (const field of coaFields) {
-    if (record[field]) {
-      const fileInfo = record[field];
-      if (typeof fileInfo === 'string') {
-        coaUrls.push(fileInfo);
-      } else if (fileInfo?.url) {
-        coaUrls.push(fileInfo.url);
-      } else if (fileInfo?.id) {
-        coaUrls.push(`/Products/${zohoProductId}/files/${fileInfo.id}`);
-      }
-    }
+    coaUrls.push(...extractFileUrls(record[field], zohoProductId));
   }
 
   return { imageUrls, coaUrls };
+}
+
+/**
+ * Download a file from a Zoho file upload field.
+ * Used by the proxy endpoint to stream files to the browser.
+ */
+export async function downloadZohoFile(
+  zohoProductId: string,
+  fileId: string,
+): Promise<{ data: Buffer; contentType: string; fileName: string }> {
+  const token = await getAccessToken();
+
+  const response = await axios.get(
+    `${ZOHO_API_URL}/Products/${zohoProductId}/actions/download_fields_attachment`,
+    {
+      params: { fields_attachment_id: fileId },
+      headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      responseType: 'arraybuffer',
+    },
+  );
+
+  const contentType = response.headers['content-type'] || 'application/octet-stream';
+  const disposition = response.headers['content-disposition'] || '';
+  const fileNameMatch = disposition.match(/filename="?([^";\n]+)"?/);
+  const fileName = fileNameMatch?.[1] || 'file';
+
+  return { data: response.data, contentType, fileName };
 }
