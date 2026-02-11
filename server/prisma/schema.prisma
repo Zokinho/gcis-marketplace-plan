@@ -1,0 +1,366 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users (links Clerk ↔ Zoho) ───
+
+model User {
+  id             String    @id @default(cuid())
+  clerkUserId    String    @unique
+  zohoContactId  String    @unique
+  email          String    @unique
+  firstName      String?
+  lastName       String?
+  companyName    String?
+  title          String?
+  contactType    String? // From Zoho Contact_Type multi-select ("Buyer; Seller")
+  approved       Boolean   @default(false) // From Zoho Account_Confirmed
+  eulaAcceptedAt DateTime?
+  docUploaded    Boolean   @default(false)
+  mailingCountry String?
+  phone          String?
+  lastSyncedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Intelligence fields
+  lastTransactionDate   DateTime?
+  transactionCount      Int       @default(0)
+  totalTransactionValue Float     @default(0)
+  avgFulfillmentScore   Float?    // From SellerScore
+
+  bids     Bid[]
+  products Product[] @relation("SellerProducts")
+
+  // Intelligence relations
+  buyerTransactions  Transaction[]    @relation("BuyerTransactions")
+  sellerTransactions Transaction[]    @relation("SellerTransactions")
+  buyerMatches       Match[]          @relation("BuyerMatches")
+  sellerScore        SellerScore?
+  predictions        Prediction[]
+  churnSignals       ChurnSignal[]
+  propensityScores   PropensityScore[]
+  curatedShares      CuratedShare[]
+}
+
+// ─── Products (synced from Zoho) ───
+
+model Product {
+  id          String  @id @default(cuid())
+  zohoProductId String @unique
+  productCode String?
+
+  // Basic info
+  name             String
+  description      String?
+  category         String? // From Product_Category picklist
+  type             String? // Sativa / Indica / Hybrid
+  licensedProducer String?
+  growthMedium     String?
+  lineage          String?
+  harvestDate      DateTime?
+
+  // Status (from Zoho checkboxes)
+  isActive       Boolean @default(false) // Product_Active
+  requestPending Boolean @default(false) // Request_pending
+
+  // Seller link
+  sellerId String
+  seller   User   @relation("SellerProducts", fields: [sellerId], references: [id])
+
+  // Pricing & inventory (seller-editable)
+  pricePerUnit  Float? // Unit_Price — seller's asking price
+  minQtyRequest Float? // Min_QTY_Request — MOQ
+  gramsAvailable Float? // Grams_Available — current stock
+  upcomingQty   Float? // Upcoming_QTY — future stock
+
+  // Cannabinoids (percentages)
+  thcMin Float?
+  thcMax Float?
+  cbdMin Float?
+  cbdMax Float?
+
+  // Terpenes & aromas
+  dominantTerpene  String? // Terpen field — top 5 terpenes
+  highestTerpenes  String? // Multi-line breakdown
+  aromas           String? // Multi-line scent profile
+
+  // Certification
+  certification String? // GACP, GMP1, GMP2, GPP
+
+  // Bud size distribution (percentages, should sum to ~100%)
+  budSizePopcorn Float? // 0-1 cm
+  budSizeSmall   Float? // 1-2 cm
+  budSizeMedium  Float? // 2-3 cm
+  budSizeLarge   Float? // 3-5 cm
+  budSizeXLarge  Float? // 5 cm+
+
+  // Media URLs (fetched from Zoho file uploads)
+  imageUrls String[]
+  coaUrls   String[]
+
+  // CoA integration fields
+  labName        String?
+  testDate       DateTime?
+  reportNumber   String?
+  coaJobId       String?
+  coaPdfUrl      String?
+  coaProcessedAt DateTime?
+  testResults    Json?
+  source         String   @default("zoho") // "zoho" | "coa_upload" | "coa_email"
+
+  // Intelligence fields
+  matchCount     Int      @default(0)
+
+  // Sync tracking
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  bids         Bid[]
+  transactions Transaction[]
+  matches      Match[]
+}
+
+// ─── Bids ───
+
+model Bid {
+  id             String    @id @default(cuid())
+  zohoTaskId     String?   @unique // Created when bid is placed
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id])
+  buyerId        String
+  buyer          User      @relation(fields: [buyerId], references: [id])
+
+  pricePerUnit   Float // Buyer's offered price per unit
+  quantity       Float
+  totalValue     Float
+  proximityScore Float? // How close to seller's asking price (0-100%)
+  status         BidStatus @default(PENDING)
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transaction Transaction?
+}
+
+enum BidStatus {
+  PENDING
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  COUNTERED
+  EXPIRED
+}
+
+// ─── Transactions (created when bid is accepted) ───
+
+model Transaction {
+  id                      String    @id @default(cuid())
+  buyerId                 String
+  buyer                   User      @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  sellerId                String
+  seller                  User      @relation("SellerTransactions", fields: [sellerId], references: [id])
+  productId               String
+  product                 Product   @relation(fields: [productId], references: [id])
+  bidId                   String?   @unique
+  bid                     Bid?      @relation(fields: [bidId], references: [id])
+  quantity                Float
+  pricePerUnit            Float
+  totalValue              Float
+  transactionDate         DateTime  @default(now())
+  status                  String    @default("pending")  // pending, completed, cancelled
+  // Outcome fields (filled after delivery)
+  actualQuantityDelivered Float?
+  deliveryOnTime          Boolean?
+  qualityAsExpected       Boolean?
+  outcomeNotes            String?
+  outcomeRecordedAt       DateTime?
+  // Tracking
+  zohoTaskId              String?   @unique
+  zohoDealId              String?   @unique
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+// ─── Matches (auto-generated buyer-product suggestions) ───
+
+model Match {
+  id             String    @id @default(cuid())
+  buyerId        String
+  buyer          User      @relation("BuyerMatches", fields: [buyerId], references: [id])
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id])
+  score          Float     // 0-100 composite score
+  breakdown      Json      // {category, priceFit, location, relationship, reorderTiming, ...}
+  insights       Json?     // Human-readable insight strings
+  status         String    @default("pending")  // pending, viewed, converted, rejected, expired
+  convertedBidId String?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([buyerId, productId])
+}
+
+// ─── Seller Scores ───
+
+model SellerScore {
+  id                  String   @id @default(cuid())
+  sellerId            String   @unique
+  seller              User     @relation(fields: [sellerId], references: [id])
+  fillRate            Float    @default(0)     // 0-100, weight 30%
+  qualityScore        Float    @default(0)     // 0-100, weight 30%
+  deliveryScore       Float    @default(0)     // 0-100, weight 25%
+  pricingScore        Float    @default(0)     // 0-100, weight 15%
+  overallScore        Float    @default(0)     // Weighted composite
+  transactionsScored  Int      @default(0)
+  lastCalculatedAt    DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ─── Predictions (reorder forecasts) ───
+
+model Prediction {
+  id                    String    @id @default(cuid())
+  buyerId               String
+  buyer                 User      @relation(fields: [buyerId], references: [id])
+  categoryName          String    // Product category string
+  predictedDate         DateTime
+  confidenceScore       Float     // 0-100
+  avgIntervalDays       Float
+  basedOnTransactions   Int
+  lastTransactionId     String?
+  notifiedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([buyerId, categoryName])
+}
+
+// ─── Churn Signals ───
+
+model ChurnSignal {
+  id                String    @id @default(cuid())
+  buyerId           String
+  buyer             User      @relation(fields: [buyerId], references: [id])
+  categoryName      String?
+  riskLevel         String    // low, medium, high, critical
+  riskScore         Float     // 0-100
+  daysSincePurchase Int
+  avgIntervalDays   Float
+  isActive          Boolean   @default(true)
+  resolvedAt        DateTime?
+  resolvedReason    String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// ─── Propensity Scores ───
+
+model PropensityScore {
+  id                String    @id @default(cuid())
+  buyerId           String
+  buyer             User      @relation(fields: [buyerId], references: [id])
+  categoryName      String    @default("_all")
+  overallScore      Float     // 0-100 composite
+  recencyScore      Float     // 0-100, weight 25%
+  frequencyScore    Float     // 0-100, weight 20%
+  monetaryScore     Float     // 0-100, weight 15%
+  categoryAffinity  Float     // 0-100, weight 15%
+  engagementScore   Float     // 0-100, weight 25%
+  features          Json?     // Input features for explainability
+  expiresAt         DateTime  // Cache expiration (24hr)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([buyerId, categoryName])
+}
+
+// ─── Market Prices ───
+
+model MarketPrice {
+  id                  String    @id @default(cuid())
+  categoryName        String    // Product category string
+  avgPrice            Float
+  minPrice            Float
+  maxPrice            Float
+  transactionCount    Int
+  totalVolume         Float
+  rollingAvg7d        Float?
+  rollingAvg30d       Float?
+  priceChange7d       Float?    // Percentage
+  priceChange30d      Float?    // Percentage
+  periodStart         DateTime
+  periodEnd           DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([categoryName, periodStart])
+}
+
+// ─── Categories ───
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Sync Log (audit trail) ───
+
+model SyncLog {
+  id          String   @id @default(cuid())
+  type        String // "products", "contacts", "inventory"
+  status      String // "success", "error"
+  recordCount Int?
+  details     Json?
+  createdAt   DateTime @default(now())
+}
+
+// ─── CoA Sync Records (tracks CoA→Marketplace pipeline) ───
+
+model CoaSyncRecord {
+  id                   String   @id @default(cuid())
+  coaJobId             String   @unique
+  coaProductId         String?
+  emailIngestionId     String?
+  marketplaceProductId String?
+  status               String   @default("pending") // "pending" | "processing" | "ready" | "confirmed" | "dismissed"
+  suggestedSellerId    String?
+  confirmedSellerId    String?
+  suggestedSellerName  String?
+  confidence           String?  // "high" | "medium" | "low"
+  matchReason          String?
+  emailSender          String?
+  emailSubject         String?
+  coaProductName       String?
+  rawData              Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+// ─── Curated Shares (public product catalogs) ───
+
+model CuratedShare {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  label       String
+  productIds  String[]
+  active      Boolean   @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  useCount    Int       @default(0)
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id])
+}
