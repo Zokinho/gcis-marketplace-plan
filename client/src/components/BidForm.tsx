@@ -44,17 +44,17 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
 
   if (success) {
     return (
-      <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
-        <svg className="mx-auto mb-3 h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <div className="rounded-lg border border-brand-sage/40 bg-brand-sage/10 p-6 text-center">
+        <svg className="mx-auto mb-3 h-10 w-10 text-brand-teal" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
-        <h3 className="mb-1 text-lg font-semibold text-green-800">Bid Submitted!</h3>
-        <p className="text-sm text-green-600">
+        <h3 className="mb-1 text-lg font-semibold text-brand-teal">Bid Submitted!</h3>
+        <p className="text-sm text-brand-teal">
           Your bid on {productName} has been submitted. Our team will review it shortly.
         </p>
         <button
           onClick={() => { setSuccess(false); setPricePerUnit(''); setQuantity(''); setNotes(''); }}
-          className="mt-4 text-sm font-medium text-green-700 underline hover:text-green-800"
+          className="mt-4 text-sm font-medium text-brand-teal underline hover:text-brand-teal/80"
         >
           Place another bid
         </button>
@@ -63,8 +63,11 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border bg-white p-5">
-      <h3 className="mb-4 text-lg font-semibold text-gray-900">Place a Bid</h3>
+    <form onSubmit={handleSubmit} className="overflow-hidden rounded-lg border bg-white">
+      <div className="bg-gradient-to-r from-brand-teal to-brand-blue px-5 py-3">
+        <h3 className="text-lg font-semibold text-white">Place a Bid</h3>
+      </div>
+      <div className="p-5">
 
       <div className="mb-4 space-y-3">
         <div>
@@ -77,7 +80,7 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
             onChange={(e) => setPricePerUnit(e.target.value)}
             placeholder="0.00"
             required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
           />
         </div>
 
@@ -94,7 +97,7 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
             onChange={(e) => setQuantity(e.target.value)}
             placeholder={minQty ? `Min ${minQty}` : '0'}
             required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
           />
         </div>
 
@@ -114,7 +117,7 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
             placeholder="Any additional comments..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
           />
         </div>
       </div>
@@ -124,10 +127,11 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
       <button
         type="submit"
         disabled={price <= 0 || qty <= 0 || submitting}
-        className="w-full rounded-lg bg-green-700 py-2.5 text-sm font-semibold text-white transition hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Submitting...' : 'Submit Bid'}
       </button>
+      </div>
     </form>
   );
 }

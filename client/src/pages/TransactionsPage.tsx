@@ -27,17 +27,17 @@ export default function TransactionsPage() {
 
   return (
     <Layout>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 rounded-lg bg-gradient-to-r from-brand-blue to-brand-teal px-6 py-5 text-white sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-brand-dark">Transactions</h2>
-          <p className="mt-1 text-sm text-gray-500">{pagination.total} transactions</p>
+          <h2 className="text-2xl font-semibold">Transactions</h2>
+          <p className="mt-0.5 text-sm text-white/70">Completed marketplace transactions &middot; {pagination.total} total</p>
         </div>
         <div className="flex gap-2">
           {['', 'pending', 'completed', 'cancelled'].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${statusFilter === status ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-600'}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${statusFilter === status ? 'bg-white/30 text-white' : 'bg-white/10 text-white/80'}`}
             >
               {status || 'All'}
             </button>
@@ -52,13 +52,13 @@ export default function TransactionsPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
         </div>
       )}
 
       {!loading && !error && transactions.length === 0 && (
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border bg-white p-12 text-center">
           <p className="text-sm text-gray-500">No transactions yet. Transactions are created when bids are accepted.</p>
         </div>
       )}
@@ -67,7 +67,7 @@ export default function TransactionsPage() {
         <>
           <div className="space-y-3">
             {transactions.map((tx) => (
-              <div key={tx.id} className="rounded-xl border bg-white p-4">
+              <div key={tx.id} className="rounded-lg border bg-white p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex flex-wrap items-center gap-2">

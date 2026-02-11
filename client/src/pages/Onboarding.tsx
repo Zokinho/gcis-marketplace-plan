@@ -3,6 +3,7 @@ import { UserButton } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStatus } from '../lib/useUserStatus';
 import { acceptEula, uploadDoc } from '../lib/api';
+import HarvexLogo from '../components/HarvexLogo';
 
 export default function Onboarding() {
   const { data, loading, refetch } = useUserStatus();
@@ -11,7 +12,7 @@ export default function Onboarding() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
       </div>
     );
   }
@@ -34,9 +35,9 @@ export default function Onboarding() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
-      <header className="border-b bg-white px-6 py-4 shadow-sm">
+      <header className="bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-4 shadow-sm">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <h1 className="text-xl font-bold text-green-900">GCIS Marketplace</h1>
+          <HarvexLogo size="sm" color="white" />
           <UserButton />
         </div>
       </header>
@@ -62,7 +63,7 @@ function StepIndicator({ step, label, active, completed }: {
   active: boolean;
   completed: boolean;
 }) {
-  const bgColor = completed ? 'bg-green-600 text-white' : active ? 'bg-green-700 text-white' : 'bg-gray-200 text-gray-500';
+  const bgColor = completed ? 'bg-brand-teal text-white' : active ? 'bg-brand-teal text-white' : 'bg-gray-200 text-gray-500';
   return (
     <div className="flex items-center gap-2">
       <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${bgColor}`}>
@@ -97,29 +98,32 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
   }, [accepted, onComplete]);
 
   return (
-    <div className="rounded-xl bg-white p-6 shadow-lg sm:p-8">
-      <h2 className="mb-2 text-2xl font-semibold text-gray-900">End User License Agreement</h2>
+    <div className="overflow-hidden rounded-lg bg-white shadow-lg">
+      <div className="bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-4 sm:px-8">
+        <h2 className="text-2xl font-semibold text-white">End User License Agreement</h2>
+      </div>
+      <div className="p-6 sm:p-8">
       <p className="mb-6 text-sm text-gray-500">
         Please read and accept the following agreement to continue.
       </p>
 
       {/* Scrollable EULA text */}
       <div className="mb-6 h-80 overflow-y-auto rounded-lg border bg-gray-50 p-4 text-sm leading-relaxed text-gray-700">
-        <h3 className="mb-3 font-bold">GCIS MARKETPLACE END USER LICENSE AGREEMENT</h3>
+        <h3 className="mb-3 font-bold">HARVEX END USER LICENSE AGREEMENT</h3>
         <p className="mb-3">
           This End User License Agreement ("Agreement") is entered into between Green Consulting
-          International Services Inc. ("GCIS") and the user ("User") accessing the GCIS Marketplace
+          International Services Inc. ("GCIS") and the user ("User") accessing the Harvex
           platform.
         </p>
         <h4 className="mb-2 font-semibold">1. Acceptance of Terms</h4>
         <p className="mb-3">
-          By accessing and using the GCIS Marketplace, User agrees to be bound by the terms and
+          By accessing and using the Harvex, User agrees to be bound by the terms and
           conditions of this Agreement. If User does not agree to these terms, User must not use the
           Marketplace.
         </p>
         <h4 className="mb-2 font-semibold">2. Platform Usage</h4>
         <p className="mb-3">
-          The GCIS Marketplace is a B2B platform connecting licensed cannabis producers with
+          The Harvex is a B2B platform connecting licensed cannabis producers with
           authorized international buyers. All transactions facilitated through the platform are
           subject to applicable laws and regulations in the jurisdictions involved.
         </p>
@@ -171,10 +175,10 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
           type="checkbox"
           checked={accepted}
           onChange={(e) => setAccepted(e.target.checked)}
-          className="mt-0.5 h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+          className="mt-0.5 h-5 w-5 rounded border-gray-300 text-brand-teal focus:ring-brand-teal"
         />
         <span className="text-sm text-gray-700">
-          I have read and agree to the GCIS Marketplace End User License Agreement.
+          I have read and agree to the Harvex End User License Agreement.
         </span>
       </label>
 
@@ -185,10 +189,11 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
       <button
         onClick={handleSubmit}
         disabled={!accepted || submitting}
-        className="w-full rounded-lg bg-green-700 px-6 py-3 font-semibold text-white transition hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-3 font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Accepting...' : 'Accept and Continue'}
       </button>
+      </div>
     </div>
   );
 }
@@ -228,8 +233,11 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
   }, [file, onComplete]);
 
   return (
-    <div className="rounded-xl bg-white p-6 shadow-lg sm:p-8">
-      <h2 className="mb-2 text-2xl font-semibold text-gray-900">Upload Agreement Document</h2>
+    <div className="overflow-hidden rounded-lg bg-white shadow-lg">
+      <div className="bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-4 sm:px-8">
+        <h2 className="text-2xl font-semibold text-white">Upload Agreement Document</h2>
+      </div>
+      <div className="p-6 sm:p-8">
       <p className="mb-6 text-sm text-gray-500">
         Please upload your signed buyer/seller agreement to complete your account setup.
       </p>
@@ -240,12 +248,12 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={`mb-6 flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition ${
-          dragOver ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50'
+          dragOver ? 'border-brand-teal bg-brand-sage/10' : 'border-gray-300 bg-gray-50'
         }`}
       >
         {file ? (
           <div className="text-center">
-            <svg className="mx-auto mb-2 h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="mx-auto mb-2 h-10 w-10 text-brand-teal" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
             <p className="font-medium text-gray-900">{file.name}</p>
@@ -266,7 +274,7 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
               Drag and drop your file here
             </p>
             <p className="mb-3 text-sm text-gray-500">or</p>
-            <label className="cursor-pointer rounded-lg bg-white px-4 py-2 text-sm font-medium text-green-700 shadow-sm ring-1 ring-gray-300 transition hover:bg-gray-50">
+            <label className="cursor-pointer rounded-lg bg-white px-4 py-2 text-sm font-medium text-brand-teal shadow-sm ring-1 ring-gray-300 transition hover:bg-gray-50">
               Browse Files
               <input
                 type="file"
@@ -287,10 +295,11 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
       <button
         onClick={handleSubmit}
         disabled={!file || submitting}
-        className="w-full rounded-lg bg-green-700 px-6 py-3 font-semibold text-white transition hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-3 font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Uploading...' : 'Upload and Complete Setup'}
       </button>
+      </div>
     </div>
   );
 }

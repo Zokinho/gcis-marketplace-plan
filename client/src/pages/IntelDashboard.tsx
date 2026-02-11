@@ -7,7 +7,7 @@ import { fetchIntelDashboard, generateMatches, runChurnDetection, recalculateSel
 
 function KpiCard({ label, value, color = 'text-brand-dark' }: { label: string; value: string | number; color?: string }) {
   return (
-    <div className="rounded-xl border bg-white p-4">
+    <div className="rounded-lg border border-l-4 border-l-brand-blue bg-white p-4">
       <p className="text-xs font-medium text-gray-400">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${color}`}>{value}</p>
     </div>
@@ -53,7 +53,7 @@ export default function IntelDashboard() {
   if (error || !data) {
     return (
       <Layout>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error || 'Failed to load'}</p>
         </div>
       </Layout>
@@ -62,8 +62,9 @@ export default function IntelDashboard() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-brand-dark">Intelligence Dashboard</h2>
+      <div className="mb-6 rounded-lg bg-gradient-to-r from-brand-blue to-brand-teal px-6 py-5 text-white">
+        <h2 className="text-2xl font-semibold">Intelligence Dashboard</h2>
+        <p className="mt-0.5 text-sm text-white/70">AI-powered insights for your marketplace</p>
       </div>
 
       {/* KPI Cards */}
@@ -80,9 +81,9 @@ export default function IntelDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent High-Score Matches */}
-        <div className="rounded-xl border bg-white p-5">
+        <div className="rounded-lg border bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">Top Matches</h3>
+            <h3 className="border-l-2 border-brand-blue pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Top Matches</h3>
             <Link to="/intelligence/matches" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
           </div>
           {data.totalMatches === 0 ? (
@@ -93,9 +94,9 @@ export default function IntelDashboard() {
         </div>
 
         {/* Churn Alerts */}
-        <div className="rounded-xl border bg-white p-5">
+        <div className="rounded-lg border bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">Churn Alerts</h3>
+            <h3 className="border-l-2 border-brand-coral pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Churn Alerts</h3>
             <Link to="/intelligence/churn" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
           </div>
           <div className="flex gap-4 text-sm">
@@ -106,18 +107,18 @@ export default function IntelDashboard() {
         </div>
 
         {/* Market Trends */}
-        <div className="rounded-xl border bg-white p-5">
+        <div className="rounded-lg border bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">Market Trends</h3>
+            <h3 className="border-l-2 border-brand-sage pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Market Trends</h3>
             <Link to="/intelligence/market" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
           </div>
           <MarketTrendChart trends={data.marketTrends} />
         </div>
 
         {/* Top Sellers */}
-        <div className="rounded-xl border bg-white p-5">
+        <div className="rounded-lg border bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">Top Sellers</h3>
+            <h3 className="border-l-2 border-brand-yellow pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Top Sellers</h3>
             <Link to="/intelligence/sellers" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
           </div>
           {data.topSellers.length === 0 ? (
@@ -136,8 +137,8 @@ export default function IntelDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-6 rounded-xl border bg-white p-5">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Quick Actions</h3>
+      <div className="mt-6 rounded-lg border bg-white p-5">
+        <h3 className="mb-3 border-l-2 border-brand-teal pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Quick Actions</h3>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => runAction('matches', () => generateMatches())}

@@ -29,7 +29,7 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
           placeholder="Name, type, lineage..."
           value={filters.search || ''}
           onChange={(e) => update({ search: e.target.value || undefined })}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
         />
       </div>
 
@@ -116,7 +116,7 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
       {/* Clear all */}
       <button
         onClick={() => onChange({ page: 1 })}
-        className="w-full rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+        className="w-full rounded-lg bg-brand-coral py-2 text-sm font-semibold text-white transition hover:bg-brand-coral/85"
       >
         Clear All Filters
       </button>
@@ -128,7 +128,7 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border bg-white py-2 text-sm font-medium text-gray-700 lg:hidden"
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-brand-teal/30 bg-white py-2 text-sm font-medium text-brand-teal lg:hidden"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
@@ -138,13 +138,15 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
 
       {/* Mobile panel */}
       {mobileOpen && (
-        <div className="mb-4 rounded-xl border bg-white p-4 lg:hidden">{content}</div>
+        <div className="mb-4 rounded-lg border bg-white p-4 lg:hidden">{content}</div>
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 rounded-xl border bg-white p-4 lg:block">
-        <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Filters</h3>
-        {content}
+      <aside className="hidden w-64 shrink-0 overflow-hidden rounded-lg border bg-white lg:block">
+        <div className="bg-gradient-to-r from-brand-teal to-brand-blue px-4 py-3">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-white">Filters</h3>
+        </div>
+        <div className="p-4">{content}</div>
       </aside>
     </>
   );
@@ -171,7 +173,7 @@ function FilterSelect({
       <select
         value={value || ''}
         onChange={(e) => onChange(e.target.value || undefined)}
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
       >
         <option value="">All</option>
         {options.map((opt) => (
@@ -211,7 +213,7 @@ function RangeFilter({
           max={rangeMax}
           step={step}
           onChange={(e) => onChangeMin(e.target.value ? parseFloat(e.target.value) : undefined)}
-          className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
         />
         <span className="self-center text-gray-400">–</span>
         <input
@@ -222,7 +224,7 @@ function RangeFilter({
           max={rangeMax}
           step={step}
           onChange={(e) => onChangeMax(e.target.value ? parseFloat(e.target.value) : undefined)}
-          className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
         />
       </div>
     </div>
@@ -257,7 +259,7 @@ function RatioFilter({
             title={p.desc}
             className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
               ratio === p.value
-                ? 'border-green-500 bg-green-50 text-green-700'
+                ? 'border-brand-teal bg-brand-sage/20 text-brand-teal'
                 : 'border-gray-300 text-gray-600 hover:bg-gray-50'
             }`}
           >
@@ -276,7 +278,7 @@ function RatioFilter({
             if (!v) { onChangeRatio(undefined); return; }
             if (/^\d+:\d+$/.test(v)) onChangeRatio(v);
           }}
-          className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-xs focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-xs focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
         />
         <span className="text-xs text-gray-400">custom</span>
       </div>
@@ -294,7 +296,7 @@ function RatioFilter({
             step={5}
             value={tolerance ?? 25}
             onChange={(e) => onChangeTolerance(parseInt(e.target.value))}
-            className="mt-0.5 w-full accent-green-600"
+            className="mt-0.5 w-full accent-brand-teal"
           />
         </div>
       )}

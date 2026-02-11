@@ -112,7 +112,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
   const currentIdx = steps.findIndex((s) => s.key === step);
 
   return (
-    <div className="rounded-xl border bg-white p-6">
+    <div className="rounded-lg border bg-white p-6">
       {/* Progress stepper */}
       <div className="mb-6 flex items-center gap-2">
         {steps.map((s, i) => (
@@ -120,16 +120,16 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
             <div
               className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
                 i <= currentIdx
-                  ? 'bg-green-600 text-white'
+                  ? 'bg-brand-teal text-white'
                   : 'bg-gray-200 text-gray-500'
               }`}
             >
               {i < currentIdx ? '\u2713' : i + 1}
             </div>
-            <span className={`text-xs ${i <= currentIdx ? 'text-green-700 font-medium' : 'text-gray-400'}`}>
+            <span className={`text-xs ${i <= currentIdx ? 'text-brand-teal font-medium' : 'text-gray-400'}`}>
               {s.label}
             </span>
-            {i < steps.length - 1 && <div className={`h-px w-6 ${i < currentIdx ? 'bg-green-400' : 'bg-gray-200'}`} />}
+            {i < steps.length - 1 && <div className={`h-px w-6 ${i < currentIdx ? 'bg-brand-teal/60' : 'bg-gray-200'}`} />}
           </div>
         ))}
       </div>
@@ -142,7 +142,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition ${
-            dragOver ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-green-400 hover:bg-gray-50'
+            dragOver ? 'border-brand-teal bg-brand-sage/10' : 'border-gray-300 hover:border-brand-teal/60 hover:bg-gray-50'
           }`}
         >
           <svg className="mx-auto mb-3 h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -163,7 +163,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
       {/* Processing step */}
       {step === 'processing' && (
         <div className="py-8 text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
           <p className="text-sm font-medium text-gray-700">Analyzing {file?.name}...</p>
           <p className="mt-1 text-xs text-gray-400">
             {jobStatus?.status === 'queued' && 'Queued for processing...'}
@@ -200,7 +200,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
           <div className="flex gap-3">
             <button
               onClick={handleConfirm}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90"
             >
               Confirm & List Product
             </button>
@@ -214,13 +214,13 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
       {/* Done step */}
       {step === 'done' && (
         <div className="py-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-            <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-sage/20">
+            <svg className="h-6 w-6 text-brand-teal" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
             </svg>
           </div>
           <p className="text-sm font-medium text-gray-700">Product created successfully!</p>
-          <button onClick={reset} className="mt-3 text-sm font-medium text-green-700 underline hover:text-green-800">
+          <button onClick={reset} className="mt-3 text-sm font-medium text-brand-teal underline hover:text-brand-teal/80">
             Upload another
           </button>
         </div>
@@ -230,7 +230,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
       {step === 'error' && (
         <div className="py-6 text-center">
           <p className="mb-2 text-sm font-medium text-red-600">{error}</p>
-          <button onClick={reset} className="text-sm font-medium text-green-700 underline hover:text-green-800">
+          <button onClick={reset} className="text-sm font-medium text-brand-teal underline hover:text-brand-teal/80">
             Try again
           </button>
         </div>

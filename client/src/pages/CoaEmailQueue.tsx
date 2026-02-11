@@ -38,15 +38,15 @@ export default function CoaEmailQueue() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-5 text-white">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CoA Inbox</h1>
-          <p className="text-sm text-gray-500">Email-ingested CoA documents awaiting seller assignment</p>
+          <h1 className="text-2xl font-bold">CoA Inbox</h1>
+          <p className="mt-0.5 text-sm text-white/70">Email-ingested CoA documents awaiting seller assignment</p>
         </div>
         <button
           onClick={handlePoll}
           disabled={polling}
-          className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30 disabled:opacity-50"
         >
           {polling ? 'Checking...' : 'Check for new emails'}
         </button>
@@ -54,7 +54,7 @@ export default function CoaEmailQueue() {
 
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
         </div>
       )}
 
@@ -63,7 +63,7 @@ export default function CoaEmailQueue() {
       )}
 
       {!loading && queue.length === 0 && (
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border bg-white p-12 text-center">
           <svg className="mx-auto mb-3 h-10 w-10 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 9v.906a2.25 2.25 0 0 1-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 0 0 1.183 1.981l6.478 3.488m8.839 2.51-4.66-2.51m0 0-1.023-.55a2.25 2.25 0 0 0-2.134 0l-1.022.55m0 0-4.661 2.51m16.5 1.615a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V8.844a2.25 2.25 0 0 1 1.183-1.981l7.5-4.039a2.25 2.25 0 0 1 2.134 0l7.5 4.039a2.25 2.25 0 0 1 1.183 1.98V19.5Z" />
           </svg>
@@ -111,13 +111,13 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
   };
 
   const confidenceColor = {
-    high: 'bg-green-100 text-green-700',
+    high: 'bg-brand-sage/20 text-brand-teal',
     medium: 'bg-yellow-100 text-yellow-700',
     low: 'bg-red-100 text-red-700',
   }[item.confidence || ''] || 'bg-gray-100 text-gray-600';
 
   return (
-    <div className="rounded-xl border bg-white p-5">
+    <div className="rounded-lg border border-l-4 border-l-brand-teal bg-white p-5">
       <div className="mb-3 flex items-start justify-between">
         <div>
           <h3 className="font-semibold text-gray-900">{item.coaProductName || 'Untitled Product'}</h3>
@@ -176,7 +176,7 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
         <button
           onClick={handleConfirm}
           disabled={!sellerId || confirming}
-          className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90 disabled:opacity-50"
         >
           {confirming ? 'Creating...' : 'Confirm & List'}
         </button>

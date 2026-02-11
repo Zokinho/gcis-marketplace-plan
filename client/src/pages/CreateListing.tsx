@@ -131,9 +131,9 @@ export default function CreateListing() {
   return (
     <Layout>
       <div className="mx-auto max-w-3xl">
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-brand-dark">Create Listing</h2>
-          <p className="text-sm text-gray-500">Add a new product to the marketplace manually.</p>
+        <div className="mb-6 rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-5 text-white">
+          <h2 className="text-2xl font-semibold">Create Listing</h2>
+          <p className="mt-0.5 text-sm text-white/70">Add a new product to the marketplace manually.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -342,7 +342,7 @@ export default function CreateListing() {
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-lg bg-brand-teal px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-blue disabled:opacity-50"
+              className="rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:opacity-50"
             >
               {submitting ? 'Submitting...' : 'Submit Listing'}
             </button>
@@ -362,8 +362,8 @@ export default function CreateListing() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-white p-5">
-      <h3 className="mb-4 text-base font-semibold text-brand-dark">{title}</h3>
+    <div className="rounded-lg border bg-white p-5">
+      <h3 className="mb-4 border-l-2 border-brand-teal pl-3 text-base font-semibold text-brand-dark">{title}</h3>
       <div className="space-y-4">{children}</div>
     </div>
   );

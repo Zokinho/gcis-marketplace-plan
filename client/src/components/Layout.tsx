@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { UserButton } from '@clerk/clerk-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStatus } from '../lib/useUserStatus';
+import HarvexLogo from './HarvexLogo';
 
-function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
+function NavLink({ to, children, onClick }: { to: string; children: React.ReactNode; onClick?: () => void }) {
   const { pathname } = useLocation();
   const active = pathname.startsWith(to);
   return (
     <Link
       to={to}
+      onClick={onClick}
       className={`text-sm font-medium transition ${active ? 'text-brand-blue' : 'text-gray-600 hover:text-brand-blue'}`}
     >
       {children}
@@ -18,29 +21,82 @@ function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { data } = useUserStatus();
   const isSeller = data?.user?.contactType?.includes('Seller') ?? false;
-  const isAdmin = isSeller; // Sellers have admin access (same as requireAdmin middleware)
+  const isAdmin = isSeller;
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navLinks = (
+    <>
+      <NavLink to="/marketplace" onClick={() => setMobileOpen(false)}>Marketplace</NavLink>
+      <NavLink to="/my-matches" onClick={() => setMobileOpen(false)}>My Matches</NavLink>
+      {isSeller && <NavLink to="/my-listings" onClick={() => setMobileOpen(false)}>My Listings</NavLink>}
+      <NavLink to="/orders" onClick={() => setMobileOpen(false)}>Orders</NavLink>
+      {isAdmin && <NavLink to="/intelligence" onClick={() => setMobileOpen(false)}>Intelligence</NavLink>}
+      {isAdmin && <NavLink to="/coa-inbox" onClick={() => setMobileOpen(false)}>CoA Inbox</NavLink>}
+      {isAdmin && <NavLink to="/shares" onClick={() => setMobileOpen(false)}>Shares</NavLink>}
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-brand-offwhite">
-      <header className="sticky top-0 z-30 border-b border-brand-gray bg-white px-4 py-3 shadow-sm sm:px-6">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <Link to="/dashboard" className="text-xl font-bold text-brand-teal">
-            GCIS Marketplace
-          </Link>
-          <div className="flex items-center gap-5">
-            <nav className="hidden gap-5 sm:flex">
-              <NavLink to="/marketplace">Marketplace</NavLink>
-              <NavLink to="/my-matches">My Matches</NavLink>
-              {isSeller && <NavLink to="/my-listings">My Listings</NavLink>}
-              <NavLink to="/orders">Orders</NavLink>
-              {isAdmin && <NavLink to="/intelligence">Intelligence</NavLink>}
-              {isAdmin && <NavLink to="/coa-inbox">CoA Inbox</NavLink>}
-              {isAdmin && <NavLink to="/shares">Shares</NavLink>}
-            </nav>
-            <UserButton />
+      <header className="sticky top-0 z-30 bg-white shadow-sm">
+        <div className="border-b border-brand-gray">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+            <Link to="/dashboard">
+              <HarvexLogo size="sm" color="dark" />
+            </Link>
+            <div className="flex items-center gap-5">
+              <nav className="hidden gap-5 sm:flex">
+                {navLinks}
+              </nav>
+              <UserButton />
+              {/* Hamburger button — mobile only */}
+              <button
+                onClick={() => setMobileOpen(!mobileOpen)}
+                className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 sm:hidden"
+                aria-label="Toggle menu"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  {mobileOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                  )}
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
+        {/* Gradient accent line */}
+        <div className="h-0.5 bg-gradient-to-r from-brand-teal to-brand-blue" />
       </header>
+
+      {/* Mobile slide-out drawer */}
+      {mobileOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/30 sm:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+          {/* Drawer */}
+          <div className="fixed right-0 top-0 z-50 flex h-full w-64 flex-col bg-white shadow-xl transition-transform sm:hidden">
+            <div className="flex items-center justify-between border-b px-4 py-4">
+              <HarvexLogo size="sm" color="dark" showText={false} />
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="rounded-lg p-1 text-gray-500 hover:bg-gray-100"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <nav className="flex flex-col gap-1 p-4">
+              {navLinks}
+            </nav>
+          </div>
+        </>
+      )}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import ProductCard from '../components/ProductCard';
+import ProductListItem from '../components/ProductListItem';
 import FilterSidebar from '../components/FilterSidebar';
 import { fetchProducts, type ProductCard as ProductCardType, type ProductFilters, type Pagination } from '../lib/api';
 
@@ -10,6 +11,7 @@ export default function Marketplace() {
   const [filters, setFilters] = useState<ProductFilters>({ page: 1, limit: 20 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'grid' | 'list'>('grid');
 
   const loadProducts = useCallback(async (f: ProductFilters) => {
     setLoading(true);
@@ -40,12 +42,16 @@ export default function Marketplace() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900">Marketplace</h2>
+      {/* Page header */}
+      <div className="mb-6 flex items-center justify-between rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-5 text-white">
+        <div>
+          <h2 className="text-2xl font-semibold">Marketplace</h2>
+          <p className="mt-0.5 text-sm text-white/70">Browse cannabis products from licensed Canadian producers</p>
+        </div>
         {pagination && (
-          <p className="text-sm text-gray-500">
+          <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-medium backdrop-blur-sm">
             {pagination.total} product{pagination.total !== 1 ? 's' : ''}
-          </p>
+          </span>
         )}
       </div>
 
@@ -53,37 +59,62 @@ export default function Marketplace() {
         <FilterSidebar filters={filters} onChange={handleFiltersChange} />
 
         <div className="min-w-0 flex-1">
-          {/* Sort bar */}
-          <div className="mb-4 flex items-center justify-end gap-2">
-            <label className="text-xs text-gray-500">Sort by</label>
-            <select
-              value={`${filters.sort || 'name'}_${filters.order || 'asc'}`}
-              onChange={(e) => {
-                const [sort, order] = e.target.value.split('_');
-                setFilters((prev) => ({ ...prev, sort, order: order as 'asc' | 'desc' }));
-              }}
-              className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-green-500 focus:outline-none"
-            >
-              <option value="name_asc">Name A-Z</option>
-              <option value="name_desc">Name Z-A</option>
-              <option value="pricePerUnit_asc">Price: Low to High</option>
-              <option value="pricePerUnit_desc">Price: High to Low</option>
-              <option value="thcMax_desc">THC: High to Low</option>
-              <option value="gramsAvailable_desc">Most Available</option>
-              <option value="createdAt_desc">Newest</option>
-            </select>
+          {/* Sort bar + view toggle */}
+          <div className="mb-4 flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
+            {/* View toggle */}
+            <div className="flex rounded-lg border border-gray-200 p-0.5">
+              <button
+                onClick={() => setView('grid')}
+                className={`rounded-md p-1.5 transition ${view === 'grid' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                aria-label="Grid view"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setView('list')}
+                className={`rounded-md p-1.5 transition ${view === 'list' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                aria-label="List view"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Sort */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-500">Sort by</label>
+              <select
+                value={`${filters.sort || 'name'}_${filters.order || 'asc'}`}
+                onChange={(e) => {
+                  const [sort, order] = e.target.value.split('_');
+                  setFilters((prev) => ({ ...prev, sort, order: order as 'asc' | 'desc' }));
+                }}
+                className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none"
+              >
+                <option value="name_asc">Name A-Z</option>
+                <option value="name_desc">Name Z-A</option>
+                <option value="pricePerUnit_asc">Price: Low to High</option>
+                <option value="pricePerUnit_desc">Price: High to Low</option>
+                <option value="thcMax_desc">THC: High to Low</option>
+                <option value="gramsAvailable_desc">Most Available</option>
+                <option value="createdAt_desc">Newest</option>
+              </select>
+            </div>
           </div>
 
           {/* Loading */}
           {loading && (
             <div className="flex items-center justify-center py-20">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
             </div>
           )}
 
           {/* Error */}
           {error && !loading && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
               <p className="font-medium text-red-700">{error}</p>
               <button
                 onClick={() => loadProducts(filters)}
@@ -96,22 +127,32 @@ export default function Marketplace() {
 
           {/* Empty state */}
           {!loading && !error && products.length === 0 && (
-            <div className="rounded-xl border bg-white p-12 text-center">
-              <svg className="mx-auto mb-4 h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-              </svg>
+            <div className="rounded-lg border border-brand-gray bg-white p-12 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10">
+                <svg className="h-8 w-8 text-brand-teal/50" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+              </div>
               <h3 className="mb-1 text-lg font-semibold text-gray-700">No products found</h3>
               <p className="text-sm text-gray-500">Try adjusting your filters or search terms.</p>
             </div>
           )}
 
-          {/* Product grid */}
+          {/* Product grid / list */}
           {!loading && !error && products.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            view === 'grid' ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {products.map((product) => (
+                  <ProductListItem key={product.id} product={product} />
+                ))}
+              </div>
+            )
           )}
 
           {/* Pagination */}
@@ -134,7 +175,7 @@ export default function Marketplace() {
                     onClick={() => handlePageChange(p as number)}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                       p === pagination.page
-                        ? 'bg-green-700 text-white'
+                        ? 'bg-brand-teal text-white'
                         : 'border text-gray-600 hover:bg-gray-50'
                     }`}
                   >

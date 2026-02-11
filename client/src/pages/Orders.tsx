@@ -8,7 +8,7 @@ import { useUserStatus } from '../lib/useUserStatus';
 const STATUS_CONFIG: Record<BidStatusType, { label: string; class: string }> = {
   PENDING: { label: 'Pending', class: 'bg-amber-100 text-amber-700' },
   UNDER_REVIEW: { label: 'Under Review', class: 'bg-blue-100 text-blue-700' },
-  ACCEPTED: { label: 'Accepted', class: 'bg-green-100 text-green-700' },
+  ACCEPTED: { label: 'Accepted', class: 'bg-brand-sage/20 text-brand-teal' },
   REJECTED: { label: 'Rejected', class: 'bg-red-100 text-red-700' },
   COUNTERED: { label: 'Countered', class: 'bg-purple-100 text-purple-700' },
   EXPIRED: { label: 'Expired', class: 'bg-gray-100 text-gray-500' },
@@ -44,16 +44,16 @@ export default function Orders() {
     <Layout>
       {/* Tab switcher for sellers */}
       {isSeller && (
-        <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1 sm:w-fit">
+        <div className="mb-6 flex gap-1 rounded-lg bg-brand-gray p-1 sm:w-fit">
           <button
             onClick={() => setTab('buyer')}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === 'buyer' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === 'buyer' ? 'bg-white shadow-sm text-brand-teal' : 'text-gray-500 hover:text-gray-700'}`}
           >
             My Bids
           </button>
           <button
             onClick={() => setTab('seller')}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === 'seller' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === 'seller' ? 'bg-white shadow-sm text-brand-teal' : 'text-gray-500 hover:text-gray-700'}`}
           >
             Incoming Bids
           </button>
@@ -102,6 +102,7 @@ function BuyerBidsView() {
           <p className="mt-1 text-sm text-gray-500">
             {total} bid{total !== 1 ? 's' : ''} placed
           </p>
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
         </div>
 
         <div className="flex flex-wrap gap-1.5">
@@ -111,7 +112,7 @@ function BuyerBidsView() {
               onClick={() => setStatusFilter(f.value)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 statusFilter === f.value
-                  ? 'bg-green-700 text-white'
+                  ? 'bg-brand-teal text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -123,19 +124,24 @@ function BuyerBidsView() {
 
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
         </div>
       )}
 
       {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
           <button onClick={load} className="mt-3 text-sm font-medium text-red-600 underline">Try again</button>
         </div>
       )}
 
       {!loading && !error && bids.length === 0 && (
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border border-brand-gray bg-white p-12 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10">
+            <svg className="h-8 w-8 text-brand-teal/50" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" />
+            </svg>
+          </div>
           <h3 className="mb-2 text-lg font-semibold text-gray-700">No bids yet</h3>
           <p className="mb-4 text-sm text-gray-500">
             {statusFilter ? 'No bids match this filter.' : 'Browse the marketplace to find products and place your first bid.'}
@@ -143,7 +149,7 @@ function BuyerBidsView() {
           {!statusFilter && (
             <Link
               to="/marketplace"
-              className="inline-block rounded-lg bg-green-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-green-800"
+              className="inline-block rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md"
             >
               Browse Marketplace
             </Link>
@@ -237,23 +243,24 @@ function SellerBidsView() {
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-brand-dark">Incoming Bids</h2>
         <p className="mt-1 text-sm text-gray-500">Bids placed on your products</p>
+        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-blue to-brand-teal" />
       </div>
 
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
         </div>
       )}
 
       {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
           <button onClick={load} className="mt-3 text-sm font-medium text-red-600 underline">Try again</button>
         </div>
       )}
 
       {!loading && !error && bids.length === 0 && (
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border bg-white p-12 text-center">
           <h3 className="mb-2 text-lg font-semibold text-gray-700">No incoming bids</h3>
           <p className="text-sm text-gray-500">When buyers bid on your products, they'll appear here.</p>
         </div>
@@ -264,7 +271,12 @@ function SellerBidsView() {
           {bids.map((bid) => {
             const statusCfg = STATUS_CONFIG[bid.status as BidStatusType] || { label: bid.status, class: 'bg-gray-100 text-gray-500' };
             return (
-              <div key={bid.id} className="rounded-xl border bg-white p-4 sm:p-5">
+              <div key={bid.id} className={`rounded-lg border border-l-4 bg-white p-4 sm:p-5 ${
+                bid.status === 'ACCEPTED' ? 'border-l-brand-teal' :
+                bid.status === 'REJECTED' ? 'border-l-brand-coral' :
+                bid.status === 'PENDING' ? 'border-l-brand-blue' :
+                'border-l-gray-300'
+              }`}>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -344,14 +356,20 @@ function BidCard({ bid }: { bid: BidRecord }) {
   const proximityColor = getProximityColor(bid.proximityScore);
 
   return (
-    <div className="rounded-xl border bg-white p-4 sm:p-5 transition hover:shadow-sm">
+    <div className={`rounded-lg border border-l-4 bg-white p-4 sm:p-5 transition hover:shadow-sm ${
+      bid.status === 'ACCEPTED' ? 'border-l-brand-teal' :
+      bid.status === 'REJECTED' ? 'border-l-brand-coral' :
+      bid.status === 'PENDING' ? 'border-l-brand-blue' :
+      bid.status === 'COUNTERED' ? 'border-l-purple-400' :
+      'border-l-gray-300'
+    }`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         {/* Left: product & bid info */}
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <Link
               to={`/marketplace/${bid.product.id}`}
-              className="text-base font-semibold text-gray-900 hover:text-green-700 transition"
+              className="text-base font-semibold text-gray-900 hover:text-brand-teal transition"
             >
               {bid.product.name}
             </Link>
@@ -417,7 +435,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function getProximityColor(score: number | null): string {
   if (score == null) return 'text-gray-500';
-  if (score >= 90) return 'text-green-700';
+  if (score >= 90) return 'text-brand-teal';
   if (score >= 75) return 'text-yellow-600';
   if (score >= 60) return 'text-orange-600';
   return 'text-red-600';

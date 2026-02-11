@@ -21,7 +21,7 @@ export default function SellerScoreCard({ fillRate, qualityScore, deliveryScore,
   const overallColor = overallScore >= 80 ? 'text-brand-blue' : overallScore >= 60 ? 'text-brand-yellow' : 'text-brand-coral';
 
   return (
-    <div className="rounded-xl border bg-white p-5">
+    <div className="rounded-lg border bg-white p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">Seller Score</h3>
         <span className={`text-2xl font-bold ${overallColor}`}>{Math.round(overallScore)}%</span>

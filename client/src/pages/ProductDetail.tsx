@@ -15,8 +15,8 @@ const TYPE_COLORS: Record<string, string> = {
 
 const CERT_COLORS: Record<string, string> = {
   GACP: 'bg-blue-100 text-blue-700',
-  GMP1: 'bg-green-100 text-green-700',
-  GMP2: 'bg-emerald-100 text-emerald-700',
+  GMP1: 'bg-brand-sage/20 text-brand-teal',
+  GMP2: 'bg-brand-sage/20 text-brand-teal',
   GPP: 'bg-cyan-100 text-cyan-700',
 };
 
@@ -48,7 +48,7 @@ export default function ProductDetail() {
     return (
       <Layout>
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
         </div>
       </Layout>
     );
@@ -57,9 +57,9 @@ export default function ProductDetail() {
   if (error || !product) {
     return (
       <Layout>
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border bg-white p-12 text-center">
           <h3 className="mb-2 text-lg font-semibold text-gray-700">{error || 'Product not found'}</h3>
-          <Link to="/marketplace" className="text-sm font-medium text-green-700 underline hover:text-green-800">
+          <Link to="/marketplace" className="text-sm font-medium text-brand-teal underline hover:text-brand-teal/80">
             Back to Marketplace
           </Link>
         </div>
@@ -81,7 +81,7 @@ export default function ProductDetail() {
     <Layout>
       {/* Breadcrumb */}
       <nav className="mb-4 text-sm text-gray-500">
-        <Link to="/marketplace" className="hover:text-green-700">Marketplace</Link>
+        <Link to="/marketplace" className="hover:text-brand-teal">Marketplace</Link>
         <span className="mx-2">/</span>
         <span className="text-gray-900">{product.name}</span>
       </nav>
@@ -91,7 +91,7 @@ export default function ProductDetail() {
         <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
           {product.imageUrls && product.imageUrls.length > 0 && (
-            <div className="rounded-xl border bg-white p-4">
+            <div className="rounded-lg border bg-white p-4">
               <div className="mb-3 flex items-center justify-center overflow-hidden rounded-lg bg-gray-50" style={{ minHeight: '320px' }}>
                 <img
                   src={product.imageUrls[selectedImage]}
@@ -118,7 +118,7 @@ export default function ProductDetail() {
           )}
 
           {/* Header */}
-          <div className="rounded-xl border bg-white p-6">
+          <div className="rounded-lg border border-l-4 border-l-brand-teal bg-white p-6">
             <div className="mb-3 flex flex-wrap gap-2">
               {product.category && (
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">{product.category}</span>
@@ -168,8 +168,8 @@ export default function ProductDetail() {
           </div>
 
           {/* Key specs */}
-          <div className="rounded-xl border bg-white p-6">
-            <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Specifications</h2>
+          <div className="rounded-lg border bg-white p-6">
+            <h2 className="mb-4 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Specifications</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <Spec label="THC" value={formatRange(product.thcMin, product.thcMax, '%')} />
               <Spec label="CBD" value={formatRange(product.cbdMin, product.cbdMax, '%')} />
@@ -191,15 +191,15 @@ export default function ProductDetail() {
 
           {/* Terpene profile */}
           {(terpenes.length > 0 || product.highestTerpenes || product.aromas) && (
-            <div className="rounded-xl border bg-white p-6">
-              <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Terpene Profile</h2>
+            <div className="rounded-lg border bg-white p-6">
+              <h2 className="mb-4 border-l-2 border-brand-sage pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Terpene Profile</h2>
 
               {terpenes.length > 0 && (
                 <div className="mb-4">
                   <p className="mb-2 text-xs font-medium text-gray-500">Dominant Terpenes</p>
                   <div className="flex flex-wrap gap-2">
                     {terpenes.map((t) => (
-                      <span key={t} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                      <span key={t} className="rounded-full bg-brand-sage/20 px-3 py-1 text-xs font-medium text-brand-teal">
                         {t}
                       </span>
                     ))}
@@ -225,15 +225,15 @@ export default function ProductDetail() {
 
           {/* Bud size distribution */}
           {budSizes.length > 0 && (
-            <div className="rounded-xl border bg-white p-6">
-              <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Bud Size Distribution</h2>
+            <div className="rounded-lg border bg-white p-6">
+              <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Bud Size Distribution</h2>
               <div className="space-y-2">
                 {budSizes.map((b) => (
                   <div key={b.label} className="flex items-center gap-3">
                     <span className="w-32 shrink-0 text-xs text-gray-600">{b.label}</span>
                     <div className="h-4 flex-1 overflow-hidden rounded-full bg-gray-100">
                       <div
-                        className="h-full rounded-full bg-green-500 transition-all"
+                        className="h-full rounded-full bg-brand-teal transition-all"
                         style={{ width: `${b.value}%` }}
                       />
                     </div>
@@ -246,8 +246,8 @@ export default function ProductDetail() {
 
           {/* CoA downloads */}
           {product.coaUrls.length > 0 && (
-            <div className="rounded-xl border bg-white p-6">
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Certificates of Analysis</h2>
+            <div className="rounded-lg border bg-white p-6">
+              <h2 className="mb-3 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Certificates of Analysis</h2>
               <div className="flex flex-wrap gap-2">
                 {product.coaUrls.map((url, i) => (
                   <a
@@ -255,7 +255,7 @@ export default function ProductDetail() {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-green-700 transition hover:bg-green-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal transition hover:bg-brand-sage/10"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -269,14 +269,14 @@ export default function ProductDetail() {
 
           {/* CoA Test Results (from AI extraction) */}
           {product.testResults && (
-            <div className="rounded-xl border bg-white p-6">
-              <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">CoA Data</h2>
+            <div className="rounded-lg border bg-white p-6">
+              <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">CoA Data</h2>
               {product.coaPdfUrl && (
                 <a
                   href={product.coaPdfUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mb-4 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-green-700 transition hover:bg-green-50"
+                  className="mb-4 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal transition hover:bg-brand-sage/10"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -295,8 +295,8 @@ export default function ProductDetail() {
 
           {/* CoA Upload for sellers viewing their own product */}
           {isSeller && !product.testResults && (
-            <div className="rounded-xl border bg-white p-6">
-              <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Upload CoA</h2>
+            <div className="rounded-lg border bg-white p-6">
+              <h2 className="mb-4 border-l-2 border-brand-sage pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Upload CoA</h2>
               <p className="mb-4 text-sm text-gray-500">
                 Upload a Certificate of Analysis PDF to auto-fill test results for this product.
               </p>
@@ -321,7 +321,7 @@ export default function ProductDetail() {
 
 function Spec({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="rounded-lg bg-gray-50 px-3 py-2">
       <p className="text-xs font-medium text-gray-400">{label}</p>
       <p className="text-sm font-semibold text-gray-900">{value}</p>
     </div>

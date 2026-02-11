@@ -29,18 +29,21 @@ export default function PredictionsPage() {
 
   return (
     <Layout>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-2xl font-semibold text-brand-dark">Reorder Predictions</h2>
+      <div className="mb-6 flex flex-col gap-4 rounded-lg bg-gradient-to-r from-brand-blue to-brand-teal px-6 py-5 text-white sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Reorder Predictions</h2>
+          <p className="mt-0.5 text-sm text-white/70">AI-predicted upcoming buyer reorders</p>
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => setView('calendar')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${view === 'calendar' ? 'bg-brand-blue text-white' : 'border text-gray-600'}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${view === 'calendar' ? 'bg-white/30 text-white' : 'bg-white/10 text-white/80'}`}
           >
             Calendar
           </button>
           <button
             onClick={() => setView('list')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${view === 'list' ? 'bg-brand-blue text-white' : 'border text-gray-600'}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${view === 'list' ? 'bg-white/30 text-white' : 'bg-white/10 text-white/80'}`}
           >
             List
           </button>
@@ -54,7 +57,7 @@ export default function PredictionsPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
         </div>
       )}
@@ -81,13 +84,13 @@ export default function PredictionsPage() {
           </div>
 
           {listData.length === 0 ? (
-            <div className="rounded-xl border bg-white p-12 text-center">
+            <div className="rounded-lg border bg-white p-12 text-center">
               <p className="text-sm text-gray-500">No {listType} predictions</p>
             </div>
           ) : (
             <div className="space-y-2">
               {listData.map((pred) => (
-                <div key={pred.id} className={`flex items-center justify-between rounded-xl border bg-white p-4 ${listType === 'overdue' ? 'border-red-200' : ''}`}>
+                <div key={pred.id} className={`flex items-center justify-between rounded-lg border bg-white p-4 ${listType === 'overdue' ? 'border-red-200' : ''}`}>
                   <div>
                     <p className="font-medium text-brand-dark">{pred.buyer?.companyName || pred.buyer?.email}</p>
                     <p className="text-xs text-gray-400">{pred.categoryName} &middot; {pred.basedOnTransactions} transactions &middot; avg {Math.round(pred.avgIntervalDays)}d interval</p>

@@ -19,7 +19,7 @@ export default function MatchCard({ match, onDismiss, dismissing }: Props) {
   const insights = match.insights || [];
 
   return (
-    <div className="rounded-xl border bg-white p-4 transition hover:shadow-sm">
+    <div className="rounded-lg border bg-white p-4 transition hover:shadow-sm">
       <div className="mb-3 flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <Link

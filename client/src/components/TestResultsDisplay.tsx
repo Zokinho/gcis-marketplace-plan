@@ -126,7 +126,7 @@ function StatusBadge({ result }: { result: string }) {
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-        isPassing ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        isPassing ? 'bg-brand-sage/20 text-brand-teal' : 'bg-red-100 text-red-700'
       }`}
     >
       {result.toUpperCase()}
@@ -140,7 +140,7 @@ function MicroBadge({ status }: { status: string }) {
   return (
     <span
       className={`rounded px-1 py-px text-[10px] font-bold ${
-        isPassing ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+        isPassing ? 'bg-brand-sage/10 text-brand-teal' : 'bg-red-50 text-red-600'
       }`}
     >
       {status.toUpperCase()}
@@ -160,9 +160,9 @@ function getValueColor(sectionKey: string, result: any): string {
   if (isNaN(num)) return 'text-gray-900';
 
   // Potency values get green
-  if (sectionKey === 'potency' && num > 0) return 'text-green-700';
+  if (sectionKey === 'potency' && num > 0) return 'text-brand-teal';
   // Terpene values get emerald
-  if (sectionKey === 'terpenes' && num > 0) return 'text-emerald-700';
+  if (sectionKey === 'terpenes' && num > 0) return 'text-brand-teal';
 
   return 'text-gray-900';
 }

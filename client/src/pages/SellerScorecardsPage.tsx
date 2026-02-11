@@ -38,12 +38,15 @@ export default function SellerScorecardsPage() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-brand-dark">Seller Scorecards</h2>
+      <div className="mb-6 flex items-center justify-between rounded-lg bg-gradient-to-r from-brand-blue to-brand-teal px-6 py-5 text-white">
+        <div>
+          <h2 className="text-2xl font-semibold">Seller Scorecards</h2>
+          <p className="mt-0.5 text-sm text-white/70">Performance metrics for marketplace sellers</p>
+        </div>
         <button
           onClick={handleRecalculate}
           disabled={recalculating}
-          className="rounded-lg bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-teal disabled:opacity-50"
+          className="rounded-lg bg-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/30 disabled:opacity-50"
         >
           {recalculating ? 'Recalculating...' : 'Recalculate All'}
         </button>
@@ -56,13 +59,13 @@ export default function SellerScorecardsPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
         </div>
       )}
 
       {!loading && !error && scores.length === 0 && (
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border bg-white p-12 text-center">
           <h3 className="mb-2 text-lg font-semibold text-gray-700">No seller scores yet</h3>
           <p className="text-sm text-gray-500">Seller scores are calculated from completed transactions with recorded outcomes.</p>
         </div>

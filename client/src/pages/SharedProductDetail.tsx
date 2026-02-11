@@ -38,7 +38,7 @@ export default function SharedProductDetail() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
       </div>
     );
   }
@@ -46,9 +46,9 @@ export default function SharedProductDetail() {
   if (error || !product) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="max-w-md rounded-xl bg-white p-8 text-center shadow-lg">
+        <div className="max-w-md rounded-lg bg-white p-8 text-center shadow-lg">
           <p className="text-gray-500">{error || 'Product not found'}</p>
-          <Link to={`/share/${token}`} className="mt-3 inline-block text-sm font-medium text-green-700 underline">
+          <Link to={`/share/${token}`} className="mt-3 inline-block text-sm font-medium text-brand-teal underline">
             Back to catalog
           </Link>
         </div>
@@ -61,12 +61,12 @@ export default function SharedProductDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="border-b bg-white px-4 py-3 shadow-sm">
+      <header className="bg-gradient-to-r from-brand-teal to-brand-blue px-4 py-3 shadow-sm">
         <div className="mx-auto max-w-6xl">
-          <nav className="text-sm text-gray-500">
-            <Link to={`/share/${token}`} className="hover:text-green-700">Catalog</Link>
+          <nav className="text-sm text-white/70">
+            <Link to={`/share/${token}`} className="hover:text-white">Catalog</Link>
             <span className="mx-2">/</span>
-            <span className="text-gray-900">{product.name}</span>
+            <span className="text-white">{product.name}</span>
           </nav>
         </div>
       </header>
@@ -77,7 +77,7 @@ export default function SharedProductDetail() {
           <div className="space-y-6 lg:col-span-2">
             {/* Image Gallery */}
             {product.imageUrls && product.imageUrls.length > 0 && (
-              <div className="rounded-xl border bg-white p-4">
+              <div className="rounded-lg border bg-white p-4">
                 <div className="mb-3 flex items-center justify-center overflow-hidden rounded-lg bg-gray-50" style={{ minHeight: '320px' }}>
                   <img
                     src={product.imageUrls[selectedImage]}
@@ -104,7 +104,7 @@ export default function SharedProductDetail() {
             )}
 
             {/* Header card */}
-            <div className="rounded-xl border bg-white p-6">
+            <div className="rounded-lg border bg-white p-6">
               <div className="mb-3 flex flex-wrap gap-2">
                 {product.category && (
                   <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
@@ -122,7 +122,7 @@ export default function SharedProductDetail() {
                   </span>
                 )}
                 {product.labName && (
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                  <span className="rounded-full bg-brand-sage/20 px-3 py-1 text-xs font-medium text-brand-teal">
                     CoA Verified
                   </span>
                 )}
@@ -136,7 +136,7 @@ export default function SharedProductDetail() {
             </div>
 
             {/* Key specs */}
-            <div className="rounded-xl border bg-white p-6">
+            <div className="rounded-lg border bg-white p-6">
               <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Specifications</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {product.thcMax != null && (
@@ -161,11 +161,11 @@ export default function SharedProductDetail() {
 
             {/* Terpene profile */}
             {terpenes.length > 0 && (
-              <div className="rounded-xl border bg-white p-6">
+              <div className="rounded-lg border bg-white p-6">
                 <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Terpene Profile</h2>
                 <div className="flex flex-wrap gap-2">
                   {terpenes.map((t) => (
-                    <span key={t} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                    <span key={t} className="rounded-full bg-brand-sage/20 px-3 py-1 text-xs font-medium text-brand-teal">
                       {t}
                     </span>
                   ))}
@@ -178,7 +178,7 @@ export default function SharedProductDetail() {
 
             {/* CoA Test Results */}
             {product.testResults && (
-              <div className="rounded-xl border bg-white p-6">
+              <div className="rounded-lg border bg-white p-6">
                 <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">
                   Certificate of Analysis
                 </h2>
@@ -194,8 +194,8 @@ export default function SharedProductDetail() {
 
           {/* Right: Actions */}
           <div className="lg:sticky lg:top-6 lg:self-start">
-            <div className="rounded-xl border bg-white p-6">
-              <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Documents</h3>
+            <div className="rounded-lg border bg-white p-6">
+              <h3 className="mb-4 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Documents</h3>
 
               {/* PDF download */}
               {product.coaPdfUrl && token && (
@@ -203,7 +203,7 @@ export default function SharedProductDetail() {
                   href={getSharedProductPdfUrl(token, product.id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mb-3 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium text-green-700 transition hover:bg-green-50"
+                  className="mb-3 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium text-brand-teal transition hover:bg-brand-sage/10"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -239,7 +239,7 @@ export default function SharedProductDetail() {
               <div className="mt-6 border-t pt-4">
                 <Link
                   to={`/share/${token}`}
-                  className="text-sm font-medium text-green-700 underline hover:text-green-800"
+                  className="text-sm font-medium text-brand-teal underline hover:text-brand-teal/80"
                 >
                   Back to catalog
                 </Link>

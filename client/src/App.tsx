@@ -47,7 +47,7 @@ function MarketplaceGuard({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
           <p className="text-gray-500">Loading your account...</p>
         </div>
       </div>
@@ -57,7 +57,7 @@ function MarketplaceGuard({ children }: { children: React.ReactNode }) {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="max-w-md rounded-xl bg-white p-8 text-center shadow-lg">
+        <div className="max-w-md rounded-lg bg-white p-8 text-center shadow-lg">
           <h2 className="mb-2 text-xl font-semibold text-red-600">Something went wrong</h2>
           <p className="text-gray-500">{error}</p>
         </div>

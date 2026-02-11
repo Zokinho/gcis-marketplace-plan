@@ -27,14 +27,14 @@ export default function CuratedShares() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-5 text-white">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Curated Shares</h1>
-          <p className="text-sm text-gray-500">Create and manage shareable product catalogs</p>
+          <h1 className="text-2xl font-bold">Curated Shares</h1>
+          <p className="mt-0.5 text-sm text-white/70">Create and manage shareable product catalogs</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          className="rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30"
         >
           + New Share
         </button>
@@ -49,12 +49,12 @@ export default function CuratedShares() {
 
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
         </div>
       )}
 
       {!loading && shares.length === 0 && !showCreate && (
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border bg-white p-12 text-center">
           <p className="text-sm text-gray-500">No shares created yet</p>
         </div>
       )}
@@ -103,7 +103,7 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
   };
 
   return (
-    <div className="mb-6 rounded-xl border bg-white p-6">
+    <div className="mb-6 rounded-lg border bg-white p-6">
       <h3 className="mb-4 text-lg font-semibold text-gray-900">Create Share Link</h3>
 
       <div className="mb-4">
@@ -113,7 +113,7 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="e.g., Q1 2026 Product Catalog for ABC Corp"
-          className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-green-500"
+          className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-teal"
         />
       </div>
 
@@ -126,7 +126,7 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search products..."
-          className="mb-2 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-green-500"
+          className="mb-2 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-teal"
         />
         <div className="max-h-48 overflow-auto rounded-lg border p-2">
           {loadingProducts ? (
@@ -158,7 +158,7 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
         <button
           onClick={handleCreate}
           disabled={!label || selectedIds.length === 0 || creating}
-          className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90 disabled:opacity-50"
         >
           {creating ? 'Creating...' : 'Create Share Link'}
         </button>
@@ -204,12 +204,12 @@ function ShareCard({ share, onUpdate }: { share: CuratedShareData; onUpdate: () 
   };
 
   return (
-    <div className={`rounded-xl border bg-white p-5 ${!share.active ? 'opacity-60' : ''}`}>
+    <div className={`rounded-lg border border-l-4 bg-white p-5 ${share.active ? 'border-l-brand-teal' : 'border-l-gray-300 opacity-60'}`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-gray-900">{share.label}</h3>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${share.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${share.active ? 'bg-brand-sage/20 text-brand-teal' : 'bg-gray-100 text-gray-500'}`}>
               {share.active ? 'Active' : 'Inactive'}
             </span>
           </div>

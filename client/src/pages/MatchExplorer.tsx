@@ -38,16 +38,16 @@ export default function MatchExplorer() {
 
   return (
     <Layout>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 rounded-lg bg-gradient-to-r from-brand-blue to-brand-teal px-6 py-5 text-white sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-brand-dark">Match Explorer</h2>
-          <p className="mt-1 text-sm text-gray-500">{pagination.total} matches found</p>
+          <h2 className="text-2xl font-semibold">Match Explorer</h2>
+          <p className="mt-0.5 text-sm text-white/70">Browse and manage product-buyer matches &middot; {pagination.total} found</p>
         </div>
         <div className="flex gap-3">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border px-3 py-1.5 text-sm"
+            className="rounded-lg bg-white/20 px-3 py-1.5 text-sm text-white [&>option]:text-gray-800"
           >
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
@@ -58,7 +58,7 @@ export default function MatchExplorer() {
           <select
             value={minScore}
             onChange={(e) => setMinScore(Number(e.target.value))}
-            className="rounded-lg border px-3 py-1.5 text-sm"
+            className="rounded-lg bg-white/20 px-3 py-1.5 text-sm text-white [&>option]:text-gray-800"
           >
             <option value={0}>Any Score</option>
             <option value={50}>50+</option>
@@ -76,13 +76,13 @@ export default function MatchExplorer() {
       )}
 
       {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
         </div>
       )}
 
       {!loading && !error && matches.length === 0 && (
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border bg-white p-12 text-center">
           <h3 className="mb-2 text-lg font-semibold text-gray-700">No matches found</h3>
           <p className="text-sm text-gray-500">Generate matches from the Intelligence Dashboard.</p>
           <Link to="/intelligence" className="mt-3 inline-block text-sm font-medium text-brand-blue underline">Go to Dashboard</Link>
@@ -93,7 +93,7 @@ export default function MatchExplorer() {
         <>
           <div className="space-y-3">
             {matches.map((match) => (
-              <div key={match.id} className="rounded-xl border bg-white transition hover:shadow-sm">
+              <div key={match.id} className="rounded-lg border bg-white transition hover:shadow-sm">
                 <div
                   className="flex cursor-pointer items-center justify-between p-4"
                   onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}

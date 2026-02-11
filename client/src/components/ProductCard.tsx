@@ -9,8 +9,8 @@ const TYPE_COLORS: Record<string, string> = {
 
 const CERT_COLORS: Record<string, string> = {
   GACP: 'bg-blue-100 text-blue-700',
-  GMP1: 'bg-green-100 text-green-700',
-  GMP2: 'bg-emerald-100 text-emerald-700',
+  GMP1: 'bg-brand-sage/20 text-brand-teal',
+  GMP2: 'bg-brand-sage/20 text-brand-teal',
   GPP: 'bg-cyan-100 text-cyan-700',
 };
 
@@ -21,14 +21,14 @@ export default function ProductCard({ product }: { product: ProductCardType }) {
   return (
     <Link
       to={`/marketplace/${product.id}`}
-      className="group flex flex-col rounded-xl border bg-white shadow-sm transition hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-sage/60"
     >
-      {/* Image placeholder */}
-      <div className="flex h-40 items-center justify-center rounded-t-xl bg-gray-100">
+      {/* Image */}
+      <div className="flex h-40 items-center justify-center bg-gradient-to-br from-brand-sage/10 to-brand-gray/40">
         {product.imageUrls?.[0] ? (
-          <img src={product.imageUrls[0]} alt={product.name} className="h-full w-full rounded-t-xl object-cover" />
+          <img src={product.imageUrls[0]} alt={product.name} className="h-full w-full object-cover" />
         ) : (
-          <svg className="h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+          <svg className="h-12 w-12 text-brand-teal/20" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
           </svg>
         )}
@@ -55,7 +55,7 @@ export default function ProductCard({ product }: { product: ProductCardType }) {
         </div>
 
         {/* Name */}
-        <h3 className="mb-1 text-sm font-semibold text-gray-900 group-hover:text-green-700">
+        <h3 className="mb-1 text-sm font-semibold text-gray-900 group-hover:text-brand-teal">
           {product.name}
         </h3>
 
@@ -85,7 +85,7 @@ export default function ProductCard({ product }: { product: ProductCardType }) {
 
           <div className="text-right text-xs">
             {available ? (
-              <span className="font-medium text-green-600">{product.gramsAvailable?.toLocaleString()}g available</span>
+              <span className="font-medium text-brand-teal">{product.gramsAvailable?.toLocaleString()}g available</span>
             ) : upcoming ? (
               <span className="font-medium text-amber-600">Upcoming</span>
             ) : (

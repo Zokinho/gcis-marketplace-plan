@@ -42,23 +42,26 @@ export default function MarketIntelPage() {
 
   return (
     <Layout>
-      <h2 className="mb-6 text-2xl font-semibold text-brand-dark">Market Intelligence</h2>
+      <div className="mb-6 rounded-lg bg-gradient-to-r from-brand-blue to-brand-teal px-6 py-5 text-white">
+        <h2 className="text-2xl font-semibold">Market Intelligence</h2>
+        <p className="mt-0.5 text-sm text-white/70">Price trends and market analysis</p>
+      </div>
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Price Trends */}
-        <div className="rounded-xl border bg-white p-5">
+        <div className="rounded-lg border bg-white p-5">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Price Trends (30d)</h3>
           <MarketTrendChart trends={trends} />
         </div>
 
         {/* Top Categories by Volume */}
-        <div className="rounded-xl border bg-white p-5">
+        <div className="rounded-lg border bg-white p-5">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Top Categories by Volume</h3>
           {topCategories.length === 0 ? (
             <p className="text-sm text-gray-400">No transaction data yet</p>
@@ -82,7 +85,7 @@ export default function MarketIntelPage() {
         </div>
 
         {/* Supply/Demand */}
-        <div className="rounded-xl border bg-white p-5">
+        <div className="rounded-lg border bg-white p-5">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Supply / Demand</h3>
           {supplyDemand.length === 0 ? (
             <p className="text-sm text-gray-400">No data yet</p>
@@ -106,7 +109,7 @@ export default function MarketIntelPage() {
         </div>
 
         {/* Category Detail */}
-        <div className="rounded-xl border bg-white p-5">
+        <div className="rounded-lg border bg-white p-5">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">
             {selectedCategory ? `${selectedCategory} Detail` : 'Select a Category'}
           </h3>

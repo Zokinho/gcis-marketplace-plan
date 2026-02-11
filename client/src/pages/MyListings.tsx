@@ -70,9 +70,9 @@ export default function MyListings() {
       )}
 
       {successMsg && (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3">
-          <span className="text-sm font-medium text-green-700">{successMsg}</span>
-          <button onClick={() => setSuccessMsg(null)} className="text-green-500 hover:text-green-700">&times;</button>
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-brand-sage/40 bg-brand-sage/10 p-3">
+          <span className="text-sm font-medium text-brand-teal">{successMsg}</span>
+          <button onClick={() => setSuccessMsg(null)} className="text-brand-sage hover:text-brand-teal">&times;</button>
         </div>
       )}
 
@@ -82,6 +82,7 @@ export default function MyListings() {
           <p className="text-sm text-gray-500">
             {listings.length} product{listings.length !== 1 ? 's' : ''}
           </p>
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
         </div>
         <div className="flex gap-2">
           <Link
@@ -113,19 +114,24 @@ export default function MyListings() {
 
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
         </div>
       )}
 
       {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
           <button onClick={load} className="mt-3 text-sm font-medium text-red-600 underline">Try again</button>
         </div>
       )}
 
       {!loading && !error && listings.length === 0 && (
-        <div className="rounded-xl border bg-white p-12 text-center">
+        <div className="rounded-lg border border-brand-gray bg-white p-12 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10">
+            <svg className="h-8 w-8 text-brand-teal/50" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+            </svg>
+          </div>
           <h3 className="mb-2 text-lg font-semibold text-gray-700">No listings yet</h3>
           <p className="mb-4 text-sm text-gray-500">Your products will appear here once they're synced from Zoho CRM or created manually.</p>
           <Link
@@ -225,7 +231,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
   const statusBadge = listing.requestPending
     ? { label: 'Pending', class: 'bg-amber-100 text-amber-700' }
     : listing.isActive
-      ? { label: 'Active', class: 'bg-green-100 text-green-700' }
+      ? { label: 'Active', class: 'bg-brand-sage/20 text-brand-teal' }
       : { label: 'Paused', class: 'bg-gray-100 text-gray-500' };
 
   const sourceBadge = SOURCE_BADGES[listing.source] || { label: listing.source, class: 'bg-gray-50 text-gray-500' };
@@ -243,7 +249,11 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       : null;
 
   return (
-    <div className="rounded-xl border bg-white p-4 sm:p-5">
+    <div className={`rounded-lg border border-l-4 bg-white p-4 sm:p-5 ${
+      listing.requestPending ? 'border-l-amber-400' :
+      listing.isActive ? 'border-l-brand-teal' :
+      'border-l-gray-300'
+    }`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         {/* Thumbnail */}
         <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
@@ -349,7 +359,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   rows={2}
-                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
                 />
               </div>
               {editError && <p className="text-xs text-red-600">{editError}</p>}
@@ -357,7 +367,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="rounded-lg bg-green-700 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-green-800 disabled:opacity-50"
+                  className="rounded-lg bg-brand-teal px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-teal/90 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -388,7 +398,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
                   listing.isActive
                     ? 'border border-amber-300 text-amber-700 hover:bg-amber-50'
-                    : 'border border-green-300 text-green-700 hover:bg-green-50'
+                    : 'border border-brand-sage text-brand-teal hover:bg-brand-sage/10'
                 }`}
               >
                 {toggling ? '...' : listing.isActive ? 'Pause' : 'Activate'}
@@ -425,7 +435,7 @@ function EditField({ label, value, onChange, step }: {
         min="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+        className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
       />
     </div>
   );

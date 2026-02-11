@@ -8,6 +8,7 @@
 
 @theme {
   --color-brand-teal: #265463;
+  --color-brand-teal-light: #2d6a7a;
   --color-brand-blue: #207AD5;
   --color-brand-yellow: #F5DE5C;
   --color-brand-coral: #F07878;
@@ -15,4 +16,5 @@
   --color-brand-sage: #91C9BF;
   --color-brand-offwhite: #FAFAFA;
   --color-brand-dark: #242424;
+  --font-logo: 'DM Sans', sans-serif;
 }

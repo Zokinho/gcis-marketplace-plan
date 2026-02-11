@@ -6,6 +6,7 @@ import {
   type ShareValidation,
   type SharedProduct,
 } from '../lib/api';
+import HarvexLogo from '../components/HarvexLogo';
 
 const TYPE_COLORS: Record<string, string> = {
   Sativa: 'bg-orange-100 text-orange-700',
@@ -41,7 +42,7 @@ export default function ShareViewer() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
       </div>
     );
   }
@@ -49,7 +50,7 @@ export default function ShareViewer() {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="max-w-md rounded-xl bg-white p-8 text-center shadow-lg">
+        <div className="max-w-md rounded-lg bg-white p-8 text-center shadow-lg">
           <h2 className="mb-2 text-xl font-semibold text-gray-800">Share Link</h2>
           <p className="text-gray-500">{error}</p>
         </div>
@@ -60,14 +61,14 @@ export default function ShareViewer() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="border-b bg-white px-4 py-4 shadow-sm">
+      <header className="bg-gradient-to-r from-brand-teal to-brand-blue px-4 py-5 text-white shadow-sm">
         <div className="mx-auto max-w-6xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-green-600">GCIS Marketplace</p>
-              <h1 className="text-xl font-bold text-gray-900">{validation?.label || 'Shared Products'}</h1>
+              <HarvexLogo size="sm" color="white" showText={false} />
+              <h1 className="text-xl font-bold">{validation?.label || 'Shared Products'}</h1>
             </div>
-            <span className="text-sm text-gray-400">{products.length} products</span>
+            <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-medium backdrop-blur-sm">{products.length} products</span>
           </div>
         </div>
       </header>
@@ -75,7 +76,7 @@ export default function ShareViewer() {
       {/* Product grid */}
       <main className="mx-auto max-w-6xl px-4 py-6">
         {products.length === 0 ? (
-          <div className="rounded-xl border bg-white p-12 text-center">
+          <div className="rounded-lg border bg-white p-12 text-center">
             <p className="text-sm text-gray-500">No products available in this share</p>
           </div>
         ) : (
@@ -84,7 +85,7 @@ export default function ShareViewer() {
               <Link
                 key={product.id}
                 to={`/share/${token}/product/${product.id}`}
-                className="group rounded-xl border bg-white p-5 transition hover:shadow-md"
+                className="group rounded-lg border bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-sage/60"
               >
                 {/* Badges */}
                 <div className="mb-3 flex flex-wrap gap-1.5">
@@ -106,7 +107,7 @@ export default function ShareViewer() {
                 </div>
 
                 {/* Name */}
-                <h3 className="mb-1 font-semibold text-gray-900 group-hover:text-green-700">{product.name}</h3>
+                <h3 className="mb-1 font-semibold text-gray-900 group-hover:text-brand-teal">{product.name}</h3>
                 {/* Key specs */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {product.thcMax != null && (
