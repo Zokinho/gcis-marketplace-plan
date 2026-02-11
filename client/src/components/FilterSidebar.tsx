@@ -93,16 +93,6 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
         onChangeTolerance={(v) => update({ ratioTolerance: v })}
       />
 
-      {/* Price Range */}
-      <RangeFilter
-        label="Price ($/g)"
-        min={filters.priceMin}
-        max={filters.priceMax}
-        onChangeMin={(v) => update({ priceMin: v })}
-        onChangeMax={(v) => update({ priceMax: v })}
-        step={0.1}
-        rangeMax={50}
-      />
 
       {/* Availability */}
       <FilterSelect

@@ -67,14 +67,9 @@ export default function ProductListItem({ product }: { product: ProductCard }) {
         </div>
       </div>
 
-      {/* Price + availability */}
+      {/* Availability */}
       <div className="hidden flex-shrink-0 text-right sm:block">
-        {product.pricePerUnit != null ? (
-          <p className="text-base font-bold text-gray-900">${product.pricePerUnit.toFixed(2)}<span className="text-xs font-normal text-gray-400">/g</span></p>
-        ) : (
-          <p className="text-sm text-gray-400">Price on request</p>
-        )}
-        <p className="mt-0.5 text-xs">
+        <p className="text-xs">
           {available ? (
             <span className="font-medium text-brand-teal">{product.gramsAvailable?.toLocaleString()}g available</span>
           ) : upcoming ? (

@@ -151,23 +151,6 @@ export default function ProductDetail() {
               <p className="mt-4 text-sm leading-relaxed text-gray-600">{product.description}</p>
             )}
 
-            {/* Market Position Indicator */}
-            {marketCtx && marketCtx.avgPrice30d != null && product.pricePerUnit != null && (
-              <div className="mt-4 rounded-lg bg-gray-50 p-3">
-                <p className="mb-1 text-xs font-medium text-gray-500">Market Position</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                  <span className="text-gray-500">
-                    Market Avg: <span className="font-semibold text-gray-700">${marketCtx.avgPrice30d.toFixed(2)}/g</span>
-                  </span>
-                  {(() => {
-                    const diff = ((product.pricePerUnit! - marketCtx.avgPrice30d!) / marketCtx.avgPrice30d!) * 100;
-                    const label = diff > 0 ? `${diff.toFixed(1)}% above` : diff < 0 ? `${Math.abs(diff).toFixed(1)}% below` : 'At';
-                    const color = diff > 5 ? 'text-brand-coral' : diff < -5 ? 'text-brand-blue' : 'text-gray-600';
-                    return <span className={`font-semibold ${color}`}>{label} market avg</span>;
-                  })()}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Key specs */}
@@ -176,7 +159,6 @@ export default function ProductDetail() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Spec label="THC" value={formatRange(product.thcMin, product.thcMax, '%')} />
               <Spec label="CBD" value={formatRange(product.cbdMin, product.cbdMax, '%')} />
-              <Spec label="Price" value={product.pricePerUnit != null ? `$${product.pricePerUnit.toFixed(2)}/g` : 'On request'} />
               <Spec label="Available" value={product.gramsAvailable != null ? `${product.gramsAvailable.toLocaleString()}g` : '—'} />
               {product.upcomingQty != null && product.upcomingQty > 0 && (
                 <Spec label="Upcoming" value={`${product.upcomingQty.toLocaleString()}g`} />

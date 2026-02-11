@@ -96,8 +96,6 @@ export default function Marketplace() {
               >
                 <option value="name_asc">Name A-Z</option>
                 <option value="name_desc">Name Z-A</option>
-                <option value="pricePerUnit_asc">Price: Low to High</option>
-                <option value="pricePerUnit_desc">Price: High to Low</option>
                 <option value="thcMax_desc">THC: High to Low</option>
                 <option value="gramsAvailable_desc">Most Available</option>
                 <option value="createdAt_desc">Newest</option>

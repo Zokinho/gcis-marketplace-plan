@@ -74,16 +74,8 @@ export default function ProductCard({ product }: { product: ProductCardType }) {
           )}
         </div>
 
-        {/* Price + Availability */}
-        <div className="mt-auto flex items-end justify-between">
-          <div>
-            {product.pricePerUnit != null ? (
-              <p className="text-lg font-bold text-gray-900">${product.pricePerUnit.toFixed(2)}<span className="text-xs font-normal text-gray-400">/g</span></p>
-            ) : (
-              <p className="text-sm text-gray-400">Price on request</p>
-            )}
-          </div>
-
+        {/* Availability */}
+        <div className="mt-auto flex items-end justify-end">
           <div className="text-right text-xs">
             {available ? (
               <span className="font-medium text-brand-teal">{product.gramsAvailable?.toLocaleString()}g available</span>
