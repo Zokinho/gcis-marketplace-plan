@@ -34,3 +34,6 @@ postgres-data/
 
 # Uploads
 uploads/
+
+# Design assets
+*.ai
