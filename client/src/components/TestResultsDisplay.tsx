@@ -40,20 +40,20 @@ export default function TestResultsDisplay({
   return (
     <div className="space-y-4">
       {/* Lab info header */}
-      <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+      <div className="flex flex-wrap gap-4 text-xs text-muted">
         {labName && (
           <span>
-            Lab: <span className="font-medium text-gray-700">{labName}</span>
+            Lab: <span className="font-medium text-secondary">{labName}</span>
           </span>
         )}
         {testDate && (
           <span>
-            Tested: <span className="font-medium text-gray-700">{new Date(testDate).toLocaleDateString()}</span>
+            Tested: <span className="font-medium text-secondary">{new Date(testDate).toLocaleDateString()}</span>
           </span>
         )}
         {reportNumber && (
           <span>
-            Report #: <span className="font-medium text-gray-700">{reportNumber}</span>
+            Report #: <span className="font-medium text-secondary">{reportNumber}</span>
           </span>
         )}
       </div>
@@ -65,9 +65,9 @@ export default function TestResultsDisplay({
         const overallResult = section?.overall_result;
 
         return (
-          <div key={sectionKey} className="rounded-lg border bg-gray-50 p-4">
+          <div key={sectionKey} className="rounded-lg border border-subtle surface-muted p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-bold text-gray-700">
+              <h4 className="text-sm font-bold text-secondary">
                 {SECTION_LABELS[sectionKey] || sectionKey}
               </h4>
               {overallResult && <StatusBadge result={overallResult} />}
@@ -110,9 +110,9 @@ function TestRow({
 
   return (
     <div className="flex items-center justify-between text-xs">
-      <span className="text-gray-600">{formatName(name)}</span>
+      <span className="text-secondary">{formatName(name)}</span>
       <div className="flex items-center gap-2">
-        {limit && <span className="text-gray-400">limit: {limit}</span>}
+        {limit && <span className="text-faint">limit: {limit}</span>}
         <span className={`font-medium ${getValueColor(sectionKey, result)}`}>{displayVal}</span>
         {status && <MicroBadge status={status} />}
       </div>
@@ -126,7 +126,7 @@ function StatusBadge({ result }: { result: string }) {
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-        isPassing ? 'bg-brand-sage/20 text-brand-teal' : 'bg-red-100 text-red-700'
+        isPassing ? 'bg-brand-sage/20 text-brand-teal' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
       }`}
     >
       {result.toUpperCase()}
@@ -140,7 +140,7 @@ function MicroBadge({ status }: { status: string }) {
   return (
     <span
       className={`rounded px-1 py-px text-[10px] font-bold ${
-        isPassing ? 'bg-brand-sage/10 text-brand-teal' : 'bg-red-50 text-red-600'
+        isPassing ? 'bg-brand-sage/10 text-brand-teal' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300'
       }`}
     >
       {status.toUpperCase()}
@@ -155,14 +155,14 @@ function formatName(key: string): string {
 }
 
 function getValueColor(sectionKey: string, result: any): string {
-  if (result == null) return 'text-gray-400';
+  if (result == null) return 'text-faint';
   const num = parseFloat(String(result));
-  if (isNaN(num)) return 'text-gray-900';
+  if (isNaN(num)) return 'text-primary';
 
   // Potency values get green
   if (sectionKey === 'potency' && num > 0) return 'text-brand-teal';
   // Terpene values get emerald
   if (sectionKey === 'terpenes' && num > 0) return 'text-brand-teal';
 
-  return 'text-gray-900';
+  return 'text-primary';
 }

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getAuth } from '@clerk/express';
+import logger from '../utils/logger';
 import { prisma } from '../index';
 import { pushOnboardingMilestone } from '../services/zohoApi';
 
@@ -24,10 +25,6 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  if (!user.approved) {
-    return res.status(403).json({ error: 'Account not yet approved' });
-  }
-
   if (user.eulaAcceptedAt) {
     return res.json({ message: 'EULA already accepted', eulaAcceptedAt: user.eulaAcceptedAt });
   }
@@ -41,7 +38,7 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
   if (user.zohoContactId) {
     try {
       await pushOnboardingMilestone(user.zohoContactId, 'eula_accepted');
-    } catch (e) { console.error('[ONBOARDING] Zoho EULA writeback failed:', e); }
+    } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[ONBOARDING] Zoho EULA writeback failed'); }
   }
 
   res.json({
@@ -71,10 +68,6 @@ router.post('/upload-doc', async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  if (!user.approved) {
-    return res.status(403).json({ error: 'Account not yet approved' });
-  }
-
   if (!user.eulaAcceptedAt) {
     return res.status(400).json({ error: 'Must accept EULA before uploading document' });
   }
@@ -92,7 +85,7 @@ router.post('/upload-doc', async (req: Request, res: Response) => {
   if (user.zohoContactId) {
     try {
       await pushOnboardingMilestone(user.zohoContactId, 'agreement_uploaded');
-    } catch (e) { console.error('[ONBOARDING] Zoho doc upload writeback failed:', e); }
+    } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[ONBOARDING] Zoho doc upload writeback failed'); }
   }
 
   res.json({ message: 'Document upload recorded' });

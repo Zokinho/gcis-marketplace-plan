@@ -36,45 +36,45 @@ export default function OutcomeForm({ bidId, orderedQuantity, onComplete }: Prop
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border bg-brand-offwhite p-4">
-      <h4 className="text-sm font-semibold text-brand-dark">Record Delivery Outcome</h4>
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-subtle surface-muted p-4">
+      <h4 className="text-sm font-semibold text-primary">Record Delivery Outcome</h4>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-500">Actual Qty Delivered (g)</label>
+        <label className="mb-1 block text-xs font-medium text-muted">Actual Qty Delivered (g)</label>
         <input
           type="number"
           step="1"
           min="0"
           value={actualQty}
           onChange={(e) => setActualQty(e.target.value)}
-          className="w-full rounded-lg border px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
+          className="w-full rounded-lg border border-default px-3 py-1.5 text-sm surface text-primary focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
         />
       </div>
 
       <div className="flex gap-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Delivered On Time?</label>
+          <label className="mb-1 block text-xs font-medium text-muted">Delivered On Time?</label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setOnTime(true)}
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${onTime === true ? 'bg-brand-blue text-white' : 'border text-brand-dark'}`}>
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${onTime === true ? 'bg-brand-blue text-white' : 'border border-default text-primary'}`}>
               Yes
             </button>
             <button type="button" onClick={() => setOnTime(false)}
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${onTime === false ? 'bg-brand-coral text-white' : 'border text-brand-dark'}`}>
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${onTime === false ? 'bg-brand-coral text-white' : 'border border-default text-primary'}`}>
               No
             </button>
           </div>
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Quality As Expected?</label>
+          <label className="mb-1 block text-xs font-medium text-muted">Quality As Expected?</label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setQuality(true)}
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${quality === true ? 'bg-brand-blue text-white' : 'border text-brand-dark'}`}>
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${quality === true ? 'bg-brand-blue text-white' : 'border border-default text-primary'}`}>
               Yes
             </button>
             <button type="button" onClick={() => setQuality(false)}
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${quality === false ? 'bg-brand-coral text-white' : 'border text-brand-dark'}`}>
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${quality === false ? 'bg-brand-coral text-white' : 'border border-default text-primary'}`}>
               No
             </button>
           </div>
@@ -82,12 +82,12 @@ export default function OutcomeForm({ bidId, orderedQuantity, onComplete }: Prop
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-500">Notes (optional)</label>
+        <label className="mb-1 block text-xs font-medium text-muted">Notes (optional)</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
-          className="w-full rounded-lg border px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
+          className="w-full rounded-lg border border-default px-3 py-1.5 text-sm surface text-primary focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
         />
       </div>
 

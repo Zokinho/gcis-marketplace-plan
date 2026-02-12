@@ -71,35 +71,35 @@ export default function PredictionsPage() {
           <div className="mb-4 flex gap-2">
             <button
               onClick={() => setListType('upcoming')}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${listType === 'upcoming' ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-600'}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${listType === 'upcoming' ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}
             >
               Upcoming
             </button>
             <button
               onClick={() => setListType('overdue')}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${listType === 'overdue' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${listType === 'overdue' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}
             >
               Overdue
             </button>
           </div>
 
           {listData.length === 0 ? (
-            <div className="rounded-lg border bg-white p-12 text-center">
-              <p className="text-sm text-gray-500">No {listType} predictions</p>
+            <div className="rounded-lg border surface p-12 text-center">
+              <p className="text-sm text-muted">No {listType} predictions</p>
             </div>
           ) : (
             <div className="space-y-2">
               {listData.map((pred) => (
-                <div key={pred.id} className={`flex items-center justify-between rounded-lg border bg-white p-4 ${listType === 'overdue' ? 'border-red-200' : ''}`}>
+                <div key={pred.id} className={`flex items-center justify-between rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4 ${listType === 'overdue' ? 'border-red-200' : ''}`}>
                   <div>
-                    <p className="font-medium text-brand-dark">{pred.buyer?.companyName || pred.buyer?.email}</p>
-                    <p className="text-xs text-gray-400">{pred.categoryName} &middot; {pred.basedOnTransactions} transactions &middot; avg {Math.round(pred.avgIntervalDays)}d interval</p>
+                    <p className="font-medium text-primary">{pred.buyer?.companyName || pred.buyer?.email}</p>
+                    <p className="text-xs text-faint">{pred.categoryName} &middot; {pred.basedOnTransactions} transactions &middot; avg {Math.round(pred.avgIntervalDays)}d interval</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-700">
+                    <p className="text-sm font-medium text-secondary">
                       {new Date(pred.predictedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
-                    <p className="text-xs text-gray-400">{Math.round(pred.confidenceScore)}% confidence</p>
+                    <p className="text-xs text-faint">{Math.round(pred.confidenceScore)}% confidence</p>
                     {pred.daysOverdue != null && pred.daysOverdue > 0 && (
                       <p className="text-xs font-medium text-red-600">{pred.daysOverdue}d overdue</p>
                     )}

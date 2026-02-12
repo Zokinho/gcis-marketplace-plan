@@ -1,4 +1,5 @@
 import axios from 'axios';
+import logger from '../utils/logger';
 
 const ZOHO_ACCOUNTS_URL = process.env.ZOHO_ACCOUNTS_URL || 'https://accounts.zohocloud.ca';
 const ZOHO_API_URL = process.env.ZOHO_API_URL || 'https://www.zohoapis.ca/crm/v7';
@@ -22,13 +23,13 @@ export async function getAccessToken(): Promise<string> {
   });
 
   if (response.data.error) {
-    console.error('[ZOHO] Token refresh failed:', response.data.error);
+    logger.error({ error: response.data.error }, '[ZOHO] Token refresh failed');
     throw new Error(`Zoho token refresh failed: ${response.data.error}`);
   }
 
   accessToken = response.data.access_token;
   tokenExpiry = Date.now() + (response.data.expires_in * 1000) - 60000; // 1 min buffer
-  console.log('[ZOHO] Access token refreshed');
+  logger.info('[ZOHO] Access token refreshed');
   return accessToken!;
 }
 
@@ -51,7 +52,7 @@ export async function zohoRequest(
     });
     return response.data;
   } catch (err: any) {
-    console.error('[ZOHO] API error:', method, endpoint, 'status:', err?.response?.status, 'body:', JSON.stringify(err?.response?.data));
+    logger.error({ method, endpoint, status: err?.response?.status, body: err?.response?.data }, '[ZOHO] API error');
     throw err;
   }
 }

@@ -3,6 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
+import logger from '../utils/logger';
+import { validate, updateListingSchema, createSellerShareSchema } from '../utils/validation';
 import { prisma } from '../index';
 import { pushProductUpdate, createZohoProduct, createProductReviewTask, uploadProductFiles } from '../services/zohoApi';
 import { zohoRequest } from '../services/zohoAuth';
@@ -173,7 +175,7 @@ router.post(
         pricePerUnit: parseFloat_(pricePerUnit) ?? null,
         gramsAvailable: parseFloat_(gramsAvailable) ?? null,
       }).catch((err) => {
-        console.error('[MY-LISTINGS] Review task creation failed (non-critical):', err?.message);
+        logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Review task creation failed (non-critical)');
       });
 
       // Upload files to Zoho — fire-and-forget (non-critical)
@@ -188,13 +190,13 @@ router.post(
       }
       if (imageDiskPaths.length > 0 || coaDiskPaths.length > 0) {
         uploadProductFiles(zohoProductId, imageDiskPaths, coaDiskPaths).catch((err) => {
-          console.error('[MY-LISTINGS] Zoho file upload failed (non-critical):', err?.message);
+          logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Zoho file upload failed (non-critical)');
         });
       }
 
       res.status(201).json({ product });
     } catch (err: any) {
-      console.error('[MY-LISTINGS] Create failed:', err?.message);
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Create failed');
       res.status(500).json({ error: 'Failed to create listing' });
     }
   },
@@ -267,7 +269,7 @@ router.get('/', async (req: Request, res: Response) => {
  * Update seller-editable fields: pricePerUnit, gramsAvailable, upcomingQty.
  * Changes sync back to Zoho.
  */
-router.patch('/:id', async (req: Request<{ id: string }>, res: Response) => {
+router.patch('/:id', validate(updateListingSchema), async (req: Request<{ id: string }>, res: Response) => {
   const sellerId = req.user!.id;
   const productId = req.params.id;
 
@@ -281,24 +283,13 @@ router.patch('/:id', async (req: Request<{ id: string }>, res: Response) => {
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description } = req.body as {
-    pricePerUnit?: number;
-    gramsAvailable?: number;
-    upcomingQty?: number;
-    minQtyRequest?: number;
-    description?: string;
-  };
-
-  // Validate — at least one field must be provided
-  if (pricePerUnit === undefined && gramsAvailable === undefined && upcomingQty === undefined && minQtyRequest === undefined && description === undefined) {
-    return res.status(400).json({ error: 'No fields to update' });
-  }
+  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description } = req.body;
 
   const updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number; minQtyRequest?: number; description?: string } = {};
-  if (pricePerUnit !== undefined) updates.pricePerUnit = Number(pricePerUnit);
-  if (gramsAvailable !== undefined) updates.gramsAvailable = Number(gramsAvailable);
-  if (upcomingQty !== undefined) updates.upcomingQty = Number(upcomingQty);
-  if (minQtyRequest !== undefined) updates.minQtyRequest = Number(minQtyRequest);
+  if (pricePerUnit !== undefined) updates.pricePerUnit = pricePerUnit;
+  if (gramsAvailable !== undefined) updates.gramsAvailable = gramsAvailable;
+  if (upcomingQty !== undefined) updates.upcomingQty = upcomingQty;
+  if (minQtyRequest !== undefined) updates.minQtyRequest = minQtyRequest;
   if (description !== undefined) updates.description = description.trim();
 
   try {
@@ -306,7 +297,7 @@ router.patch('/:id', async (req: Request<{ id: string }>, res: Response) => {
     const updated = await prisma.product.findUnique({ where: { id: productId } });
     res.json({ message: 'Product updated', product: updated });
   } catch (err: any) {
-    console.error('[MY-LISTINGS] Update failed:', err?.message);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Update failed');
     res.status(500).json({ error: 'Failed to update product' });
   }
 });
@@ -346,7 +337,7 @@ router.patch('/:id/toggle-active', async (req: Request<{ id: string }>, res: Res
       data: { data: [{ Product_Active: newActive }], trigger: [] },
     });
   } catch (err: any) {
-    console.error('[MY-LISTINGS] Zoho toggle sync failed:', err?.message);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Zoho toggle sync failed');
     // Don't fail the request — local state is updated
   }
 
@@ -359,13 +350,9 @@ router.patch('/:id/toggle-active', async (req: Request<{ id: string }>, res: Res
  * POST /api/my-listings/share
  * Create a shareable link for selected products (or all active).
  */
-router.post('/share', async (req: Request, res: Response) => {
+router.post('/share', validate(createSellerShareSchema), async (req: Request, res: Response) => {
   const sellerId = req.user!.id;
-  const { label, productIds, expiresInDays } = req.body as {
-    label?: string;
-    productIds?: string[];
-    expiresInDays?: number;
-  };
+  const { label, productIds, expiresInDays } = req.body;
 
   // If no productIds provided, share all active products
   let idsToShare: string[];

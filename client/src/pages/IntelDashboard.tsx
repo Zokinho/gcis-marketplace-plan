@@ -5,10 +5,10 @@ import RiskBadge from '../components/RiskBadge';
 import MarketTrendChart from '../components/MarketTrendChart';
 import { fetchIntelDashboard, generateMatches, runChurnDetection, recalculateSellerScores, type IntelDashboard as DashboardData } from '../lib/api';
 
-function KpiCard({ label, value, color = 'text-brand-dark' }: { label: string; value: string | number; color?: string }) {
+function KpiCard({ label, value, color = 'text-primary' }: { label: string; value: string | number; color?: string }) {
   return (
-    <div className="rounded-lg border border-l-4 border-l-brand-blue bg-white p-4">
-      <p className="text-xs font-medium text-gray-400">{label}</p>
+    <div className="rounded-lg border border-brand-blue/15 border-l-4 border-l-brand-blue bg-brand-blue/5 shadow-md p-4">
+      <p className="text-xs font-medium text-faint">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${color}`}>{value}</p>
     </div>
   );
@@ -62,9 +62,10 @@ export default function IntelDashboard() {
 
   return (
     <Layout>
-      <div className="mb-6 rounded-lg bg-gradient-to-r from-brand-blue to-brand-teal px-6 py-5 text-white">
-        <h2 className="text-2xl font-semibold">Intelligence Dashboard</h2>
-        <p className="mt-0.5 text-sm text-white/70">AI-powered insights for your marketplace</p>
+      <div className="mb-6">
+        <h2 className="text-2xl font-semibold text-primary">Intelligence Dashboard</h2>
+        <p className="text-sm text-muted">AI-powered insights for your marketplace</p>
+        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-blue to-brand-teal" />
       </div>
 
       {/* KPI Cards */}
@@ -75,26 +76,26 @@ export default function IntelDashboard() {
         <KpiCard
           label="At-Risk Buyers"
           value={data.atRiskBuyers.critical + data.atRiskBuyers.high}
-          color={data.atRiskBuyers.critical > 0 ? 'text-red-600' : 'text-brand-dark'}
+          color={data.atRiskBuyers.critical > 0 ? 'text-red-600' : 'text-primary'}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent High-Score Matches */}
-        <div className="rounded-lg border bg-white p-5">
+        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="border-l-2 border-brand-blue pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Top Matches</h3>
             <Link to="/intelligence/matches" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
           </div>
           {data.totalMatches === 0 ? (
-            <p className="text-sm text-gray-400">No matches generated yet</p>
+            <p className="text-sm text-faint">No matches generated yet</p>
           ) : (
-            <p className="text-sm text-gray-500">{data.totalMatches} total matches, {data.pendingMatches} pending</p>
+            <p className="text-sm text-muted">{data.totalMatches} total matches, {data.pendingMatches} pending</p>
           )}
         </div>
 
         {/* Churn Alerts */}
-        <div className="rounded-lg border bg-white p-5">
+        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="border-l-2 border-brand-coral pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Churn Alerts</h3>
             <Link to="/intelligence/churn" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
@@ -107,7 +108,7 @@ export default function IntelDashboard() {
         </div>
 
         {/* Market Trends */}
-        <div className="rounded-lg border bg-white p-5">
+        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="border-l-2 border-brand-sage pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Market Trends</h3>
             <Link to="/intelligence/market" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
@@ -116,18 +117,18 @@ export default function IntelDashboard() {
         </div>
 
         {/* Top Sellers */}
-        <div className="rounded-lg border bg-white p-5">
+        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="border-l-2 border-brand-yellow pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Top Sellers</h3>
             <Link to="/intelligence/sellers" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
           </div>
           {data.topSellers.length === 0 ? (
-            <p className="text-sm text-gray-400">No seller scores yet</p>
+            <p className="text-sm text-faint">No seller scores yet</p>
           ) : (
             <div className="space-y-2">
               {data.topSellers.map((s: any) => (
                 <div key={s.id || s.sellerId} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700">{s.seller?.companyName || 'Unknown'}</span>
+                  <span className="text-secondary">{s.seller?.companyName || 'Unknown'}</span>
                   <span className="font-semibold text-brand-blue">{Math.round(s.overallScore)}%</span>
                 </div>
               ))}
@@ -137,27 +138,27 @@ export default function IntelDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-6 rounded-lg border bg-white p-5">
+      <div className="mt-6 rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
         <h3 className="mb-3 border-l-2 border-brand-teal pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Quick Actions</h3>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => runAction('matches', () => generateMatches())}
             disabled={running !== null}
-            className="rounded-lg bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-teal disabled:opacity-50"
+            className="rounded-lg bg-brand-teal px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-teal/80 disabled:opacity-50"
           >
             {running === 'matches' ? 'Generating...' : 'Generate Matches'}
           </button>
           <button
             onClick={() => runAction('churn', () => runChurnDetection())}
             disabled={running !== null}
-            className="rounded-lg border px-4 py-2 text-xs font-semibold text-gray-700 transition hover:bg-brand-offwhite disabled:opacity-50"
+            className="rounded-lg border border-brand-teal/30 px-4 py-2 text-xs font-semibold text-brand-teal transition hover:bg-brand-teal/10 disabled:opacity-50"
           >
             {running === 'churn' ? 'Running...' : 'Run Churn Detection'}
           </button>
           <button
             onClick={() => runAction('scores', () => recalculateSellerScores())}
             disabled={running !== null}
-            className="rounded-lg border px-4 py-2 text-xs font-semibold text-gray-700 transition hover:bg-brand-offwhite disabled:opacity-50"
+            className="rounded-lg border border-brand-teal/30 px-4 py-2 text-xs font-semibold text-brand-teal transition hover:bg-brand-teal/10 disabled:opacity-50"
           >
             {running === 'scores' ? 'Calculating...' : 'Recalculate Seller Scores'}
           </button>

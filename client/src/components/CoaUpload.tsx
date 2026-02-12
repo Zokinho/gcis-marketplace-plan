@@ -112,7 +112,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
   const currentIdx = steps.findIndex((s) => s.key === step);
 
   return (
-    <div className="rounded-lg border bg-white p-6">
+    <div className="rounded-lg border border-subtle surface p-6">
       {/* Progress stepper */}
       <div className="mb-6 flex items-center gap-2">
         {steps.map((s, i) => (
@@ -121,15 +121,15 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
               className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
                 i <= currentIdx
                   ? 'bg-brand-teal text-white'
-                  : 'bg-gray-200 text-gray-500'
+                  : 'bg-gray-200 dark:bg-slate-600 text-muted'
               }`}
             >
               {i < currentIdx ? '\u2713' : i + 1}
             </div>
-            <span className={`text-xs ${i <= currentIdx ? 'text-brand-teal font-medium' : 'text-gray-400'}`}>
+            <span className={`text-xs ${i <= currentIdx ? 'text-brand-teal font-medium' : 'text-faint'}`}>
               {s.label}
             </span>
-            {i < steps.length - 1 && <div className={`h-px w-6 ${i < currentIdx ? 'bg-brand-teal/60' : 'bg-gray-200'}`} />}
+            {i < steps.length - 1 && <div className={`h-px w-6 ${i < currentIdx ? 'bg-brand-teal/60' : 'bg-gray-200 dark:bg-slate-600'}`} />}
           </div>
         ))}
       </div>
@@ -142,14 +142,14 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition ${
-            dragOver ? 'border-brand-teal bg-brand-sage/10' : 'border-gray-300 hover:border-brand-teal/60 hover:bg-gray-50'
+            dragOver ? 'border-brand-teal bg-brand-sage/10' : 'border-default hover:border-brand-teal/60 hover-surface-muted'
           }`}
         >
-          <svg className="mx-auto mb-3 h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <svg className="mx-auto mb-3 h-10 w-10 text-faint" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
           </svg>
-          <p className="text-sm font-medium text-gray-700">Drop a CoA PDF here or click to browse</p>
-          <p className="mt-1 text-xs text-gray-400">PDF files up to 50MB</p>
+          <p className="text-sm font-medium text-secondary">Drop a CoA PDF here or click to browse</p>
+          <p className="mt-1 text-xs text-faint">PDF files up to 50MB</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -164,8 +164,8 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
       {step === 'processing' && (
         <div className="py-8 text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
-          <p className="text-sm font-medium text-gray-700">Analyzing {file?.name}...</p>
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="text-sm font-medium text-secondary">Analyzing {file?.name}...</p>
+          <p className="mt-1 text-xs text-faint">
             {jobStatus?.status === 'queued' && 'Queued for processing...'}
             {jobStatus?.status === 'processing' && `Processing ${jobStatus.pageCount || '...'} pages...`}
             {!jobStatus && 'Uploading...'}
@@ -176,8 +176,8 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
       {/* Preview step */}
       {step === 'preview' && preview && (
         <div>
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">Extracted Data</h3>
-          <div className="mb-4 space-y-2 rounded-lg bg-gray-50 p-4 text-sm">
+          <h3 className="mb-4 text-lg font-semibold text-primary">Extracted Data</h3>
+          <div className="mb-4 space-y-2 rounded-lg surface-muted p-4 text-sm">
             <Row label="Product Name" value={preview.mappedFields.name} />
             <Row label="Lab" value={preview.mappedFields.labName} />
             <Row label="Test Date" value={preview.mappedFields.testDate} />
@@ -204,7 +204,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
             >
               Confirm & List Product
             </button>
-            <button onClick={reset} className="rounded-lg border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+            <button onClick={reset} className="rounded-lg border border-default px-4 py-2 text-sm text-secondary hover-surface-muted">
               Cancel
             </button>
           </div>
@@ -219,7 +219,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
               <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
             </svg>
           </div>
-          <p className="text-sm font-medium text-gray-700">Product created successfully!</p>
+          <p className="text-sm font-medium text-secondary">Product created successfully!</p>
           <button onClick={reset} className="mt-3 text-sm font-medium text-brand-teal underline hover:text-brand-teal/80">
             Upload another
           </button>
@@ -243,8 +243,8 @@ function Row({ label, value }: { label: string; value: string | number | null | 
   if (!value) return null;
   return (
     <div className="flex justify-between">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-gray-900">{String(value)}</span>
+      <span className="text-muted">{label}</span>
+      <span className="font-medium text-primary">{String(value)}</span>
     </div>
   );
 }

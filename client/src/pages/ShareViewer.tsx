@@ -9,9 +9,9 @@ import {
 import HarvexLogo from '../components/HarvexLogo';
 
 const TYPE_COLORS: Record<string, string> = {
-  Sativa: 'bg-orange-100 text-orange-700',
-  Indica: 'bg-purple-100 text-purple-700',
-  Hybrid: 'bg-teal-100 text-teal-700',
+  Sativa: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700',
+  Indica: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700',
+  Hybrid: 'bg-teal-100 dark:bg-teal-900/20 text-teal-700',
 };
 
 export default function ShareViewer() {
@@ -41,7 +41,7 @@ export default function ShareViewer() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center surface-base">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
       </div>
     );
@@ -49,23 +49,23 @@ export default function ShareViewer() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="max-w-md rounded-lg bg-white p-8 text-center shadow-lg">
-          <h2 className="mb-2 text-xl font-semibold text-gray-800">Share Link</h2>
-          <p className="text-gray-500">{error}</p>
+      <div className="flex min-h-screen items-center justify-center surface-base">
+        <div className="max-w-md rounded-lg surface p-8 text-center shadow-lg">
+          <h2 className="mb-2 text-xl font-semibold text-primary">Share Link</h2>
+          <p className="text-muted">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen surface-base">
       {/* Header */}
-      <header className="bg-gradient-to-r from-brand-teal to-brand-blue px-4 py-5 text-white shadow-sm">
+      <header className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-4 py-5 text-white shadow-sm">
         <div className="mx-auto max-w-6xl">
           <div className="flex items-center justify-between">
             <div>
-              <HarvexLogo size="sm" color="white" showText={false} />
+              <HarvexLogo size="sm" color="white" />
               <h1 className="text-xl font-bold">{validation?.label || 'Shared Products'}</h1>
             </div>
             <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-medium backdrop-blur-sm">{products.length} products</span>
@@ -76,8 +76,8 @@ export default function ShareViewer() {
       {/* Product grid */}
       <main className="mx-auto max-w-6xl px-4 py-6">
         {products.length === 0 ? (
-          <div className="rounded-lg border bg-white p-12 text-center">
-            <p className="text-sm text-gray-500">No products available in this share</p>
+          <div className="rounded-lg border border-subtle surface p-12 text-center">
+            <p className="text-sm text-muted">No products available in this share</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -85,47 +85,47 @@ export default function ShareViewer() {
               <Link
                 key={product.id}
                 to={`/share/${token}/product/${product.id}`}
-                className="group rounded-lg border bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-sage/60"
+                className="group rounded-lg border border-subtle surface p-5 transition hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-sage/60"
               >
                 {/* Badges */}
                 <div className="mb-3 flex flex-wrap gap-1.5">
                   {product.category && (
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                    <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-slate-300">
                       {product.category}
                     </span>
                   )}
                   {product.type && (
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300'}`}>
                       {product.type}
                     </span>
                   )}
                   {product.labName && (
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                    <span className="rounded-full bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 text-[10px] font-medium text-blue-700">
                       CoA Verified
                     </span>
                   )}
                 </div>
 
                 {/* Name */}
-                <h3 className="mb-1 font-semibold text-gray-900 group-hover:text-brand-teal">{product.name}</h3>
+                <h3 className="mb-1 font-semibold text-primary group-hover:text-brand-teal">{product.name}</h3>
                 {/* Key specs */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {product.thcMax != null && (
                     <div>
-                      <span className="text-gray-400">THC:</span>{' '}
-                      <span className="font-medium text-gray-700">{product.thcMax}%</span>
+                      <span className="text-faint">THC:</span>{' '}
+                      <span className="font-medium text-secondary">{product.thcMax}%</span>
                     </div>
                   )}
                   {product.cbdMax != null && product.cbdMax > 0 && (
                     <div>
-                      <span className="text-gray-400">CBD:</span>{' '}
-                      <span className="font-medium text-gray-700">{product.cbdMax}%</span>
+                      <span className="text-faint">CBD:</span>{' '}
+                      <span className="font-medium text-secondary">{product.cbdMax}%</span>
                     </div>
                   )}
                   {product.gramsAvailable != null && (
                     <div>
-                      <span className="text-gray-400">Available:</span>{' '}
-                      <span className="font-medium text-gray-700">{product.gramsAvailable.toLocaleString()}g</span>
+                      <span className="text-faint">Available:</span>{' '}
+                      <span className="font-medium text-secondary">{product.gramsAvailable.toLocaleString()}g</span>
                     </div>
                   )}
                 </div>

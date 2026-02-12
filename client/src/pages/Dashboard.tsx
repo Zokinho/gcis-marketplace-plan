@@ -44,13 +44,16 @@ export default function Dashboard() {
   return (
     <Layout>
       {/* Welcome banner */}
-      <div className="mb-6 rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue p-6 text-white">
-        <h2 className="text-2xl font-semibold">
-          Welcome{user?.firstName ? `, ${user.firstName}` : ''}
-        </h2>
-        <p className="mt-1 text-sm text-white/70">
-          Your Harvex dashboard — browse products, manage orders, and track your activity.
-        </p>
+      <div className="mb-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-primary">
+            Welcome{user?.firstName ? `, ${user.firstName}` : ''}
+          </h2>
+          <p className="text-sm text-muted">
+            Your Harvex dashboard — browse products, manage orders, and track your activity.
+          </p>
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -78,11 +81,11 @@ function DashboardCard({
   return (
     <Link
       to={href}
-      className={`rounded-lg border border-l-4 ${accentColor} bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
+      className={`rounded-lg border border-brand-blue/15 border-l-4 ${accentColor} bg-brand-blue/5 p-6 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg`}
     >
       <div className="mb-3">{icon}</div>
-      <h3 className="mb-2 text-lg font-semibold text-gray-900">{title}</h3>
-      <p className="text-sm text-gray-500">{description}</p>
+      <h3 className="mb-2 text-lg font-semibold text-primary">{title}</h3>
+      <p className="text-sm text-muted">{description}</p>
     </Link>
   );
 }

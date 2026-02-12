@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
+import logger from '../utils/logger';
 import { prisma } from '../index';
 import { getCoaClient } from '../services/coaClient';
+import { validate, createShareSchema, updateShareSchema } from '../utils/validation';
 
 const router = Router();
 
@@ -11,7 +13,7 @@ const router = Router();
  * POST /api/shares
  * Create a curated share link.
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', validate(createShareSchema), async (req: Request, res: Response) => {
   const { label, productIds, expiresAt } = req.body as {
     label: string;
     productIds: string[];
@@ -62,7 +64,7 @@ router.get('/', async (_req: Request, res: Response) => {
  * PATCH /api/shares/:id
  * Update a share (label, productIds, active, expiresAt).
  */
-router.patch('/:id', async (req: Request<{ id: string }>, res: Response) => {
+router.patch('/:id', validate(updateShareSchema), async (req: Request<{ id: string }>, res: Response) => {
   const { id } = req.params;
   const { label, productIds, active, expiresAt } = req.body as {
     label?: string;
@@ -90,15 +92,14 @@ router.patch('/:id', async (req: Request<{ id: string }>, res: Response) => {
 
 /**
  * DELETE /api/shares/:id
- * Deactivate a share (soft delete).
+ * Permanently delete a share.
  */
 router.delete('/:id', async (req: Request<{ id: string }>, res: Response) => {
   try {
-    const share = await prisma.curatedShare.update({
+    await prisma.curatedShare.delete({
       where: { id: req.params.id },
-      data: { active: false },
     });
-    res.json({ share });
+    res.json({ success: true });
   } catch {
     res.status(404).json({ error: 'Share not found' });
   }
@@ -264,7 +265,7 @@ publicShareRouter.get('/:token/products/:id/pdf', async (req: Request<{ token: s
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}_CoA.pdf"`);
     res.send(pdfBuffer);
   } catch (err: any) {
-    console.error('[SHARES] PDF proxy failed:', err?.message);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SHARES] PDF proxy failed');
     res.status(502).json({ error: 'CoA service unavailable' });
   }
 });

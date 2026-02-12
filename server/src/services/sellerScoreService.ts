@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '../index';
+import logger from '../utils/logger';
 
 interface ScoreResult {
   fillRate: number;
@@ -176,7 +177,7 @@ export async function recalculateAllSellerScores(): Promise<{ sellersUpdated: nu
     try {
       await updateSellerScore(seller.id);
     } catch (err) {
-      console.error(`[SELLER-SCORES] Error scoring seller ${seller.id}:`, err);
+      logger.error({ err, sellerId: seller.id }, '[SELLER-SCORES] Error scoring seller');
     }
   }
 

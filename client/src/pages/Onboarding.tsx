@@ -34,8 +34,8 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      <header className="bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-4 shadow-sm">
+    <div className="flex min-h-screen flex-col surface-base">
+      <header className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-4 shadow-sm">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
           <HarvexLogo size="sm" color="white" />
           <UserButton />
@@ -46,7 +46,7 @@ export default function Onboarding() {
         {/* Progress indicator */}
         <div className="mb-8 flex items-center justify-center gap-4">
           <StepIndicator step={1} label="Accept EULA" active={needsEula} completed={!needsEula} />
-          <div className="h-px w-12 bg-gray-300" />
+          <div className="h-px w-12 bg-gray-300 dark:bg-slate-600" />
           <StepIndicator step={2} label="Upload Document" active={needsDoc} completed={false} />
         </div>
 
@@ -63,7 +63,7 @@ function StepIndicator({ step, label, active, completed }: {
   active: boolean;
   completed: boolean;
 }) {
-  const bgColor = completed ? 'bg-brand-teal text-white' : active ? 'bg-brand-teal text-white' : 'bg-gray-200 text-gray-500';
+  const bgColor = completed ? 'bg-brand-teal text-white' : active ? 'bg-brand-teal text-white' : 'bg-gray-200 dark:bg-slate-600 text-muted';
   return (
     <div className="flex items-center gap-2">
       <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${bgColor}`}>
@@ -73,7 +73,7 @@ function StepIndicator({ step, label, active, completed }: {
           </svg>
         ) : step}
       </div>
-      <span className={`text-sm font-medium ${active || completed ? 'text-gray-900' : 'text-gray-400'}`}>{label}</span>
+      <span className={`text-sm font-medium ${active || completed ? 'text-primary' : 'text-faint'}`}>{label}</span>
     </div>
   );
 }
@@ -98,17 +98,17 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
   }, [accepted, onComplete]);
 
   return (
-    <div className="overflow-hidden rounded-lg bg-white shadow-lg">
-      <div className="bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-4 sm:px-8">
+    <div className="overflow-hidden rounded-lg surface shadow-lg">
+      <div className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-4 sm:px-8">
         <h2 className="text-2xl font-semibold text-white">End User License Agreement</h2>
       </div>
       <div className="p-6 sm:p-8">
-      <p className="mb-6 text-sm text-gray-500">
+      <p className="mb-6 text-sm text-muted">
         Please read and accept the following agreement to continue.
       </p>
 
       {/* Scrollable EULA text */}
-      <div className="mb-6 h-80 overflow-y-auto rounded-lg border bg-gray-50 p-4 text-sm leading-relaxed text-gray-700">
+      <div className="mb-6 h-80 overflow-y-auto rounded-lg border border-subtle surface-muted p-4 text-sm leading-relaxed text-secondary">
         <h3 className="mb-3 font-bold">HARVEX END USER LICENSE AGREEMENT</h3>
         <p className="mb-3">
           This End User License Agreement ("Agreement") is entered into between Green Consulting
@@ -175,9 +175,9 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
           type="checkbox"
           checked={accepted}
           onChange={(e) => setAccepted(e.target.checked)}
-          className="mt-0.5 h-5 w-5 rounded border-gray-300 text-brand-teal focus:ring-brand-teal"
+          className="mt-0.5 h-5 w-5 rounded border-default text-brand-teal focus:ring-brand-teal"
         />
-        <span className="text-sm text-gray-700">
+        <span className="text-sm text-secondary">
           I have read and agree to the Harvex End User License Agreement.
         </span>
       </label>
@@ -189,7 +189,7 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
       <button
         onClick={handleSubmit}
         disabled={!accepted || submitting}
-        className="w-full rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-3 font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-3 font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Accepting...' : 'Accept and Continue'}
       </button>
@@ -233,12 +233,12 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
   }, [file, onComplete]);
 
   return (
-    <div className="overflow-hidden rounded-lg bg-white shadow-lg">
-      <div className="bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-4 sm:px-8">
+    <div className="overflow-hidden rounded-lg surface shadow-lg">
+      <div className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-4 sm:px-8">
         <h2 className="text-2xl font-semibold text-white">Upload Agreement Document</h2>
       </div>
       <div className="p-6 sm:p-8">
-      <p className="mb-6 text-sm text-gray-500">
+      <p className="mb-6 text-sm text-muted">
         Please upload your signed buyer/seller agreement to complete your account setup.
       </p>
 
@@ -248,7 +248,7 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={`mb-6 flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition ${
-          dragOver ? 'border-brand-teal bg-brand-sage/10' : 'border-gray-300 bg-gray-50'
+          dragOver ? 'border-brand-teal bg-brand-sage/10' : 'border-default surface-muted'
         }`}
       >
         {file ? (
@@ -256,8 +256,8 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
             <svg className="mx-auto mb-2 h-10 w-10 text-brand-teal" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
-            <p className="font-medium text-gray-900">{file.name}</p>
-            <p className="text-sm text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+            <p className="font-medium text-primary">{file.name}</p>
+            <p className="text-sm text-muted">{(file.size / 1024).toFixed(1)} KB</p>
             <button
               onClick={() => setFile(null)}
               className="mt-2 text-sm text-red-600 hover:text-red-700"
@@ -267,14 +267,14 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
           </div>
         ) : (
           <>
-            <svg className="mb-3 h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="mb-3 h-10 w-10 text-faint" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
             </svg>
-            <p className="mb-1 font-medium text-gray-700">
+            <p className="mb-1 font-medium text-secondary">
               Drag and drop your file here
             </p>
-            <p className="mb-3 text-sm text-gray-500">or</p>
-            <label className="cursor-pointer rounded-lg bg-white px-4 py-2 text-sm font-medium text-brand-teal shadow-sm ring-1 ring-gray-300 transition hover:bg-gray-50">
+            <p className="mb-3 text-sm text-muted">or</p>
+            <label className="cursor-pointer rounded-lg surface px-4 py-2 text-sm font-medium text-brand-teal shadow-sm ring-1 ring-gray-300 dark:ring-slate-600 transition hover-surface-muted">
               Browse Files
               <input
                 type="file"
@@ -283,7 +283,7 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
                 className="hidden"
               />
             </label>
-            <p className="mt-3 text-xs text-gray-400">PDF, DOC, DOCX, PNG, or JPG (max 10 MB)</p>
+            <p className="mt-3 text-xs text-faint">PDF, DOC, DOCX, PNG, or JPG (max 10 MB)</p>
           </>
         )}
       </div>
@@ -295,7 +295,7 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
       <button
         onClick={handleSubmit}
         disabled={!file || submitting}
-        className="w-full rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-3 font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-3 font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Uploading...' : 'Upload and Complete Setup'}
       </button>

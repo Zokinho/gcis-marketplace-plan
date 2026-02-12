@@ -13,9 +13,9 @@ import {
 } from '../lib/api';
 
 const TYPE_COLORS: Record<string, string> = {
-  Sativa: 'bg-orange-100 text-orange-700',
-  Indica: 'bg-purple-100 text-purple-700',
-  Hybrid: 'bg-teal-100 text-teal-700',
+  Sativa: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  Indica: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  Hybrid: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
 };
 
 export default function MyListings() {
@@ -57,7 +57,7 @@ export default function MyListings() {
       {/* Seller Score Summary */}
       {myScore && myScore.transactionsScored > 0 && (
         <div className="mb-6">
-          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-500">Your Seller Score</h3>
+          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted">Your Seller Score</h3>
           <SellerScoreCard
             fillRate={myScore.fillRate}
             qualityScore={myScore.qualityScore}
@@ -78,8 +78,8 @@ export default function MyListings() {
 
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-brand-dark">My Listings</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-2xl font-semibold text-primary">My Listings</h2>
+          <p className="text-sm text-muted">
             {listings.length} product{listings.length !== 1 ? 's' : ''}
           </p>
           <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
@@ -119,21 +119,21 @@ export default function MyListings() {
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
           <p className="font-medium text-red-700">{error}</p>
           <button onClick={load} className="mt-3 text-sm font-medium text-red-600 underline">Try again</button>
         </div>
       )}
 
       {!loading && !error && listings.length === 0 && (
-        <div className="rounded-lg border border-brand-gray bg-white p-12 text-center">
+        <div className="rounded-lg border border-brand-gray surface p-12 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10">
             <svg className="h-8 w-8 text-brand-teal/50" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
             </svg>
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-gray-700">No listings yet</h3>
-          <p className="mb-4 text-sm text-gray-500">Your products will appear here once they're synced from Zoho CRM or created manually.</p>
+          <h3 className="mb-2 text-lg font-semibold text-secondary">No listings yet</h3>
+          <p className="mb-4 text-sm text-muted">Your products will appear here once they're synced from Zoho CRM or created manually.</p>
           <Link
             to="/create-listing"
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand-teal px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-blue"
@@ -158,9 +158,9 @@ export default function MyListings() {
 }
 
 const SOURCE_BADGES: Record<string, { label: string; class: string }> = {
-  zoho: { label: 'Zoho', class: 'bg-blue-50 text-blue-600' },
-  manual: { label: 'Manual', class: 'bg-violet-50 text-violet-600' },
-  'coa-email': { label: 'CoA Email', class: 'bg-cyan-50 text-cyan-600' },
+  zoho: { label: 'Zoho', class: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300' },
+  manual: { label: 'Manual', class: 'bg-violet-50 text-violet-600 dark:bg-violet-900/20 dark:text-violet-300' },
+  'coa-email': { label: 'CoA Email', class: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-900/20 dark:text-cyan-300' },
 };
 
 function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: () => void }) {
@@ -232,12 +232,12 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
   }
 
   const statusBadge = listing.requestPending
-    ? { label: 'Pending', class: 'bg-amber-100 text-amber-700' }
+    ? { label: 'Pending', class: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
     : listing.isActive
       ? { label: 'Active', class: 'bg-brand-sage/20 text-brand-teal' }
-      : { label: 'Paused', class: 'bg-gray-100 text-gray-500' };
+      : { label: 'Paused', class: 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400' };
 
-  const sourceBadge = SOURCE_BADGES[listing.source] || { label: listing.source, class: 'bg-gray-50 text-gray-500' };
+  const sourceBadge = SOURCE_BADGES[listing.source] || { label: listing.source, class: 'bg-gray-50 text-gray-500 dark:bg-slate-700 dark:text-slate-400' };
 
   const thcDisplay = listing.thcMin != null && listing.thcMax != null && listing.thcMin !== listing.thcMax
     ? `${listing.thcMin}–${listing.thcMax}%`
@@ -252,19 +252,19 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       : null;
 
   return (
-    <div className={`rounded-lg border border-l-4 bg-white p-4 sm:p-5 ${
+    <div className={`rounded-lg border border-brand-blue/15 border-l-4 bg-brand-blue/5 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
       listing.requestPending ? 'border-l-amber-400' :
       listing.isActive ? 'border-l-brand-teal' :
-      'border-l-gray-300'
+      'border-l-gray-300 dark:border-l-slate-600'
     }`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         {/* Thumbnail */}
-        <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+        <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-slate-700">
           {listing.imageUrls?.[0] ? (
             <img src={listing.imageUrls[0]} alt={listing.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <svg className="h-8 w-8 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+              <svg className="h-8 w-8 text-faint" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
               </svg>
             </div>
@@ -275,17 +275,17 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
         <div className="min-w-0 flex-1">
           {/* Header row: name + badges */}
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-gray-900">{listing.name}</h3>
+            <h3 className="text-base font-semibold text-primary">{listing.name}</h3>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.class}`}>
               {statusBadge.label}
             </span>
             {listing.type && (
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[listing.type] || 'bg-gray-100 text-gray-600'}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[listing.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                 {listing.type}
               </span>
             )}
             {listing.category && (
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-slate-300">
                 {listing.category}
               </span>
             )}
@@ -293,7 +293,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
               {sourceBadge.label}
             </span>
             {listing.pendingBids > 0 && (
-              <span className="flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+              <span className="flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
                 <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
                 </svg>
@@ -335,7 +335,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                     )}
                   </div>
                   {listing.description && (
-                    <p className="mt-2 text-xs leading-relaxed text-gray-500">{listing.description}</p>
+                    <p className="mt-2 text-xs leading-relaxed text-muted">{listing.description}</p>
                   )}
                 </div>
               )}
@@ -357,11 +357,11 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 <EditField label="Min QTY (g)" value={minQty} onChange={setMinQty} step="1" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Certification</label>
+                <label className="mb-1 block text-xs font-medium text-muted">Certification</label>
                 <select
                   value={cert}
                   onChange={(e) => setCert(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
+                  className="w-full input-field"
                 >
                   <option value="">None</option>
                   {['GACP', 'GMP1', 'GMP2', 'GPP', 'IMC-GAP'].map((c) => (
@@ -370,12 +370,12 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Description</label>
+                <label className="mb-1 block text-xs font-medium text-muted">Description</label>
                 <textarea
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   rows={2}
-                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
+                  className="w-full input-field"
                 />
               </div>
               {editError && <p className="text-xs text-red-600">{editError}</p>}
@@ -389,7 +389,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 </button>
                 <button
                   onClick={() => { setEditing(false); resetFields(); }}
-                  className="rounded-lg border px-4 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+                  className="rounded-lg border border-default px-4 py-1.5 text-xs font-medium text-secondary transition hover-surface-muted"
                 >
                   Cancel
                 </button>
@@ -403,7 +403,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
           <div className="flex shrink-0 gap-2">
             <button
               onClick={() => setEditing(true)}
-              className="rounded-lg border px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-default px-3 py-1.5 text-xs font-medium text-secondary transition hover-surface-muted"
             >
               Edit
             </button>
@@ -429,9 +429,9 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <span className="text-gray-500">
-      <span className="font-medium text-gray-400">{label}:</span>{' '}
-      <span className="font-semibold text-gray-700">{value}</span>
+    <span className="text-muted">
+      <span className="font-medium text-faint">{label}:</span>{' '}
+      <span className="font-semibold text-secondary">{value}</span>
     </span>
   );
 }
@@ -444,14 +444,14 @@ function EditField({ label, value, onChange, step }: {
 }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-gray-500">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-muted">{label}</label>
       <input
         type="number"
         step={step}
         min="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
+        className="w-full input-field"
       />
     </div>
   );

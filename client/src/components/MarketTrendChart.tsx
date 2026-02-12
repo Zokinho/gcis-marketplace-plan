@@ -9,12 +9,12 @@ const TREND_ICONS: Record<string, string> = {
 const TREND_COLORS: Record<string, string> = {
   up: 'text-brand-sage',
   down: 'text-brand-coral',
-  stable: 'text-brand-dark',
+  stable: 'text-primary',
 };
 
 export default function MarketTrendChart({ trends }: { trends: MarketTrend[] }) {
   if (trends.length === 0) {
-    return <p className="text-sm text-gray-400">No market data yet</p>;
+    return <p className="text-sm text-faint">No market data yet</p>;
   }
 
   const maxVolume = Math.max(...trends.map(t => t.volume), 1);
@@ -23,7 +23,7 @@ export default function MarketTrendChart({ trends }: { trends: MarketTrend[] }) 
     <div className="space-y-3">
       {trends.map((trend) => (
         <div key={trend.categoryName} className="flex items-center gap-3">
-          <span className="w-28 shrink-0 truncate text-xs font-medium text-brand-dark">
+          <span className="w-28 shrink-0 truncate text-xs font-medium text-primary">
             {trend.categoryName}
           </span>
           <div className="h-4 flex-1 overflow-hidden rounded-full bg-brand-gray">
@@ -32,7 +32,7 @@ export default function MarketTrendChart({ trends }: { trends: MarketTrend[] }) 
               style={{ width: `${(trend.volume / maxVolume) * 100}%` }}
             />
           </div>
-          <span className="w-16 text-right text-xs font-medium text-brand-dark">
+          <span className="w-16 text-right text-xs font-medium text-primary">
             ${trend.currentAvgPrice.toFixed(2)}
           </span>
           <span className={`w-12 text-right text-xs font-semibold ${TREND_COLORS[trend.trend]}`}>

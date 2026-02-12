@@ -63,15 +63,15 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
   }
 
   return (
-    <form onSubmit={handleSubmit} className="overflow-hidden rounded-lg border bg-white">
-      <div className="bg-gradient-to-r from-brand-teal to-brand-blue px-5 py-3">
+    <form onSubmit={handleSubmit} className="overflow-hidden rounded-lg border border-default surface">
+      <div className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-5 py-3">
         <h3 className="text-lg font-semibold text-white">Place a Bid</h3>
       </div>
       <div className="p-5">
 
       <div className="mb-4 space-y-3">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Price per gram ($)</label>
+          <label className="mb-1 block text-sm font-medium text-secondary">Price per gram ($)</label>
           <input
             type="number"
             step="0.01"
@@ -80,14 +80,14 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
             onChange={(e) => setPricePerUnit(e.target.value)}
             placeholder="0.00"
             required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
+            className="w-full rounded-lg input-field"
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-sm font-medium text-secondary">
             Quantity (grams)
-            {minQty != null && <span className="ml-1 font-normal text-gray-400">Min: {minQty.toLocaleString()}g</span>}
+            {minQty != null && <span className="ml-1 font-normal text-faint">Min: {minQty.toLocaleString()}g</span>}
           </label>
           <input
             type="number"
@@ -97,13 +97,13 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
             onChange={(e) => setQuantity(e.target.value)}
             placeholder={minQty ? `Min ${minQty}` : '0'}
             required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
+            className="w-full rounded-lg input-field"
           />
         </div>
 
         {totalValue > 0 && (
-          <p className="text-sm text-gray-600">
-            Total: <span className="font-semibold text-gray-900">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <p className="text-sm text-secondary">
+            Total: <span className="font-semibold text-primary">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </p>
         )}
 
@@ -111,13 +111,13 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
         <ProximityIndicator bidPrice={price} sellerPrice={sellerPrice} />
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Notes (optional)</label>
+          <label className="mb-1 block text-sm font-medium text-secondary">Notes (optional)</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
             placeholder="Any additional comments..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal"
+            className="w-full rounded-lg input-field"
           />
         </div>
       </div>
@@ -127,7 +127,7 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
       <button
         type="submit"
         disabled={price <= 0 || qty <= 0 || submitting}
-        className="w-full rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Submitting...' : 'Submit Bid'}
       </button>

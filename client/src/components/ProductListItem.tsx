@@ -2,28 +2,27 @@ import { Link } from 'react-router-dom';
 import type { ProductCard } from '../lib/api';
 
 const TYPE_COLORS: Record<string, string> = {
-  Sativa: 'bg-orange-100 text-orange-700',
-  Indica: 'bg-purple-100 text-purple-700',
-  Hybrid: 'bg-teal-100 text-teal-700',
+  Sativa: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  Indica: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  Hybrid: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
 };
 
 const CERT_COLORS: Record<string, string> = {
-  GACP: 'bg-blue-100 text-blue-700',
+  GACP: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   GMP1: 'bg-brand-sage/20 text-brand-teal',
   GMP2: 'bg-brand-sage/20 text-brand-teal',
-  GPP: 'bg-cyan-100 text-cyan-700',
-  'IMC-GAP': 'bg-amber-100 text-amber-700',
+  GPP: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'IMC-GAP': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
 };
 
-export default function ProductListItem({ product }: { product: ProductCard }) {
+export default function ProductListItem({ product, onClick }: { product: ProductCard; onClick?: (productId: string) => void }) {
   const available = (product.gramsAvailable ?? 0) > 0;
   const upcoming = (product.upcomingQty ?? 0) > 0;
 
-  return (
-    <Link
-      to={`/marketplace/${product.id}`}
-      className="group flex items-center gap-4 rounded-lg border bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-md hover:border-brand-sage/60"
-    >
+  const className = "group flex items-center gap-4 rounded-lg border border-brand-blue/15 bg-brand-blue/5 p-4 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl";
+
+  const content = (
+    <>
       {/* Thumbnail */}
       <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-brand-sage/10 to-brand-gray/40">
         {product.imageUrls?.[0] ? (
@@ -40,29 +39,29 @@ export default function ProductListItem({ product }: { product: ProductCard }) {
       {/* Name + badges */}
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex flex-wrap items-center gap-1.5">
-          <h3 className="text-sm font-semibold text-gray-900 group-hover:text-brand-teal">{product.name}</h3>
+          <h3 className="text-sm font-semibold text-primary group-hover:text-brand-teal">{product.name}</h3>
           {product.category && (
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{product.category}</span>
+            <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-secondary">{product.category}</span>
           )}
           {product.type && (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 text-gray-600'}`}>{product.type}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>{product.type}</span>
           )}
-          {product.certification && (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${CERT_COLORS[product.certification] || 'bg-gray-100 text-gray-600'}`}>{product.certification}</span>
-          )}
+          {product.certification && product.certification.split(', ').map((cert) => (
+            <span key={cert} className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${CERT_COLORS[cert.trim()] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>{cert.trim()}</span>
+          ))}
           {product.labName && (
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">CoA Verified</span>
+            <span className="rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">CoA Verified</span>
           )}
         </div>
-        <div className="flex flex-wrap gap-x-5 gap-y-0.5 text-xs text-gray-500">
+        <div className="flex flex-wrap gap-x-5 gap-y-0.5 text-xs text-muted">
           {(product.thcMin != null || product.thcMax != null) && (
-            <span>THC <span className="font-semibold text-gray-700">{formatRange(product.thcMin, product.thcMax)}%</span></span>
+            <span>THC <span className="font-semibold text-secondary">{formatRange(product.thcMin, product.thcMax)}%</span></span>
           )}
           {(product.cbdMin != null || product.cbdMax != null) && (
-            <span>CBD <span className="font-semibold text-gray-700">{formatRange(product.cbdMin, product.cbdMax)}%</span></span>
+            <span>CBD <span className="font-semibold text-secondary">{formatRange(product.cbdMin, product.cbdMax)}%</span></span>
           )}
           {product.licensedProducer && (
-            <span>LP <span className="font-semibold text-gray-700">{product.licensedProducer}</span></span>
+            <span>LP <span className="font-semibold text-secondary">{product.licensedProducer}</span></span>
           )}
         </div>
       </div>
@@ -75,15 +74,29 @@ export default function ProductListItem({ product }: { product: ProductCard }) {
           ) : upcoming ? (
             <span className="font-medium text-amber-600">Upcoming</span>
           ) : (
-            <span className="text-gray-400">Out of stock</span>
+            <span className="text-faint">Out of stock</span>
           )}
         </p>
       </div>
 
       {/* Arrow */}
-      <svg className="hidden h-4 w-4 flex-shrink-0 text-gray-300 group-hover:text-brand-teal sm:block" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <svg className="hidden h-4 w-4 flex-shrink-0 text-faint group-hover:text-brand-teal sm:block" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
       </svg>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <div className={className + ' cursor-pointer'} onClick={() => onClick(product.id)}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link to={`/marketplace/${product.id}`} className={className}>
+      {content}
     </Link>
   );
 }

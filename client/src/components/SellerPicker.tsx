@@ -55,13 +55,13 @@ export default function SellerPicker({ value, onChange, suggestedSeller }: Selle
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="mb-1 block text-xs font-medium text-gray-500">Seller</label>
+      <label className="mb-1 block text-xs font-medium text-muted">Seller</label>
 
       {/* Suggested seller badge */}
       {suggestedSeller && !value && (
-        <div className="mb-2 flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-xs">
-          <span className="font-medium text-blue-700">Suggested:</span>
-          <span className="text-blue-900">{displayName(suggestedSeller)}</span>
+        <div className="mb-2 flex items-center gap-2 rounded-md bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-xs">
+          <span className="font-medium text-blue-700 dark:text-blue-300">Suggested:</span>
+          <span className="text-blue-900 dark:text-blue-200">{displayName(suggestedSeller)}</span>
           <button
             onClick={() => onChange(suggestedSeller.id)}
             className="ml-auto rounded bg-blue-600 px-2 py-0.5 text-white hover:bg-blue-700"
@@ -74,14 +74,14 @@ export default function SellerPicker({ value, onChange, suggestedSeller }: Selle
       {/* Selected display / search input */}
       <div
         onClick={() => setOpen(true)}
-        className="flex cursor-pointer items-center rounded-lg border bg-white px-3 py-2"
+        className="flex cursor-pointer items-center rounded-lg border border-default surface px-3 py-2"
       >
         {selected ? (
           <div className="flex flex-1 items-center justify-between">
-            <span className="text-sm text-gray-900">{displayName(selected)}</span>
+            <span className="text-sm text-primary">{displayName(selected)}</span>
             <button
               onClick={(e) => { e.stopPropagation(); onChange(null); setSearch(''); }}
-              className="ml-2 text-gray-400 hover:text-gray-600"
+              className="ml-2 text-faint hover:text-secondary"
             >
               &times;
             </button>
@@ -93,16 +93,16 @@ export default function SellerPicker({ value, onChange, suggestedSeller }: Selle
             onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
             placeholder={loading ? 'Loading sellers...' : 'Search sellers...'}
-            className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
+            className="w-full bg-transparent text-sm text-primary outline-none placeholder:text-faint"
           />
         )}
       </div>
 
       {/* Dropdown */}
       {open && !selected && (
-        <div className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-lg border bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-subtle surface shadow-lg">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-gray-400">
+            <div className="px-3 py-2 text-xs text-faint">
               {loading ? 'Loading...' : 'No sellers found'}
             </div>
           ) : (
@@ -110,11 +110,11 @@ export default function SellerPicker({ value, onChange, suggestedSeller }: Selle
               <button
                 key={s.id}
                 onClick={() => { onChange(s.id); setOpen(false); setSearch(''); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover-surface-muted"
               >
                 <div>
-                  <p className="font-medium text-gray-900">{displayName(s)}</p>
-                  <p className="text-xs text-gray-400">{s.email}</p>
+                  <p className="font-medium text-primary">{displayName(s)}</p>
+                  <p className="text-xs text-faint">{s.email}</p>
                 </div>
               </button>
             ))

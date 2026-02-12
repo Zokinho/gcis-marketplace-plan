@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
+import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
+import { validate, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema } from '../utils/validation';
 import { prisma } from '../index';
 import { runFullSync, syncProducts, syncContacts, syncProductsDelta } from '../services/zohoSync';
 import { getCoaClient } from '../services/coaClient';
@@ -48,8 +50,8 @@ router.get('/sync-status', async (_req: Request, res: Response) => {
  * Manually trigger a full sync (products + contacts).
  * Optionally accepts { type: "products" | "contacts" } to sync only one.
  */
-router.post('/sync-now', async (req: Request, res: Response) => {
-  const { type } = req.body as { type?: string };
+router.post('/sync-now', validate(syncNowSchema), async (req: Request, res: Response) => {
+  const { type } = req.body;
 
   try {
     let result;
@@ -66,7 +68,7 @@ router.post('/sync-now', async (req: Request, res: Response) => {
 
     res.json({ message: 'Sync completed', result });
   } catch (err: any) {
-    console.error('[ADMIN] Manual sync failed:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] Manual sync failed');
     res.status(500).json({ error: 'Sync failed', details: err?.message });
   }
 });
@@ -107,16 +109,8 @@ router.get('/coa-email-queue', async (_req: Request, res: Response) => {
  * POST /api/admin/coa-email-confirm
  * Confirm seller and create a marketplace Product from a CoaSyncRecord.
  */
-router.post('/coa-email-confirm', async (req: Request, res: Response) => {
-  const { syncRecordId, sellerId, overrides } = req.body as {
-    syncRecordId: string;
-    sellerId: string;
-    overrides?: Record<string, any>;
-  };
-
-  if (!syncRecordId || !sellerId) {
-    return res.status(400).json({ error: 'syncRecordId and sellerId are required' });
-  }
+router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: Request, res: Response) => {
+  const { syncRecordId, sellerId, overrides } = req.body;
 
   const syncRecord = await prisma.coaSyncRecord.findUnique({
     where: { id: syncRecordId },
@@ -178,7 +172,7 @@ router.post('/coa-email-confirm', async (req: Request, res: Response) => {
 
     res.json({ product });
   } catch (err: any) {
-    console.error('[ADMIN] CoA email confirm failed:', err?.message);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] CoA email confirm failed');
     res.status(500).json({ error: 'Failed to create product', details: err?.message });
   }
 });
@@ -187,12 +181,8 @@ router.post('/coa-email-confirm', async (req: Request, res: Response) => {
  * POST /api/admin/coa-email-dismiss
  * Dismiss/skip a CoaSyncRecord.
  */
-router.post('/coa-email-dismiss', async (req: Request, res: Response) => {
-  const { syncRecordId } = req.body as { syncRecordId: string };
-
-  if (!syncRecordId) {
-    return res.status(400).json({ error: 'syncRecordId is required' });
-  }
+router.post('/coa-email-dismiss', validate(adminCoaDismissSchema), async (req: Request, res: Response) => {
+  const { syncRecordId } = req.body;
 
   const updated = await prisma.coaSyncRecord.update({
     where: { id: syncRecordId },
@@ -235,6 +225,92 @@ router.post('/coa-email-poll', async (_req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: 'Poll failed', details: err?.message });
   }
+});
+
+// ─── User Management ───
+
+/**
+ * GET /api/admin/users
+ * List users with optional filter: pending, approved, all
+ */
+router.get('/users', async (req: Request, res: Response) => {
+  const filter = (req.query.filter as string) || 'all';
+
+  let where: Prisma.UserWhereInput = {};
+  if (filter === 'pending') {
+    where = { approved: false, docUploaded: true };
+  } else if (filter === 'approved') {
+    where = { approved: true };
+  }
+
+  const users = await prisma.user.findMany({
+    where,
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      companyName: true,
+      contactType: true,
+      zohoContactId: true,
+      eulaAcceptedAt: true,
+      docUploaded: true,
+      approved: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Map zohoContactId to a boolean for the frontend
+  const mapped = users.map((u) => ({
+    ...u,
+    zohoLinked: !!u.zohoContactId,
+    zohoContactId: undefined,
+  }));
+
+  res.json({ users: mapped });
+});
+
+/**
+ * POST /api/admin/users/:userId/approve
+ * Approve a user — sets approved = true, optionally sets contactType.
+ */
+router.post('/users/:userId/approve', validate(approveUserSchema), async (req: Request<{ userId: string }>, res: Response) => {
+  const { userId } = req.params;
+  const { contactType } = req.body;
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const data: Prisma.UserUpdateInput = { approved: true };
+  if (contactType && !user.contactType) {
+    data.contactType = contactType;
+  }
+
+  const updated = await prisma.user.update({ where: { id: userId }, data });
+  logger.info({ userEmail: updated.email, approvedBy: req.user?.email }, '[ADMIN] User approved');
+
+  res.json({ message: 'User approved', user: { id: updated.id, email: updated.email, approved: updated.approved } });
+});
+
+/**
+ * POST /api/admin/users/:userId/reject
+ * Reject a user — deletes the user record so they can re-register.
+ */
+router.post('/users/:userId/reject', async (req: Request<{ userId: string }>, res: Response) => {
+  const { userId } = req.params;
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  await prisma.user.delete({ where: { id: userId } });
+  logger.info({ userEmail: user.email, rejectedBy: req.user?.email }, '[ADMIN] User rejected (deleted)');
+
+  res.json({ message: 'User rejected and removed' });
 });
 
 export default router;

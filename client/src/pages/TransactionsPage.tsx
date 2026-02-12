@@ -58,8 +58,8 @@ export default function TransactionsPage() {
       )}
 
       {!loading && !error && transactions.length === 0 && (
-        <div className="rounded-lg border bg-white p-12 text-center">
-          <p className="text-sm text-gray-500">No transactions yet. Transactions are created when bids are accepted.</p>
+        <div className="rounded-lg border surface p-12 text-center">
+          <p className="text-sm text-muted">No transactions yet. Transactions are created when bids are accepted.</p>
         </div>
       )}
 
@@ -67,11 +67,11 @@ export default function TransactionsPage() {
         <>
           <div className="space-y-3">
             {transactions.map((tx) => (
-              <div key={tx.id} className="rounded-lg border bg-white p-4">
+              <div key={tx.id} className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-brand-dark">{tx.product?.name || 'Unknown'}</span>
+                      <span className="font-semibold text-primary">{tx.product?.name || 'Unknown'}</span>
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                         tx.status === 'completed' ? 'bg-sky-100 text-brand-blue'
                         : tx.status === 'cancelled' ? 'bg-red-100 text-red-700'
@@ -80,24 +80,24 @@ export default function TransactionsPage() {
                         {tx.status}
                       </span>
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                       <span>Buyer: {tx.buyer?.companyName || tx.buyer?.email}</span>
                       <span>Seller: {tx.seller?.companyName || tx.seller?.email}</span>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
+                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
                       <span>Qty: {tx.quantity.toLocaleString()}g</span>
                       <span>Price: ${tx.pricePerUnit.toFixed(2)}/g</span>
                       <span>Total: ${tx.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     {tx.outcomeRecordedAt && (
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                        {tx.actualQuantityDelivered != null && <span className="text-gray-500">Delivered: {tx.actualQuantityDelivered}g</span>}
+                        {tx.actualQuantityDelivered != null && <span className="text-muted">Delivered: {tx.actualQuantityDelivered}g</span>}
                         {tx.deliveryOnTime != null && <span className={tx.deliveryOnTime ? 'text-brand-blue' : 'text-red-600'}>On Time: {tx.deliveryOnTime ? 'Yes' : 'No'}</span>}
                         {tx.qualityAsExpected != null && <span className={tx.qualityAsExpected ? 'text-brand-blue' : 'text-red-600'}>Quality OK: {tx.qualityAsExpected ? 'Yes' : 'No'}</span>}
                       </div>
                     )}
                   </div>
-                  <div className="shrink-0 text-right text-xs text-gray-400">
+                  <div className="shrink-0 text-right text-xs text-faint">
                     {new Date(tx.transactionDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
                 </div>
@@ -107,9 +107,9 @@ export default function TransactionsPage() {
 
           {pagination.totalPages > 1 && (
             <div className="mt-6 flex items-center justify-center gap-2">
-              <button onClick={() => load(pagination.page - 1)} disabled={pagination.page <= 1} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Previous</button>
-              <span className="text-sm text-gray-500">Page {pagination.page} of {pagination.totalPages}</span>
-              <button onClick={() => load(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Next</button>
+              <button onClick={() => load(pagination.page - 1)} disabled={pagination.page <= 1} className="rounded-lg border px-3 py-1.5 text-sm text-secondary disabled:opacity-40">Previous</button>
+              <span className="text-sm text-muted">Page {pagination.page} of {pagination.totalPages}</span>
+              <button onClick={() => load(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages} className="rounded-lg border px-3 py-1.5 text-sm text-secondary disabled:opacity-40">Next</button>
             </div>
           )}
         </>

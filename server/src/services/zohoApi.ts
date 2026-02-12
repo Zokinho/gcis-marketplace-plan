@@ -4,6 +4,7 @@ import axios from 'axios';
 import { zohoRequest, getAccessToken, ZOHO_API_URL } from './zohoAuth';
 import { prisma } from '../index';
 import { calculateProximity } from '../utils/proximity';
+import logger from '../utils/logger';
 
 // ─── Product field list for sync ───
 
@@ -141,7 +142,7 @@ export async function createBidTask(bid: {
   pricePerUnit: number | null;
 }, buyer: {
   companyName: string | null;
-  zohoContactId: string;
+  zohoContactId: string | null;
 }) {
   const proximityScore = calculateProximity(bid.pricePerUnit, product.pricePerUnit || 0);
 
@@ -151,7 +152,7 @@ export async function createBidTask(bid: {
       Status: 'Not Started',
       Priority: proximityScore > 80 ? 'High' : 'Normal',
       What_Id: product.zohoProductId,
-      Who_Id: buyer.zohoContactId,
+      ...(buyer.zohoContactId ? { Who_Id: buyer.zohoContactId } : {}),
       Description: [
         `Product: ${product.name}`,
         `Bid: $${bid.pricePerUnit}/unit x ${bid.quantity}g = $${bid.totalValue}`,
@@ -243,8 +244,8 @@ export async function updateBidTaskOutcome(
 export async function createDeal(params: {
   productName: string;
   buyerCompany: string | null;
-  buyerZohoContactId: string;
-  sellerZohoContactId: string;
+  buyerZohoContactId: string | null;
+  sellerZohoContactId: string | null;
   amount: number;
   quantity: number;
 }): Promise<string | null> {
@@ -256,7 +257,7 @@ export async function createDeal(params: {
         Deal_Name: `${params.productName} — ${params.buyerCompany || 'Buyer'}`,
         Stage: 'Closed Won',
         Amount: params.amount,
-        Contact_Name: params.buyerZohoContactId,
+        ...(params.buyerZohoContactId ? { Contact_Name: params.buyerZohoContactId } : {}),
         Description: [
           `Product: ${params.productName}`,
           `Quantity: ${params.quantity}g`,
@@ -359,7 +360,7 @@ export async function createZohoProduct(fields: {
   if (fields.lineage) zohoFields.Lineage = fields.lineage;
   if (fields.growthMedium) zohoFields.Growth_Medium = fields.growthMedium;
   if (fields.harvestDate) zohoFields.Harvest_Date = fields.harvestDate.toISOString().split('T')[0];
-  if (fields.certification) zohoFields.Certification = [fields.certification];
+  if (fields.certification) zohoFields.Certification = fields.certification.split(',').map((c) => c.trim()).filter(Boolean);
   if (fields.thcMin != null) zohoFields.THC_as_is = fields.thcMin;
   if (fields.thcMax != null) zohoFields.THC_max = fields.thcMax;
   if (fields.cbdMin != null) zohoFields.CBD_as_is = fields.cbdMin;
@@ -467,7 +468,7 @@ export async function uploadProductFiles(
       const fileId = await uploadToZFS(imageFiles[i]);
       updatePayload[imageFieldNames[i]] = [{ file_id: fileId }];
     } catch (err: any) {
-      console.error(`[ZOHO] Image upload failed for ${imageFieldNames[i]}:`, err?.message);
+      logger.error({ err, field: imageFieldNames[i] }, '[ZOHO] Image upload failed');
     }
   }
 
@@ -477,7 +478,7 @@ export async function uploadProductFiles(
       const fileId = await uploadToZFS(coaFiles[i]);
       updatePayload[coaFieldNames[i]] = [{ file_id: fileId }];
     } catch (err: any) {
-      console.error(`[ZOHO] CoA upload failed for ${coaFieldNames[i]}:`, err?.message);
+      logger.error({ err, field: coaFieldNames[i] }, '[ZOHO] CoA upload failed');
     }
   }
 
@@ -492,7 +493,7 @@ export async function uploadProductFiles(
     }, {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
-    console.log(`[ZOHO] Uploaded ${Object.keys(updatePayload).length} files to product ${zohoProductId}`);
+    logger.info({ count: Object.keys(updatePayload).length, zohoProductId }, '[ZOHO] Uploaded files to product');
   }
 }
 

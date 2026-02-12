@@ -27,14 +27,15 @@ export default function CuratedShares() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-5 text-white">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Curated Shares</h1>
-          <p className="mt-0.5 text-sm text-white/70">Create and manage shareable product catalogs</p>
+          <h1 className="text-2xl font-semibold text-primary">Curated Shares</h1>
+          <p className="text-sm text-muted">Create and manage shareable product catalogs</p>
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30"
+          className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-blue"
         >
           + New Share
         </button>
@@ -54,8 +55,8 @@ export default function CuratedShares() {
       )}
 
       {!loading && shares.length === 0 && !showCreate && (
-        <div className="rounded-lg border bg-white p-12 text-center">
-          <p className="text-sm text-gray-500">No shares created yet</p>
+        <div className="rounded-lg border border-subtle surface p-12 text-center">
+          <p className="text-sm text-muted">No shares created yet</p>
         </div>
       )}
 
@@ -103,22 +104,22 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
   };
 
   return (
-    <div className="mb-6 rounded-lg border bg-white p-6">
-      <h3 className="mb-4 text-lg font-semibold text-gray-900">Create Share Link</h3>
+    <div className="mb-6 rounded-lg border border-subtle surface p-6">
+      <h3 className="mb-4 text-lg font-semibold text-primary">Create Share Link</h3>
 
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-gray-500">Label</label>
+        <label className="mb-1 block text-xs font-medium text-muted">Label</label>
         <input
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="e.g., Q1 2026 Product Catalog for ABC Corp"
-          className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-teal"
+          className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
         />
       </div>
 
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-gray-500">
+        <label className="mb-1 block text-xs font-medium text-muted">
           Products ({selectedIds.length} selected)
         </label>
         <input
@@ -126,14 +127,14 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search products..."
-          className="mb-2 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand-teal"
+          className="mb-2 w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
         />
-        <div className="max-h-48 overflow-auto rounded-lg border p-2">
+        <div className="max-h-48 overflow-auto rounded-lg border border-subtle p-2">
           {loadingProducts ? (
-            <p className="text-xs text-gray-400">Loading products...</p>
+            <p className="text-xs text-faint">Loading products...</p>
           ) : (
             filtered.map((p) => (
-              <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-gray-50">
+              <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover-surface-muted">
                 <input
                   type="checkbox"
                   checked={selectedIds.includes(p.id)}
@@ -142,11 +143,11 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
                       prev.includes(p.id) ? prev.filter((id) => id !== p.id) : [...prev, p.id],
                     );
                   }}
-                  className="rounded border-gray-300"
+                  className="rounded border-default"
                 />
-                <span className="text-sm text-gray-700">{p.name}</span>
+                <span className="text-sm text-secondary">{p.name}</span>
                 {p.licensedProducer && (
-                  <span className="text-xs text-gray-400">by {p.licensedProducer}</span>
+                  <span className="text-xs text-faint">by {p.licensedProducer}</span>
                 )}
               </label>
             ))
@@ -162,7 +163,7 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
         >
           {creating ? 'Creating...' : 'Create Share Link'}
         </button>
-        <button onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+        <button onClick={onCancel} className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary hover-surface-muted">
           Cancel
         </button>
       </div>
@@ -204,16 +205,16 @@ function ShareCard({ share, onUpdate }: { share: CuratedShareData; onUpdate: () 
   };
 
   return (
-    <div className={`rounded-lg border border-l-4 bg-white p-5 ${share.active ? 'border-l-brand-teal' : 'border-l-gray-300 opacity-60'}`}>
+    <div className={`rounded-lg border border-brand-blue/15 border-l-4 bg-brand-blue/5 shadow-md p-5 ${share.active ? 'border-l-brand-teal' : 'border-l-gray-300 dark:border-l-slate-600 opacity-60'}`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-gray-900">{share.label}</h3>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${share.active ? 'bg-brand-sage/20 text-brand-teal' : 'bg-gray-100 text-gray-500'}`}>
+            <h3 className="font-semibold text-primary">{share.label}</h3>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${share.active ? 'bg-brand-sage/20 text-brand-teal' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400'}`}>
               {share.active ? 'Active' : 'Inactive'}
             </span>
           </div>
-          <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-400">
+          <div className="mt-1 flex flex-wrap gap-3 text-xs text-faint">
             <span>{share.productIds.length} products</span>
             <span>{share.useCount} views</span>
             {share.lastUsedAt && <span>Last viewed: {new Date(share.lastUsedAt).toLocaleDateString()}</span>}
@@ -224,16 +225,16 @@ function ShareCard({ share, onUpdate }: { share: CuratedShareData; onUpdate: () 
       </div>
 
       {/* Share URL */}
-      <div className="mt-3 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+      <div className="mt-3 flex items-center gap-2 rounded-lg surface-muted px-3 py-2">
         <input
           type="text"
           readOnly
           value={shareUrl}
-          className="flex-1 bg-transparent text-xs text-gray-600 outline-none"
+          className="flex-1 bg-transparent text-xs text-secondary outline-none"
         />
         <button
           onClick={copyLink}
-          className="rounded-md bg-white px-3 py-1 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-100"
+          className="rounded-md surface px-3 py-1 text-xs font-medium text-secondary shadow-sm hover-surface-muted"
         >
           {copied ? 'Copied!' : 'Copy'}
         </button>
@@ -243,7 +244,7 @@ function ShareCard({ share, onUpdate }: { share: CuratedShareData; onUpdate: () 
       <div className="mt-3 flex gap-3">
         <button
           onClick={handleToggle}
-          className="text-xs font-medium text-gray-500 hover:text-gray-700"
+          className="text-xs font-medium text-muted hover:text-secondary dark:hover:text-slate-200"
         >
           {share.active ? 'Deactivate' : 'Reactivate'}
         </button>

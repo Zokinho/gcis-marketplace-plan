@@ -5,6 +5,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import logger from '../utils/logger';
 import { prisma } from '../index';
 import * as matchingEngine from '../services/matchingEngine';
 import * as sellerScoreService from '../services/sellerScoreService';
@@ -66,7 +67,7 @@ adminRouter.get('/dashboard', async (_req: Request, res: Response) => {
       })),
     });
   } catch (err) {
-    console.error('[INTEL] Dashboard error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Dashboard error');
     res.status(500).json({ error: 'Failed to load dashboard' });
   }
 });
@@ -105,7 +106,7 @@ adminRouter.get('/matches', async (req: Request, res: Response) => {
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    console.error('[INTEL] Matches error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Matches error');
     res.status(500).json({ error: 'Failed to fetch matches' });
   }
 });
@@ -126,7 +127,7 @@ adminRouter.get('/matches/:id', async (req: Request<{ id: string }>, res: Respon
     if (!match) return res.status(404).json({ error: 'Match not found' });
     res.json({ match });
   } catch (err) {
-    console.error('[INTEL] Match detail error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Match detail error');
     res.status(500).json({ error: 'Failed to fetch match' });
   }
 });
@@ -146,7 +147,7 @@ adminRouter.post('/matches/generate', async (req: Request, res: Response) => {
       res.json(result);
     }
   } catch (err) {
-    console.error('[INTEL] Match generation error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Match generation error');
     res.status(500).json({ error: 'Failed to generate matches' });
   }
 });
@@ -168,7 +169,7 @@ adminRouter.get('/predictions', async (req: Request, res: Response) => {
       res.json({ predictions });
     }
   } catch (err) {
-    console.error('[INTEL] Predictions error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Predictions error');
     res.status(500).json({ error: 'Failed to fetch predictions' });
   }
 });
@@ -202,7 +203,7 @@ adminRouter.get('/predictions/calendar', async (_req: Request, res: Response) =>
 
     res.json({ weeks });
   } catch (err) {
-    console.error('[INTEL] Calendar error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Calendar error');
     res.status(500).json({ error: 'Failed to build calendar' });
   }
 });
@@ -218,7 +219,7 @@ adminRouter.get('/churn/at-risk', async (req: Request, res: Response) => {
     const buyers = await churnDetectionService.getAtRiskBuyers({ minRiskLevel, limit });
     res.json({ buyers });
   } catch (err) {
-    console.error('[INTEL] Churn at-risk error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Churn at-risk error');
     res.status(500).json({ error: 'Failed to fetch at-risk buyers' });
   }
 });
@@ -231,7 +232,7 @@ adminRouter.get('/churn/stats', async (_req: Request, res: Response) => {
     const stats = await churnDetectionService.getChurnStats();
     res.json(stats);
   } catch (err) {
-    console.error('[INTEL] Churn stats error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Churn stats error');
     res.status(500).json({ error: 'Failed to fetch churn stats' });
   }
 });
@@ -244,7 +245,7 @@ adminRouter.post('/churn/detect', async (_req: Request, res: Response) => {
     const result = await churnDetectionService.detectAllChurnSignals();
     res.json(result);
   } catch (err) {
-    console.error('[INTEL] Churn detection error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Churn detection error');
     res.status(500).json({ error: 'Failed to run churn detection' });
   }
 });
@@ -257,7 +258,7 @@ adminRouter.get('/market/trends', async (_req: Request, res: Response) => {
     const trends = await marketContextService.getMarketTrends();
     res.json({ trends });
   } catch (err) {
-    console.error('[INTEL] Market trends error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Market trends error');
     res.status(500).json({ error: 'Failed to fetch market trends' });
   }
 });
@@ -270,7 +271,7 @@ adminRouter.get('/market/insights', async (_req: Request, res: Response) => {
     const insights = await marketContextService.getMarketInsights();
     res.json(insights);
   } catch (err) {
-    console.error('[INTEL] Market insights error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Market insights error');
     res.status(500).json({ error: 'Failed to fetch market insights' });
   }
 });
@@ -283,7 +284,7 @@ adminRouter.get('/market/:categoryName', async (req: Request<{ categoryName: str
     const context = await marketContextService.getMarketContext(req.params.categoryName);
     res.json(context);
   } catch (err) {
-    console.error('[INTEL] Market context error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Market context error');
     res.status(500).json({ error: 'Failed to fetch market context' });
   }
 });
@@ -297,7 +298,7 @@ adminRouter.get('/propensity/top', async (req: Request, res: Response) => {
     const buyers = await propensityService.getTopPropensityBuyers(limit);
     res.json({ buyers });
   } catch (err) {
-    console.error('[INTEL] Propensity error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Propensity error');
     res.status(500).json({ error: 'Failed to fetch propensity scores' });
   }
 });
@@ -315,7 +316,7 @@ adminRouter.get('/seller-scores', async (_req: Request, res: Response) => {
     });
     res.json({ scores });
   } catch (err) {
-    console.error('[INTEL] Seller scores error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Seller scores error');
     res.status(500).json({ error: 'Failed to fetch seller scores' });
   }
 });
@@ -340,7 +341,7 @@ adminRouter.get('/seller-scores/:sellerId', async (req: Request<{ sellerId: stri
 
     res.json({ score });
   } catch (err) {
-    console.error('[INTEL] Seller score detail error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Seller score detail error');
     res.status(500).json({ error: 'Failed to fetch seller score' });
   }
 });
@@ -353,7 +354,7 @@ adminRouter.post('/seller-scores/recalculate', async (_req: Request, res: Respon
     const result = await sellerScoreService.recalculateAllSellerScores();
     res.json(result);
   } catch (err) {
-    console.error('[INTEL] Recalculate error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Recalculate error');
     res.status(500).json({ error: 'Failed to recalculate seller scores' });
   }
 });
@@ -390,7 +391,7 @@ adminRouter.get('/transactions', async (req: Request, res: Response) => {
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    console.error('[INTEL] Transactions error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Transactions error');
     res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 });
@@ -413,7 +414,7 @@ adminRouter.get('/transactions/:id', async (req: Request<{ id: string }>, res: R
     if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
     res.json({ transaction });
   } catch (err) {
-    console.error('[INTEL] Transaction detail error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Transaction detail error');
     res.status(500).json({ error: 'Failed to fetch transaction' });
   }
 });
@@ -455,7 +456,7 @@ buyerMatchRouter.get('/', async (req: Request, res: Response) => {
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    console.error('[MATCHES] Buyer matches error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MATCHES] Buyer matches error');
     res.status(500).json({ error: 'Failed to fetch matches' });
   }
 });
@@ -490,7 +491,7 @@ buyerMatchRouter.get('/:id', async (req: Request<{ id: string }>, res: Response)
 
     res.json({ match });
   } catch (err) {
-    console.error('[MATCHES] Match detail error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MATCHES] Match detail error');
     res.status(500).json({ error: 'Failed to fetch match' });
   }
 });
@@ -515,7 +516,7 @@ buyerMatchRouter.post('/:id/dismiss', async (req: Request<{ id: string }>, res: 
 
     res.json({ status: 'rejected' });
   } catch (err) {
-    console.error('[MATCHES] Dismiss error:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MATCHES] Dismiss error');
     res.status(500).json({ error: 'Failed to dismiss match' });
   }
 });

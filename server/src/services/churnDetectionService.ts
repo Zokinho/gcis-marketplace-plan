@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '../index';
+import logger from '../utils/logger';
 
 function calculateRiskLevel(daysSince: number, avgInterval: number): { level: 'low' | 'medium' | 'high' | 'critical'; score: number } {
   const ratio = daysSince / avgInterval;
@@ -131,7 +132,7 @@ export async function detectAllChurnSignals(): Promise<{ signalsCreated: number;
         }
       }
     } catch (err) {
-      console.error(`[CHURN] Error analyzing buyer ${buyer.id}:`, err);
+      logger.error({ err, buyerId: buyer.id }, '[CHURN] Error analyzing buyer');
     }
   }
 

@@ -3,6 +3,7 @@ import { prisma } from '../index';
 import { getCoaClient } from './coaClient';
 import { detectSeller } from './sellerDetection';
 import { mapCoaToProductFields } from '../utils/coaMapper';
+import logger from '../utils/logger';
 
 let cronJob: cron.ScheduledTask | null = null;
 
@@ -92,16 +93,16 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
           processed++;
         }
       } catch (err: any) {
-        console.error(`[COA-EMAIL] Error processing ingestion ${ingestion.id}:`, err?.message);
+        logger.error({ err, ingestionId: ingestion.id }, '[COA-EMAIL] Error processing ingestion');
         errors++;
       }
     }
 
     if (processed > 0) {
-      console.log(`[COA-EMAIL] Processed ${processed} new email attachments, ${errors} errors`);
+      logger.info({ processed, errors }, '[COA-EMAIL] Processed new email attachments');
     }
   } catch (err: any) {
-    console.error('[COA-EMAIL] Poll failed:', err?.message);
+    logger.error({ err }, '[COA-EMAIL] Poll failed');
   }
 
   return { processed, errors };
@@ -118,18 +119,18 @@ export function startCoaEmailSync() {
     try {
       await pollEmailIngestions();
     } catch (err) {
-      console.error('[COA-EMAIL] Cron error:', err);
+      logger.error({ err }, '[COA-EMAIL] Cron error');
     }
   });
 
-  console.log('[COA-EMAIL] Cron scheduled: every 5 minutes');
+  logger.info('[COA-EMAIL] Cron scheduled: every 5 minutes');
 }
 
 export function stopCoaEmailSync() {
   if (cronJob) {
     cronJob.stop();
     cronJob = null;
-    console.log('[COA-EMAIL] Cron stopped');
+    logger.info('[COA-EMAIL] Cron stopped');
   }
 }
 

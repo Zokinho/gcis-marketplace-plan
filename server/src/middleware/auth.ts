@@ -9,7 +9,7 @@ declare global {
       user?: {
         id: string;
         clerkUserId: string;
-        zohoContactId: string;
+        zohoContactId: string | null;
         email: string;
         firstName: string | null;
         lastName: string | null;
@@ -41,12 +41,6 @@ export async function marketplaceAuth(req: Request, res: Response, next: NextFun
   if (!user) {
     return res.status(403).json({ error: 'Account not found', code: 'NOT_FOUND' });
   }
-  if (!user.zohoContactId) {
-    return res.status(403).json({
-      error: 'Your email is not in our system. Please contact GCIS to get started.',
-      code: 'NO_ZOHO_LINK',
-    });
-  }
   if (!user.approved) {
     return res.status(403).json({ error: 'Account pending approval', code: 'PENDING_APPROVAL' });
   }
@@ -71,20 +65,25 @@ export function requireSeller(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Cache admin emails at module load (parsed once, not per-request)
+const ADMIN_EMAILS_SET = new Set(
+  (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+);
+
 /**
  * Admin route guard.
- * Checks if the user is a seller or their email is in the ADMIN_EMAILS list.
+ * Only allows users whose email is in the ADMIN_EMAILS list.
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  const isSeller = req.user?.contactType?.includes('Seller') ?? false;
-
-  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const isAdminEmail = req.user?.email ? adminEmails.includes(req.user.email.toLowerCase()) : false;
-
-  if (!isSeller && !isAdminEmail) {
+  if (!isAdmin(req.user?.email)) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
+}
+
+/** Check if an email is in the admin list. */
+export function isAdmin(email: string | null | undefined): boolean {
+  return email ? ADMIN_EMAILS_SET.has(email.toLowerCase()) : false;
 }
 
 export { requireAuth };

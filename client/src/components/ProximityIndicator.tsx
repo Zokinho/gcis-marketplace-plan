@@ -5,7 +5,7 @@
 export default function ProximityIndicator({ bidPrice, sellerPrice }: { bidPrice: number; sellerPrice: number | null }) {
   if (!sellerPrice || sellerPrice <= 0 || !bidPrice || bidPrice <= 0) {
     return (
-      <div className="rounded-lg border bg-gray-50 p-3 text-center text-sm text-gray-400">
+      <div className="rounded-lg border border-subtle surface-muted p-3 text-center text-sm text-faint">
         Enter a price to see bid strength
       </div>
     );
@@ -18,19 +18,19 @@ export default function ProximityIndicator({ bidPrice, sellerPrice }: { bidPrice
 
   if (ratio >= 0.9) {
     label = 'This is a strong offer';
-    colorClass = 'text-green-700 bg-green-50 border-green-200';
+    colorClass = 'text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
     icon = '✓';
   } else if (ratio >= 0.8) {
     label = 'Competitive offer';
-    colorClass = 'text-yellow-700 bg-yellow-50 border-yellow-200';
+    colorClass = 'text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800';
     icon = '~';
   } else if (ratio >= 0.7) {
     label = 'Your offer may be too low';
-    colorClass = 'text-orange-700 bg-orange-50 border-orange-200';
+    colorClass = 'text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800';
     icon = '!';
   } else {
     label = 'Your offer is unlikely to be accepted';
-    colorClass = 'text-red-700 bg-red-50 border-red-200';
+    colorClass = 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
     icon = '✗';
   }
 

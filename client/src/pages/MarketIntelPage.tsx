@@ -55,29 +55,29 @@ export default function MarketIntelPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Price Trends */}
-        <div className="rounded-lg border bg-white p-5">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Price Trends (30d)</h3>
+        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Price Trends (30d)</h3>
           <MarketTrendChart trends={trends} />
         </div>
 
         {/* Top Categories by Volume */}
-        <div className="rounded-lg border bg-white p-5">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Top Categories by Volume</h3>
+        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Top Categories by Volume</h3>
           {topCategories.length === 0 ? (
-            <p className="text-sm text-gray-400">No transaction data yet</p>
+            <p className="text-sm text-faint">No transaction data yet</p>
           ) : (
             <div className="space-y-2">
               {topCategories.map((cat) => (
                 <button
                   key={cat.categoryName}
                   onClick={() => setSelectedCategory(cat.categoryName)}
-                  className={`w-full rounded-lg px-3 py-2 text-left transition hover:bg-brand-offwhite ${selectedCategory === cat.categoryName ? 'bg-brand-gray/30 ring-1 ring-brand-blue/30' : ''}`}
+                  className={`w-full rounded-lg px-3 py-2 text-left transition hover-surface-muted ${selectedCategory === cat.categoryName ? 'bg-brand-gray/30 ring-1 ring-brand-blue/30' : ''}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">{cat.categoryName}</span>
-                    <span className="text-sm text-gray-500">${cat.avgPrice.toFixed(2)}/g</span>
+                    <span className="text-sm font-medium text-secondary">{cat.categoryName}</span>
+                    <span className="text-sm text-muted">${cat.avgPrice.toFixed(2)}/g</span>
                   </div>
-                  <p className="text-xs text-gray-400">Vol: ${cat.volume.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                  <p className="text-xs text-faint">Vol: ${cat.volume.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                 </button>
               ))}
             </div>
@@ -85,19 +85,19 @@ export default function MarketIntelPage() {
         </div>
 
         {/* Supply/Demand */}
-        <div className="rounded-lg border bg-white p-5">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Supply / Demand</h3>
+        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Supply / Demand</h3>
           {supplyDemand.length === 0 ? (
-            <p className="text-sm text-gray-400">No data yet</p>
+            <p className="text-sm text-faint">No data yet</p>
           ) : (
             <div className="space-y-2">
               {supplyDemand.map((sd) => {
                 const color = sd.assessment === 'high_demand' ? 'text-brand-blue bg-sky-100'
                   : sd.assessment === 'oversupply' ? 'text-red-700 bg-red-50'
-                  : 'text-gray-600 bg-brand-offwhite';
+                  : 'text-secondary bg-brand-offwhite dark:bg-slate-700';
                 return (
                   <div key={sd.categoryName} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm">
-                    <span className="text-gray-700">{sd.categoryName}</span>
+                    <span className="text-secondary">{sd.categoryName}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
                       {sd.assessment.replace('_', ' ')} ({sd.ratio.toFixed(1)})
                     </span>
@@ -109,12 +109,12 @@ export default function MarketIntelPage() {
         </div>
 
         {/* Category Detail */}
-        <div className="rounded-lg border bg-white p-5">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">
+        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
             {selectedCategory ? `${selectedCategory} Detail` : 'Select a Category'}
           </h3>
           {!categoryContext ? (
-            <p className="text-sm text-gray-400">Click a category to see details</p>
+            <p className="text-sm text-faint">Click a category to see details</p>
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -138,8 +138,8 @@ export default function MarketIntelPage() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-gray-400">{label}</p>
-      <p className="text-sm font-semibold text-gray-700">{value}</p>
+      <p className="text-xs text-faint">{label}</p>
+      <p className="text-sm font-semibold text-secondary">{value}</p>
     </div>
   );
 }

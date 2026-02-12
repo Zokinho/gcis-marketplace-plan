@@ -65,9 +65,9 @@ export default function SellerScorecardsPage() {
       )}
 
       {!loading && !error && scores.length === 0 && (
-        <div className="rounded-lg border bg-white p-12 text-center">
-          <h3 className="mb-2 text-lg font-semibold text-gray-700">No seller scores yet</h3>
-          <p className="text-sm text-gray-500">Seller scores are calculated from completed transactions with recorded outcomes.</p>
+        <div className="rounded-lg border surface p-12 text-center">
+          <h3 className="mb-2 text-lg font-semibold text-secondary">No seller scores yet</h3>
+          <p className="text-sm text-muted">Seller scores are calculated from completed transactions with recorded outcomes.</p>
         </div>
       )}
 
@@ -75,7 +75,7 @@ export default function SellerScorecardsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {scores.map((score) => (
             <div key={score.id}>
-              <p className="mb-2 text-sm font-semibold text-gray-700">
+              <p className="mb-2 text-sm font-semibold text-secondary">
                 {score.seller?.companyName || score.seller?.email || 'Unknown'}
               </p>
               <SellerScoreCard

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getAuth } from '@clerk/express';
 import { prisma } from '../index';
+import { isAdmin } from '../middleware/auth';
 
 const router = Router();
 
@@ -9,15 +10,13 @@ const router = Router();
  * This drives frontend routing decisions.
  */
 function getUserStatusCode(user: {
-  zohoContactId: string;
   approved: boolean;
   eulaAcceptedAt: Date | null;
   docUploaded: boolean;
 }): string {
-  if (!user.zohoContactId) return 'NO_ZOHO_LINK';
-  if (!user.approved) return 'PENDING_APPROVAL';
   if (!user.eulaAcceptedAt) return 'EULA_REQUIRED';
   if (!user.docUploaded) return 'DOC_REQUIRED';
+  if (!user.approved) return 'PENDING_APPROVAL';
   return 'ACTIVE';
 }
 
@@ -60,6 +59,7 @@ router.get('/status', async (req: Request, res: Response) => {
       approved: user.approved,
       eulaAcceptedAt: user.eulaAcceptedAt,
       docUploaded: user.docUploaded,
+      isAdmin: isAdmin(user.email),
     },
   });
 });

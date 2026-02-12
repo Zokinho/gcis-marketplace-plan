@@ -25,7 +25,7 @@ export default function ScoreBreakdown({ breakdown }: { breakdown: Record<string
     <div className="space-y-2">
       {entries.map(([factor, score]) => (
         <div key={factor} className="flex items-center gap-3">
-          <span className="w-28 shrink-0 text-xs text-gray-500">
+          <span className="w-28 shrink-0 text-xs text-muted">
             {FACTOR_LABELS[factor] || factor}
           </span>
           <div className="h-3 flex-1 overflow-hidden rounded-full bg-brand-gray">
@@ -34,7 +34,7 @@ export default function ScoreBreakdown({ breakdown }: { breakdown: Record<string
               style={{ width: `${Math.min(100, score)}%` }}
             />
           </div>
-          <span className="w-8 text-right text-xs font-semibold text-brand-dark">{Math.round(score)}</span>
+          <span className="w-8 text-right text-xs font-semibold text-primary">{Math.round(score)}</span>
         </div>
       ))}
     </div>

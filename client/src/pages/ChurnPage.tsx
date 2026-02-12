@@ -63,9 +63,9 @@ export default function ChurnPage() {
       {/* Stats */}
       {stats && (
         <div className="mb-6 grid gap-4 sm:grid-cols-4">
-          <div className="rounded-lg border bg-white p-4 text-center">
-            <p className="text-xs text-gray-400">Total At Risk</p>
-            <p className="text-2xl font-bold text-brand-dark">{stats.totalAtRisk}</p>
+          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4 text-center">
+            <p className="text-xs text-faint">Total At Risk</p>
+            <p className="text-2xl font-bold text-primary">{stats.totalAtRisk}</p>
           </div>
           <div className="rounded-lg border bg-red-50 p-4 text-center">
             <p className="text-xs text-red-400">Critical</p>
@@ -88,7 +88,7 @@ export default function ChurnPage() {
           <button
             key={level}
             onClick={() => setMinLevel(level)}
-            className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${minLevel === level ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-600'}`}
+            className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${minLevel === level ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}
           >
             {level}+
           </button>
@@ -108,33 +108,33 @@ export default function ChurnPage() {
       )}
 
       {!loading && !error && buyers.length === 0 && (
-        <div className="rounded-lg border bg-white p-12 text-center">
-          <p className="text-sm text-gray-500">No at-risk buyers detected at this threshold</p>
+        <div className="rounded-lg border surface p-12 text-center">
+          <p className="text-sm text-muted">No at-risk buyers detected at this threshold</p>
         </div>
       )}
 
       {!loading && !error && buyers.length > 0 && (
         <div className="space-y-3">
           {buyers.map((entry: any) => (
-            <div key={entry.buyer.id} className="rounded-lg border bg-white p-4">
+            <div key={entry.buyer.id} className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4">
               <div className="mb-2 flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-brand-dark">{entry.buyer.companyName || entry.buyer.email}</p>
+                  <p className="font-semibold text-primary">{entry.buyer.companyName || entry.buyer.email}</p>
                   {entry.buyer.companyName && (
-                    <p className="text-xs text-gray-400">{entry.buyer.email}</p>
+                    <p className="text-xs text-faint">{entry.buyer.email}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
                   <RiskBadge level={entry.overallRiskLevel} />
-                  <span className="text-sm font-bold text-gray-700">{Math.round(entry.overallRiskScore)}%</span>
+                  <span className="text-sm font-bold text-secondary">{Math.round(entry.overallRiskScore)}%</span>
                 </div>
               </div>
               {entry.signals.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {entry.signals.map((signal: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg bg-brand-offwhite px-3 py-1.5 text-xs">
-                      <span className="text-gray-600">{signal.categoryName || 'Overall'}</span>
-                      <span className="text-gray-500">
+                    <div key={i} className="flex items-center justify-between rounded-lg bg-brand-offwhite dark:bg-slate-700 px-3 py-1.5 text-xs">
+                      <span className="text-secondary">{signal.categoryName || 'Overall'}</span>
+                      <span className="text-muted">
                         {signal.daysSincePurchase}d since purchase (avg {Math.round(signal.avgIntervalDays)}d)
                       </span>
                     </div>

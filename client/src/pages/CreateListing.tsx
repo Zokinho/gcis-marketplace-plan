@@ -42,7 +42,7 @@ export default function CreateListing() {
   const [lineage, setLineage] = useState('');
   const [growthMedium, setGrowthMedium] = useState('');
   const [harvestDate, setHarvestDate] = useState('');
-  const [certification, setCertification] = useState('');
+  const [certifications, setCertifications] = useState<string[]>([]);
 
   // Potency & terpenes
   const [thc, setThc] = useState('');
@@ -74,7 +74,7 @@ export default function CreateListing() {
   }, [budPopcorn, budSmall, budMedium, budLarge, budXLarge]);
 
   const budSizeColor = useMemo(() => {
-    if (budSizeTotal === 0) return 'text-gray-400';
+    if (budSizeTotal === 0) return 'text-faint';
     if (budSizeTotal >= 99 && budSizeTotal <= 101) return 'text-green-600';
     if (budSizeTotal >= 95 && budSizeTotal <= 105) return 'text-yellow-600';
     return 'text-red-600';
@@ -99,7 +99,7 @@ export default function CreateListing() {
     if (lineage.trim()) formData.append('lineage', lineage.trim());
     if (growthMedium.trim()) formData.append('growthMedium', growthMedium.trim());
     if (harvestDate) formData.append('harvestDate', harvestDate);
-    if (certification) formData.append('certification', certification);
+    if (certifications.length > 0) formData.append('certification', certifications.join(', '));
     if (thc) formData.append('thc', thc);
     if (cbd) formData.append('cbd', cbd);
     if (dominantTerpene.trim()) formData.append('dominantTerpene', dominantTerpene.trim());
@@ -131,9 +131,12 @@ export default function CreateListing() {
   return (
     <Layout>
       <div className="mx-auto max-w-3xl">
-        <div className="mb-6 rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-5 text-white">
-          <h2 className="text-2xl font-semibold">Create Listing</h2>
-          <p className="mt-0.5 text-sm text-white/70">Add a new product to the marketplace manually.</p>
+        <div className="mb-6">
+          <div>
+            <h2 className="text-2xl font-semibold text-primary">Create Listing</h2>
+            <p className="text-sm text-muted">Add a new product to the marketplace manually.</p>
+            <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -191,10 +194,22 @@ export default function CreateListing() {
                 <input type="date" value={harvestDate} onChange={(e) => setHarvestDate(e.target.value)} className="input-field" />
               </Field>
               <Field label="Certification">
-                <select value={certification} onChange={(e) => setCertification(e.target.value)} className="input-field">
-                  <option value="">Select...</option>
-                  {CERTIFICATIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <div className="flex flex-wrap gap-1.5">
+                  {CERTIFICATIONS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCertifications((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c])}
+                      className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+                        certifications.includes(c)
+                          ? 'border-brand-teal bg-brand-sage/20 text-brand-teal'
+                          : 'border-default text-secondary hover-surface-muted'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </Field>
             </div>
           </Section>
@@ -318,7 +333,7 @@ export default function CreateListing() {
                 className="input-field text-sm"
               />
               {coaFiles.length > 0 && (
-                <ul className="mt-2 space-y-1 text-sm text-gray-600">
+                <ul className="mt-2 space-y-1 text-sm text-secondary">
                   {coaFiles.map((f, i) => (
                     <li key={i} className="flex items-center gap-1.5">
                       <svg className="h-4 w-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
@@ -333,7 +348,7 @@ export default function CreateListing() {
           </Section>
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm font-medium text-red-700">
               {error}
             </div>
           )}
@@ -342,14 +357,14 @@ export default function CreateListing() {
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:opacity-50"
+              className="rounded-lg bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:opacity-50"
             >
               {submitting ? 'Submitting...' : 'Submit Listing'}
             </button>
             <button
               type="button"
               onClick={() => navigate('/my-listings')}
-              className="rounded-lg border px-6 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+              className="rounded-lg border border-default px-6 py-2.5 text-sm font-medium text-secondary transition hover-surface-muted"
             >
               Cancel
             </button>
@@ -362,8 +377,8 @@ export default function CreateListing() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border bg-white p-5">
-      <h3 className="mb-4 border-l-2 border-brand-teal pl-3 text-base font-semibold text-brand-dark">{title}</h3>
+    <div className="rounded-lg border border-default surface p-5">
+      <h3 className="mb-4 border-l-2 border-brand-teal pl-3 text-base font-semibold text-primary">{title}</h3>
       <div className="space-y-4">{children}</div>
     </div>
   );
@@ -372,7 +387,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-gray-600">
+      <label className="mb-1 block text-xs font-medium text-secondary">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </label>

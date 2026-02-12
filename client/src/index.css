@@ -1,9 +1,90 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Semantic color tokens ───────────────────────────────────────── */
+:root {
+  --surface-base: #E9ECF3;
+  --surface: #ffffff;
+  --surface-muted: #f3f4f6;
+  --surface-inset: #e5e7eb;
+
+  --on-surface: #111827;
+  --on-surface-secondary: #374151;
+  --on-surface-muted: #6b7280;
+  --on-surface-faint: #9ca3af;
+
+  --border-default: #d1d5db;
+  --border-subtle: #e5e7eb;
+
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+
+  --card-blue-bg: rgba(32, 122, 213, 0.05);
+  --card-blue-border: rgba(32, 122, 213, 0.15);
+  --filter-blue-bg: rgba(32, 122, 213, 0.04);
+}
+
+.dark {
+  --surface-base: #1e2a3a;
+  --surface: #1e293b;
+  --surface-muted: #334155;
+  --surface-inset: #475569;
+
+  --on-surface: #f1f5f9;
+  --on-surface-secondary: #cbd5e1;
+  --on-surface-muted: #94a3b8;
+  --on-surface-faint: #64748b;
+
+  --border-default: #475569;
+  --border-subtle: #334155;
+
+  --input-bg: #1e293b;
+  --input-border: #475569;
+
+  --card-blue-bg: rgba(32, 122, 213, 0.1);
+  --card-blue-border: rgba(32, 122, 213, 0.25);
+  --filter-blue-bg: rgba(32, 122, 213, 0.08);
+}
+
+/* ── Semantic utility classes ────────────────────────────────────── */
 @layer components {
-  .input-field {
-    @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal;
+  /* Surfaces */
+  .surface-base { background-color: var(--surface-base); }
+  .surface      { background-color: var(--surface); }
+  .surface-muted { background-color: var(--surface-muted); }
+  .surface-inset { background-color: var(--surface-inset); }
+
+  /* Text */
+  .text-primary   { color: var(--on-surface); }
+  .text-secondary { color: var(--on-surface-secondary); }
+  .text-muted     { color: var(--on-surface-muted); }
+  .text-faint     { color: var(--on-surface-faint); }
+
+  /* Borders */
+  .border-default { border-color: var(--border-default); }
+  .border-subtle  { border-color: var(--border-subtle); }
+
+  /* Cards */
+  .card-blue {
+    background-color: var(--card-blue-bg);
+    border-color: var(--card-blue-border);
   }
+
+  /* Inputs */
+  .input-field {
+    @apply w-full rounded-lg px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal;
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--on-surface);
+  }
+
+  /* Hover helpers */
+  .hover-surface-muted { transition: background-color 150ms; }
+  .hover-surface-muted:hover { background-color: var(--surface-muted); }
+
+  /* Dividers */
+  .divide-themed > :not(:last-child) { border-color: var(--border-subtle); }
 }
 
 @theme {

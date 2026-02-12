@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Webhook } from 'svix';
+import logger from '../utils/logger';
 import { prisma } from '../index';
 import { zohoRequest } from '../services/zohoAuth';
 import { BidStatus } from '@prisma/client';
@@ -24,8 +25,12 @@ interface ClerkWebhookEvent {
 router.post('/clerk', async (req: Request, res: Response) => {
   const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
 
-  // Verify webhook signature if secret is configured
-  if (webhookSecret) {
+  if (!webhookSecret) {
+    logger.error('[WEBHOOK] CLERK_WEBHOOK_SECRET is not configured — rejecting request');
+    return res.status(500).json({ error: 'Webhook secret not configured' });
+  }
+
+  {
     const svixId = req.headers['svix-id'] as string;
     const svixTimestamp = req.headers['svix-timestamp'] as string;
     const svixSignature = req.headers['svix-signature'] as string;
@@ -42,7 +47,7 @@ router.post('/clerk', async (req: Request, res: Response) => {
         'svix-signature': svixSignature,
       });
     } catch (err) {
-      console.error('[WEBHOOK] Signature verification failed:', err);
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[WEBHOOK] Signature verification failed');
       return res.status(400).json({ error: 'Invalid signature' });
     }
   }
@@ -53,7 +58,7 @@ router.post('/clerk', async (req: Request, res: Response) => {
     try {
       await handleUserCreated(event.data);
     } catch (err) {
-      console.error('[WEBHOOK] Error handling user.created:', err);
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[WEBHOOK] Error handling user.created');
       return res.status(500).json({ error: 'Internal error processing webhook' });
     }
   }
@@ -64,7 +69,7 @@ router.post('/clerk', async (req: Request, res: Response) => {
 async function handleUserCreated(data: ClerkWebhookEvent['data']) {
   const email = data.email_addresses[0]?.email_address;
   if (!email) {
-    console.error('[WEBHOOK] No email found in user.created event');
+    logger.error('[WEBHOOK] No email found in user.created event');
     return;
   }
 
@@ -73,7 +78,7 @@ async function handleUserCreated(data: ClerkWebhookEvent['data']) {
     where: { clerkUserId: data.id },
   });
   if (existing) {
-    console.log(`[WEBHOOK] User already exists for Clerk ID ${data.id}, skipping`);
+    logger.info({ clerkId: data.id }, '[WEBHOOK] User already exists, skipping');
     return;
   }
 
@@ -85,28 +90,27 @@ async function handleUserCreated(data: ClerkWebhookEvent['data']) {
   } catch (err: any) {
     // 204 = no results found, which is fine
     if (err?.response?.status !== 204) {
-      console.error('[WEBHOOK] Zoho search error:', err?.message);
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[WEBHOOK] Zoho search error');
     }
   }
 
   if (!zohoContact) {
-    // Email not found in Zoho — unknown person
+    // Email not found in Zoho — open registration, no Zoho link
     await prisma.user.create({
       data: {
         clerkUserId: data.id,
-        zohoContactId: '',
         email,
         firstName: data.first_name,
         lastName: data.last_name,
         approved: false,
       },
     });
-    console.log(`[WEBHOOK] Unknown contact created for ${email} — no Zoho match`);
+    logger.info({ email }, '[WEBHOOK] New user created — no Zoho match');
     return;
   }
 
   if (zohoContact.Account_Confirmed) {
-    // Known contact, confirmed — create linked user
+    // Known contact, confirmed — create linked user (still requires admin approval)
     const contactType = zohoContact.Contact_Type || 'Buyer';
 
     await prisma.user.create({
@@ -118,7 +122,7 @@ async function handleUserCreated(data: ClerkWebhookEvent['data']) {
         lastName: zohoContact.Last_Name,
         companyName: zohoContact.Company,
         contactType,
-        approved: true,
+        approved: false,
       },
     });
 
@@ -128,10 +132,10 @@ async function handleUserCreated(data: ClerkWebhookEvent['data']) {
         data: { data: [{ User_UID: data.id }], trigger: [] },
       });
     } catch (err) {
-      console.error('[WEBHOOK] Failed to update Zoho User_UID:', err);
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[WEBHOOK] Failed to update Zoho User_UID');
     }
 
-    console.log(`[WEBHOOK] Approved user created for ${email} (${contactType})`);
+    logger.info({ email, contactType }, '[WEBHOOK] User created — awaiting admin approval');
   } else {
     // Contact exists but Account_Confirmed is false
     await prisma.user.create({
@@ -158,10 +162,10 @@ async function handleUserCreated(data: ClerkWebhookEvent['data']) {
         }], trigger: [] },
       });
     } catch (err) {
-      console.error('[WEBHOOK] Failed to create Zoho notification task:', err);
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[WEBHOOK] Failed to create Zoho notification task');
     }
 
-    console.log(`[WEBHOOK] Pending user created for ${email} — awaiting approval`);
+    logger.info({ email }, '[WEBHOOK] Pending user created — awaiting approval');
   }
 }
 
@@ -176,7 +180,7 @@ router.post('/zoho', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'module and record_id are required' });
   }
 
-  console.log(`[ZOHO WEBHOOK] ${module}/${action} — record ${record_id}`);
+  logger.info({ module, action, record_id }, '[ZOHO WEBHOOK] Incoming webhook');
 
   try {
     switch (module) {
@@ -190,11 +194,11 @@ router.post('/zoho', async (req: Request, res: Response) => {
         await updateBidStatus(record_id);
         break;
       default:
-        console.log(`[ZOHO WEBHOOK] Unknown module: ${module}`);
+        logger.info({ module }, '[ZOHO WEBHOOK] Unknown module');
     }
     res.status(200).send('OK');
   } catch (err) {
-    console.error(`[ZOHO WEBHOOK] Error processing ${module}/${record_id}:`, err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) }, module, record_id }, '[ZOHO WEBHOOK] Error processing webhook');
     res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
@@ -217,7 +221,7 @@ async function syncSingleProduct(zohoProductId: string) {
     }
 
     if (!sellerId) {
-      console.log(`[ZOHO WEBHOOK] No seller found for product ${zohoProductId}, skipping`);
+      logger.info({ zohoProductId }, '[ZOHO WEBHOOK] No seller found for product, skipping');
       return;
     }
 
@@ -289,7 +293,7 @@ async function syncSingleProduct(zohoProductId: string) {
       },
     });
 
-    console.log(`[ZOHO WEBHOOK] Product ${record.Product_Name} synced`);
+    logger.info({ productName: record.Product_Name }, '[ZOHO WEBHOOK] Product synced');
   } catch (err: any) {
     if (err?.response?.status === 204) return;
     throw err;
@@ -307,7 +311,7 @@ async function syncSingleContact(zohoContactId: string) {
 
     const user = await prisma.user.findUnique({ where: { zohoContactId } });
     if (!user) {
-      console.log(`[ZOHO WEBHOOK] No local user for contact ${zohoContactId}`);
+      logger.info({ zohoContactId }, '[ZOHO WEBHOOK] No local user for contact');
       return;
     }
 
@@ -325,7 +329,7 @@ async function syncSingleContact(zohoContactId: string) {
       },
     });
 
-    console.log(`[ZOHO WEBHOOK] Contact ${record.First_Name} ${record.Last_Name} synced`);
+    logger.info({ contactName: `${record.First_Name} ${record.Last_Name}` }, '[ZOHO WEBHOOK] Contact synced');
   } catch (err: any) {
     if (err?.response?.status === 204) return;
     throw err;
@@ -345,7 +349,7 @@ async function updateBidStatus(zohoTaskId: string) {
     // Find the bid linked to this Zoho Task
     const bid = await prisma.bid.findUnique({ where: { zohoTaskId } });
     if (!bid) {
-      console.log(`[ZOHO WEBHOOK] No bid found for Zoho Task ${zohoTaskId}`);
+      logger.info({ zohoTaskId }, '[ZOHO WEBHOOK] No bid found for Zoho Task');
       return;
     }
 
@@ -377,7 +381,7 @@ async function updateBidStatus(zohoTaskId: string) {
         newStatus = 'EXPIRED';
         break;
       default:
-        console.log(`[ZOHO WEBHOOK] Unknown task status: ${zohoStatus}`);
+        logger.info({ zohoStatus }, '[ZOHO WEBHOOK] Unknown task status');
         return;
     }
 
@@ -386,7 +390,7 @@ async function updateBidStatus(zohoTaskId: string) {
         where: { id: bid.id },
         data: { status: newStatus },
       });
-      console.log(`[ZOHO WEBHOOK] Bid ${bid.id} status updated: ${bid.status} → ${newStatus}`);
+      logger.info({ bidId: bid.id, oldStatus: bid.status, newStatus }, '[ZOHO WEBHOOK] Bid status updated');
     }
   } catch (err: any) {
     if (err?.response?.status === 204) return;

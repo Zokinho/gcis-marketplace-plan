@@ -47,7 +47,7 @@ export default function MatchExplorer() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg bg-white/20 px-3 py-1.5 text-sm text-white [&>option]:text-gray-800"
+            className="rounded-lg bg-white/20 px-3 py-1.5 text-sm text-white [&>option]:text-primary"
           >
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
@@ -58,7 +58,7 @@ export default function MatchExplorer() {
           <select
             value={minScore}
             onChange={(e) => setMinScore(Number(e.target.value))}
-            className="rounded-lg bg-white/20 px-3 py-1.5 text-sm text-white [&>option]:text-gray-800"
+            className="rounded-lg bg-white/20 px-3 py-1.5 text-sm text-white [&>option]:text-primary"
           >
             <option value={0}>Any Score</option>
             <option value={50}>50+</option>
@@ -82,9 +82,9 @@ export default function MatchExplorer() {
       )}
 
       {!loading && !error && matches.length === 0 && (
-        <div className="rounded-lg border bg-white p-12 text-center">
-          <h3 className="mb-2 text-lg font-semibold text-gray-700">No matches found</h3>
-          <p className="text-sm text-gray-500">Generate matches from the Intelligence Dashboard.</p>
+        <div className="rounded-lg border surface p-12 text-center">
+          <h3 className="mb-2 text-lg font-semibold text-secondary">No matches found</h3>
+          <p className="text-sm text-muted">Generate matches from the Intelligence Dashboard.</p>
           <Link to="/intelligence" className="mt-3 inline-block text-sm font-medium text-brand-blue underline">Go to Dashboard</Link>
         </div>
       )}
@@ -93,7 +93,7 @@ export default function MatchExplorer() {
         <>
           <div className="space-y-3">
             {matches.map((match) => (
-              <div key={match.id} className="rounded-lg border bg-white transition hover:shadow-sm">
+              <div key={match.id} className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md transition hover:shadow-lg">
                 <div
                   className="flex cursor-pointer items-center justify-between p-4"
                   onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
@@ -101,24 +101,24 @@ export default function MatchExplorer() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`text-xl font-bold ${getScoreColor(match.score)}`}>{Math.round(match.score)}</span>
-                      <Link to={`/marketplace/${match.product.id}`} className="font-semibold text-brand-dark hover:text-brand-blue" onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/marketplace/${match.product.id}`} className="font-semibold text-primary hover:text-brand-blue" onClick={(e) => e.stopPropagation()}>
                         {match.product.name}
                       </Link>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-faint">
                         {match.buyer?.companyName || match.buyer?.email}
                       </span>
                     </div>
                     {match.insights && match.insights.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {(match.insights as Array<{ type: string; text: string }>).slice(0, 3).map((insight, i) => (
-                          <span key={i} className="rounded-full bg-brand-offwhite px-2 py-0.5 text-xs text-gray-500">
+                          <span key={i} className="rounded-full bg-brand-offwhite dark:bg-slate-700 px-2 py-0.5 text-xs text-muted">
                             {insight.text}
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
-                  <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium capitalize text-gray-600">
+                  <span className="shrink-0 rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium capitalize text-gray-600 dark:text-slate-300">
                     {match.status}
                   </span>
                 </div>
@@ -137,15 +137,15 @@ export default function MatchExplorer() {
               <button
                 onClick={() => load(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="rounded-lg border px-3 py-1.5 text-sm font-medium text-gray-600 disabled:opacity-40"
+                className="rounded-lg border px-3 py-1.5 text-sm font-medium text-secondary disabled:opacity-40"
               >
                 Previous
               </button>
-              <span className="text-sm text-gray-500">Page {pagination.page} of {pagination.totalPages}</span>
+              <span className="text-sm text-muted">Page {pagination.page} of {pagination.totalPages}</span>
               <button
                 onClick={() => load(pagination.page + 1)}
                 disabled={pagination.page >= pagination.totalPages}
-                className="rounded-lg border px-3 py-1.5 text-sm font-medium text-gray-600 disabled:opacity-40"
+                className="rounded-lg border px-3 py-1.5 text-sm font-medium text-secondary disabled:opacity-40"
               >
                 Next
               </button>
