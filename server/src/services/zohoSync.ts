@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { prisma } from '../index';
+import logger from '../utils/logger';
 import {
   fetchAllProducts,
   fetchMarketplaceContacts,
@@ -7,6 +8,7 @@ import {
   fetchProductFileUrls,
   fetchDeletedProductIds,
 } from './zohoApi';
+import { createNotification, createNotificationBatch } from './notificationService';
 
 // ─── Seller resolution cache ───
 
@@ -86,7 +88,7 @@ function mapProductFields(p: any) {
 }
 
 export async function syncProducts(): Promise<{ synced: number; skipped: number; errors: number }> {
-  console.log('[SYNC] Starting product sync...');
+  logger.info('[SYNC] Starting product sync...');
   let synced = 0;
   let skipped = 0;
   let errors = 0;
@@ -111,7 +113,7 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
         try {
           fileUrls = await fetchProductFileUrls(p.id);
         } catch (err) {
-          console.error(`[SYNC] Failed to fetch file URLs for product ${p.id}:`, err);
+          logger.error({ err }, `[SYNC] Failed to fetch file URLs for product ${p.id}`);
         }
 
         await prisma.product.upsert({
@@ -131,7 +133,7 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
         });
         synced++;
       } catch (err) {
-        console.error(`[SYNC] Error syncing product ${p.id} (${p.Product_Name}):`, err);
+        logger.error({ err }, `[SYNC] Error syncing product ${p.id} (${p.Product_Name})`);
         errors++;
       }
     }
@@ -157,9 +159,9 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
       },
     });
 
-    console.log(`[SYNC] Products complete: ${synced} synced, ${skipped} skipped, ${errors} errors`);
+    logger.info({ synced, skipped, errors }, '[SYNC] Products complete');
   } catch (err: any) {
-    console.error('[SYNC] Product sync failed:', err?.message);
+    logger.error({ err }, '[SYNC] Product sync failed');
     await prisma.syncLog.create({
       data: {
         type: 'products',
@@ -179,7 +181,7 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
  * Falls back to full sync if no previous sync or on error.
  */
 export async function syncProductsDelta(): Promise<{ synced: number; skipped: number; errors: number; mode: string }> {
-  console.log('[SYNC] Starting delta product sync...');
+  logger.info('[SYNC] Starting delta product sync...');
 
   // Find last successful product sync timestamp
   const lastSync = await prisma.syncLog.findFirst({
@@ -188,7 +190,7 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
   });
 
   if (!lastSync) {
-    console.log('[SYNC] No previous sync found, falling back to full sync');
+    logger.info('[SYNC] No previous sync found, falling back to full sync');
     const result = await syncProducts();
     return { ...result, mode: 'full-fallback' };
   }
@@ -201,7 +203,7 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
     const products = await fetchProductsModifiedSince(lastSync.createdAt);
 
     if (products.length === 0) {
-      console.log('[SYNC] Delta sync: no modified products');
+      logger.info('[SYNC] Delta sync: no modified products');
       await prisma.syncLog.create({
         data: {
           type: 'products-delta',
@@ -224,10 +226,16 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
         try {
           fileUrls = await fetchProductFileUrls(p.id);
         } catch (err) {
-          console.error(`[SYNC] Failed to fetch file URLs for product ${p.id}:`, err);
+          logger.error({ err }, `[SYNC] Failed to fetch file URLs for product ${p.id}`);
         }
 
-        await prisma.product.upsert({
+        // Check if this is a new product or price change (for notifications)
+        const existing = await prisma.product.findUnique({
+          where: { zohoProductId: p.id },
+          select: { id: true, pricePerUnit: true, sellerId: true },
+        });
+
+        const product = await prisma.product.upsert({
           where: { zohoProductId: p.id },
           update: {
             ...fields,
@@ -242,9 +250,58 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
             coaUrls: fileUrls.coaUrls,
           },
         });
+
+        // Notification: PRODUCT_NEW — notify previous buyers of this seller
+        if (!existing && fields.isActive) {
+          try {
+            const previousBuyers = await prisma.transaction.findMany({
+              where: { sellerId },
+              select: { buyerId: true },
+              distinct: ['buyerId'],
+              take: 20,
+            });
+            createNotificationBatch(
+              previousBuyers.map((t) => ({
+                userId: t.buyerId,
+                type: 'PRODUCT_NEW' as const,
+                title: 'New product from a seller you know',
+                body: `${fields.name} is now available`,
+                data: { productId: product.id },
+              })),
+            );
+          } catch (e) {
+            logger.error({ err: e }, '[SYNC] PRODUCT_NEW notification error');
+          }
+        }
+
+        // Notification: PRODUCT_PRICE — notify buyers with pending bids
+        if (existing && fields.pricePerUnit != null && existing.pricePerUnit != null
+          && fields.pricePerUnit !== existing.pricePerUnit) {
+          try {
+            const pendingBidders = await prisma.bid.findMany({
+              where: { productId: existing.id, status: 'PENDING' },
+              select: { buyerId: true },
+              distinct: ['buyerId'],
+              take: 20,
+            });
+            const direction = fields.pricePerUnit < existing.pricePerUnit ? 'decreased' : 'increased';
+            createNotificationBatch(
+              pendingBidders.map((b) => ({
+                userId: b.buyerId,
+                type: 'PRODUCT_PRICE' as const,
+                title: `Price ${direction}`,
+                body: `${fields.name} price ${direction} to $${fields.pricePerUnit!.toFixed(2)}/g`,
+                data: { productId: product.id },
+              })),
+            );
+          } catch (e) {
+            logger.error({ err: e }, '[SYNC] PRODUCT_PRICE notification error');
+          }
+        }
+
         synced++;
       } catch (err) {
-        console.error(`[SYNC] Error syncing product ${p.id} (${p.Product_Name}):`, err);
+        logger.error({ err }, `[SYNC] Error syncing product ${p.id} (${p.Product_Name})`);
         errors++;
       }
     }
@@ -279,14 +336,14 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
         });
         removed = result.count;
         if (removed > 0) {
-          console.log(`[SYNC] Removed ${removed} products deleted from Zoho`);
+          logger.info({ removed }, '[SYNC] Removed products deleted from Zoho');
         }
         if (productIdsWithBids.size > 0) {
-          console.log(`[SYNC] Deactivated ${productIdsWithBids.size} deleted products (have bids, preserving history)`);
+          logger.info({ count: productIdsWithBids.size }, '[SYNC] Deactivated deleted products (have bids, preserving history)');
         }
       }
     } catch (err: any) {
-      console.error('[SYNC] Deleted products check failed (non-critical):', err?.message);
+      logger.error({ err }, '[SYNC] Deleted products check failed (non-critical)');
     }
 
     await prisma.syncLog.create({
@@ -298,9 +355,9 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
       },
     });
 
-    console.log(`[SYNC] Delta sync complete: ${synced} synced, ${skipped} skipped, ${errors} errors, ${removed} removed`);
+    logger.info({ synced, skipped, errors, removed }, '[SYNC] Delta sync complete');
   } catch (err: any) {
-    console.error('[SYNC] Delta sync failed, falling back to full sync:', err?.message);
+    logger.error({ err }, '[SYNC] Delta sync failed, falling back to full sync');
     const result = await syncProducts();
     return { ...result, mode: 'full-fallback' };
   }
@@ -311,7 +368,7 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
 // ─── Contact Sync ───
 
 export async function syncContacts(): Promise<{ synced: number; errors: number }> {
-  console.log('[SYNC] Starting contact sync...');
+  logger.info('[SYNC] Starting contact sync...');
   let synced = 0;
   let errors = 0;
 
@@ -353,7 +410,7 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
         });
         synced++;
       } catch (err) {
-        console.error(`[SYNC] Error syncing contact ${c.id} (${c.Email}):`, err);
+        logger.error({ err }, `[SYNC] Error syncing contact ${c.id} (${c.Email})`);
         errors++;
       }
     }
@@ -367,9 +424,9 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
       },
     });
 
-    console.log(`[SYNC] Contacts complete: ${synced} synced, ${errors} errors`);
+    logger.info({ synced, errors }, '[SYNC] Contacts complete');
   } catch (err: any) {
-    console.error('[SYNC] Contact sync failed:', err?.message);
+    logger.error({ err }, '[SYNC] Contact sync failed');
     await prisma.syncLog.create({
       data: {
         type: 'contacts',
@@ -386,13 +443,13 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
 
 export async function runFullSync() {
   const start = Date.now();
-  console.log('[SYNC] ─── Full sync starting ───');
+  logger.info('[SYNC] ─── Full sync starting ───');
 
   const productResult = await syncProducts();
   const contactResult = await syncContacts();
 
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-  console.log(`[SYNC] ─── Full sync complete in ${elapsed}s ───`);
+  logger.info({ elapsed }, '[SYNC] ─── Full sync complete ───');
 
   return { products: productResult, contacts: contactResult, durationSeconds: Number(elapsed) };
 }
@@ -408,25 +465,25 @@ export function startSyncCron() {
   cronJob = cron.schedule('*/15 * * * *', async () => {
     try {
       const start = Date.now();
-      console.log('[SYNC] ─── Cron sync starting (delta products + contacts) ───');
+      logger.info('[SYNC] ─── Cron sync starting (delta products + contacts) ───');
 
       const productResult = await syncProductsDelta();
       const contactResult = await syncContacts();
 
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-      console.log(`[SYNC] ─── Cron sync complete in ${elapsed}s (mode: ${productResult.mode}) ───`);
+      logger.info({ elapsed, mode: productResult.mode }, '[SYNC] ─── Cron sync complete ───');
     } catch (err) {
-      console.error('[SYNC] Cron sync error:', err);
+      logger.error({ err }, '[SYNC] Cron sync error');
     }
   });
 
-  console.log('[SYNC] Cron scheduled: every 15 minutes (delta sync)');
+  logger.info('[SYNC] Cron scheduled: every 15 minutes (delta sync)');
 }
 
 export function stopSyncCron() {
   if (cronJob) {
     cronJob.stop();
     cronJob = null;
-    console.log('[SYNC] Cron stopped');
+    logger.info('[SYNC] Cron stopped');
   }
 }

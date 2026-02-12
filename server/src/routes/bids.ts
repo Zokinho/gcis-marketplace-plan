@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
+import logger from '../utils/logger';
 import { prisma } from '../index';
 import { calculateProximity } from '../utils/proximity';
+import { validate, createBidSchema, bidOutcomeSchema } from '../utils/validation';
 import {
   createBidTask,
   updateBidTaskStatus,
@@ -11,6 +13,7 @@ import {
 } from '../services/zohoApi';
 import * as churnDetectionService from '../services/churnDetectionService';
 import * as marketContextService from '../services/marketContextService';
+import { createNotification } from '../services/notificationService';
 
 const router = Router();
 
@@ -18,25 +21,10 @@ const router = Router();
  * POST /api/bids
  * Create a new bid on a product.
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', validate(createBidSchema), async (req: Request, res: Response) => {
   const buyer = req.user!;
 
-  const { productId, pricePerUnit, quantity, notes } = req.body;
-
-  // Validate required fields
-  if (!productId || !pricePerUnit || !quantity) {
-    return res.status(400).json({ error: 'productId, pricePerUnit, and quantity are required' });
-  }
-
-  const price = parseFloat(pricePerUnit);
-  const qty = parseFloat(quantity);
-
-  if (isNaN(price) || price <= 0) {
-    return res.status(400).json({ error: 'pricePerUnit must be a positive number' });
-  }
-  if (isNaN(qty) || qty <= 0) {
-    return res.status(400).json({ error: 'quantity must be a positive number' });
-  }
+  const { productId, pricePerUnit: price, quantity: qty, notes } = req.body;
 
   // Fetch product with seller info
   const product = await prisma.product.findUnique({
@@ -81,6 +69,15 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    // Notify seller of new bid (fire-and-forget)
+    createNotification({
+      userId: product.sellerId,
+      type: 'BID_RECEIVED',
+      title: 'New bid received',
+      body: `${buyer.companyName || 'A buyer'} bid $${price.toFixed(2)}/g on ${product.name}`,
+      data: { bidId: bid.id, productId: product.id },
+    });
+
     // Create Zoho Task (non-blocking — don't fail the bid if Zoho is down)
     try {
       await createBidTask(
@@ -102,7 +99,7 @@ router.post('/', async (req: Request, res: Response) => {
         },
       );
     } catch (zohoErr) {
-      console.error('[BIDS] Failed to create Zoho Task for bid:', bid.id, zohoErr);
+      logger.error({ err: zohoErr instanceof Error ? zohoErr : { message: String(zohoErr) }, bidId: bid.id }, '[BIDS] Failed to create Zoho Task for bid');
       // Bid is still created locally — Zoho task can be retried later
     }
 
@@ -115,7 +112,7 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('[BIDS] Failed to create bid:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to create bid');
     res.status(500).json({ error: 'Failed to create bid' });
   }
 });
@@ -171,8 +168,55 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('[BIDS] Failed to fetch bids:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to fetch bids');
     res.status(500).json({ error: 'Failed to fetch bids' });
+  }
+});
+
+/**
+ * GET /api/bids/seller
+ * Get bids on the seller's products.
+ * NOTE: Must be defined BEFORE /:id to avoid "seller" matching as a bid ID.
+ */
+router.get('/seller', async (req: Request, res: Response) => {
+  const seller = req.user!;
+
+  if (!seller.contactType?.includes('Seller')) {
+    return res.status(403).json({ error: 'Seller access required' });
+  }
+
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+  const status = req.query.status as string | undefined;
+
+  const where: any = { product: { sellerId: seller.id } };
+  if (status && ['PENDING', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'COUNTERED', 'EXPIRED'].includes(status)) {
+    where.status = status;
+  }
+
+  try {
+    const [bids, total] = await Promise.all([
+      prisma.bid.findMany({
+        where,
+        include: {
+          product: { select: { id: true, name: true, category: true, type: true, pricePerUnit: true, imageUrls: true } },
+          buyer: { select: { id: true } },
+          transaction: { select: { id: true, status: true, outcomeRecordedAt: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.bid.count({ where }),
+    ]);
+
+    res.json({
+      bids,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to fetch seller bids');
+    res.status(500).json({ error: 'Failed to fetch seller bids' });
   }
 });
 
@@ -211,7 +255,7 @@ router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {
 
     res.json({ bid });
   } catch (err) {
-    console.error('[BIDS] Failed to fetch bid:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to fetch bid');
     res.status(500).json({ error: 'Failed to fetch bid' });
   }
 });
@@ -276,23 +320,32 @@ router.patch('/:id/accept', async (req: Request<{ id: string }>, res: Response) 
       }),
     ]);
 
+    // Notify buyer of acceptance (fire-and-forget)
+    createNotification({
+      userId: bid.buyerId,
+      type: 'BID_ACCEPTED',
+      title: 'Bid accepted!',
+      body: `Your bid on ${bid.product.name} has been accepted`,
+      data: { bidId: bid.id, productId: bid.productId },
+    });
+
     // Non-blocking side effects
     try {
       await churnDetectionService.resolveOnPurchase(bid.buyerId, bid.product.category || undefined);
-    } catch (e) { console.error('[BIDS] Churn resolve error:', e); }
+    } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Churn resolve error'); }
 
     try {
       if (bid.product.category) {
         await marketContextService.updateMarketPrice(bid.product.category, bid.pricePerUnit, bid.quantity);
       }
-    } catch (e) { console.error('[BIDS] Market price update error:', e); }
+    } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Market price update error'); }
 
     // Zoho writeback — all non-blocking
     // 1. Update Zoho Task status → Accepted
     if (bid.zohoTaskId) {
       try {
         await updateBidTaskStatus(bid.zohoTaskId, 'accept');
-      } catch (e) { console.error('[BIDS] Zoho Task accept update failed:', e); }
+      } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Zoho Task accept update failed'); }
     }
 
     // 2. Decrement inventory locally + push to Zoho
@@ -300,7 +353,7 @@ router.patch('/:id/accept', async (req: Request<{ id: string }>, res: Response) 
       const newGrams = Math.max(0, bid.product.gramsAvailable - bid.quantity);
       try {
         await pushProductUpdate(bid.productId, { gramsAvailable: newGrams });
-      } catch (e) { console.error('[BIDS] Inventory decrement failed:', e); }
+      } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Inventory decrement failed'); }
     }
 
     // 3. Create Deal (if ZOHO_DEALS_ENABLED), store zohoDealId on Transaction
@@ -319,11 +372,11 @@ router.patch('/:id/accept', async (req: Request<{ id: string }>, res: Response) 
           data: { zohoDealId },
         });
       }
-    } catch (e) { console.error('[BIDS] Zoho Deal creation failed:', e); }
+    } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Zoho Deal creation failed'); }
 
     res.json({ transaction: { id: transaction.id, status: transaction.status } });
   } catch (err) {
-    console.error('[BIDS] Failed to accept bid:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to accept bid');
     res.status(500).json({ error: 'Failed to accept bid' });
   }
 });
@@ -338,7 +391,7 @@ router.patch('/:id/reject', async (req: Request<{ id: string }>, res: Response) 
   try {
     const bid = await prisma.bid.findUnique({
       where: { id: req.params.id },
-      include: { product: { select: { sellerId: true } } },
+      include: { product: { select: { sellerId: true, name: true } } },
     });
 
     if (!bid) return res.status(404).json({ error: 'Bid not found' });
@@ -356,16 +409,25 @@ router.patch('/:id/reject', async (req: Request<{ id: string }>, res: Response) 
       data: { status: 'REJECTED' },
     });
 
+    // Notify buyer of rejection (fire-and-forget)
+    createNotification({
+      userId: bid.buyerId,
+      type: 'BID_REJECTED',
+      title: 'Bid rejected',
+      body: `Your bid on ${bid.product.name} was not accepted`,
+      data: { bidId: bid.id, productId: bid.productId },
+    });
+
     // Zoho writeback — update Task status → Rejected
     if (bid.zohoTaskId) {
       try {
         await updateBidTaskStatus(bid.zohoTaskId, 'reject');
-      } catch (e) { console.error('[BIDS] Zoho Task reject update failed:', e); }
+      } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Zoho Task reject update failed'); }
     }
 
     res.json({ status: 'REJECTED' });
   } catch (err) {
-    console.error('[BIDS] Failed to reject bid:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to reject bid');
     res.status(500).json({ error: 'Failed to reject bid' });
   }
 });
@@ -374,7 +436,7 @@ router.patch('/:id/reject', async (req: Request<{ id: string }>, res: Response) 
  * PATCH /api/bids/:id/outcome
  * Record delivery outcome for a transaction linked to a bid.
  */
-router.patch('/:id/outcome', async (req: Request<{ id: string }>, res: Response) => {
+router.patch('/:id/outcome', validate(bidOutcomeSchema), async (req: Request<{ id: string }>, res: Response) => {
   const seller = req.user!;
 
   const { actualQuantityDelivered, deliveryOnTime, qualityAsExpected, outcomeNotes } = req.body;
@@ -412,6 +474,15 @@ router.patch('/:id/outcome', async (req: Request<{ id: string }>, res: Response)
       },
     });
 
+    // Notify buyer of outcome (fire-and-forget)
+    createNotification({
+      userId: bid.buyerId,
+      type: 'BID_OUTCOME',
+      title: 'Delivery outcome recorded',
+      body: `Outcome recorded for your order — ${parsedQuality === false ? 'quality issue reported' : 'completed successfully'}`,
+      data: { bidId: bid.id, productId: bid.productId },
+    });
+
     // Zoho writeback — append outcome to Task description
     if (bid.zohoTaskId) {
       try {
@@ -421,7 +492,7 @@ router.patch('/:id/outcome', async (req: Request<{ id: string }>, res: Response)
           qualityAsExpected: parsedQuality,
           outcomeNotes: outcomeNotes || undefined,
         });
-      } catch (e) { console.error('[BIDS] Zoho Task outcome update failed:', e); }
+      } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Zoho Task outcome update failed'); }
     }
 
     // Update Deal stage if applicable
@@ -429,59 +500,13 @@ router.patch('/:id/outcome', async (req: Request<{ id: string }>, res: Response)
       try {
         const stage = (parsedQuality === false) ? 'Closed Lost' : 'Closed Won';
         await updateDealStage(bid.transaction.zohoDealId, stage);
-      } catch (e) { console.error('[BIDS] Zoho Deal stage update failed:', e); }
+      } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Zoho Deal stage update failed'); }
     }
 
     res.json({ transaction: { id: transaction.id, status: transaction.status } });
   } catch (err) {
-    console.error('[BIDS] Failed to record outcome:', err);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to record outcome');
     res.status(500).json({ error: 'Failed to record outcome' });
-  }
-});
-
-/**
- * GET /api/bids/seller
- * Get bids on the seller's products.
- */
-router.get('/seller', async (req: Request, res: Response) => {
-  const seller = req.user!;
-
-  if (!seller.contactType?.includes('Seller')) {
-    return res.status(403).json({ error: 'Seller access required' });
-  }
-
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
-  const status = req.query.status as string | undefined;
-
-  const where: any = { product: { sellerId: seller.id } };
-  if (status && ['PENDING', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'COUNTERED', 'EXPIRED'].includes(status)) {
-    where.status = status;
-  }
-
-  try {
-    const [bids, total] = await Promise.all([
-      prisma.bid.findMany({
-        where,
-        include: {
-          product: { select: { id: true, name: true, category: true, type: true, pricePerUnit: true, imageUrls: true } },
-          buyer: { select: { id: true } },
-          transaction: { select: { id: true, status: true, outcomeRecordedAt: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.bid.count({ where }),
-    ]);
-
-    res.json({
-      bids,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    });
-  } catch (err) {
-    console.error('[BIDS] Failed to fetch seller bids:', err);
-    res.status(500).json({ error: 'Failed to fetch seller bids' });
   }
 });
 

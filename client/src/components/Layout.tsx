@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { UserButton } from '@clerk/clerk-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStatus } from '../lib/useUserStatus';
+import { useTheme } from '../lib/useTheme';
 import HarvexLogo from './HarvexLogo';
+import ThemeToggle from './ThemeToggle';
+import NotificationBell from './NotificationBell';
 
 function NavLink({ to, children, onClick }: { to: string; children: React.ReactNode; onClick?: () => void }) {
   const { pathname } = useLocation();
@@ -11,7 +14,7 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
     <Link
       to={to}
       onClick={onClick}
-      className={`text-sm font-medium transition ${active ? 'text-brand-blue' : 'text-gray-600 hover:text-brand-blue'}`}
+      className={`text-sm font-medium transition ${active ? 'text-brand-yellow' : 'text-white/80 hover:text-white'}`}
     >
       {children}
     </Link>
@@ -20,8 +23,9 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { data } = useUserStatus();
+  const { resolved } = useTheme();
   const isSeller = data?.user?.contactType?.includes('Seller') ?? false;
-  const isAdmin = isSeller;
+  const isAdmin = data?.user?.isAdmin ?? false;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = (
@@ -33,26 +37,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {isAdmin && <NavLink to="/intelligence" onClick={() => setMobileOpen(false)}>Intelligence</NavLink>}
       {isAdmin && <NavLink to="/coa-inbox" onClick={() => setMobileOpen(false)}>CoA Inbox</NavLink>}
       {isAdmin && <NavLink to="/shares" onClick={() => setMobileOpen(false)}>Shares</NavLink>}
+      {isAdmin && <NavLink to="/users" onClick={() => setMobileOpen(false)}>Users</NavLink>}
     </>
   );
 
   return (
-    <div className="min-h-screen bg-brand-offwhite">
-      <header className="sticky top-0 z-30 bg-white shadow-sm">
-        <div className="border-b border-brand-gray">
+    <div className="min-h-screen surface-base">
+      <header className="sticky top-0 z-30 bg-brand-blue dark:bg-[#255564] shadow-sm">
+        <div className="border-b border-white/10">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
             <Link to="/dashboard">
-              <HarvexLogo size="sm" color="dark" />
+              <HarvexLogo size="sm" color="white" />
             </Link>
             <div className="flex items-center gap-5">
               <nav className="hidden gap-5 sm:flex">
                 {navLinks}
               </nav>
+              <ThemeToggle />
+              <NotificationBell />
               <UserButton />
               {/* Hamburger button — mobile only */}
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
-                className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 sm:hidden"
+                className="rounded-lg p-1.5 text-white/70 hover:text-white sm:hidden"
                 aria-label="Toggle menu"
               >
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -79,12 +86,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(false)}
           />
           {/* Drawer */}
-          <div className="fixed right-0 top-0 z-50 flex h-full w-64 flex-col bg-white shadow-xl transition-transform sm:hidden">
-            <div className="flex items-center justify-between border-b px-4 py-4">
-              <HarvexLogo size="sm" color="dark" showText={false} />
+          <div className="fixed right-0 top-0 z-50 flex h-full w-64 flex-col surface shadow-xl transition-transform sm:hidden">
+            <div className="flex items-center justify-between border-b border-default px-4 py-4">
+              <HarvexLogo size="sm" color={resolved === 'dark' ? 'white' : 'dark'} showText={false} />
               <button
                 onClick={() => setMobileOpen(false)}
-                className="rounded-lg p-1 text-gray-500 hover:bg-gray-100"
+                className="rounded-lg p-1 text-muted hover-surface-muted"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { SignIn, SignUp, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import { useUserStatus } from './lib/useUserStatus';
 import Landing from './pages/Landing';
@@ -7,7 +7,7 @@ import Marketplace from './pages/Marketplace';
 import ProductDetail from './pages/ProductDetail';
 import Onboarding from './pages/Onboarding';
 import PendingApproval from './pages/PendingApproval';
-import NoZohoLink from './pages/NoZohoLink';
+import UserManagement from './pages/UserManagement';
 import MyListings from './pages/MyListings';
 import CreateListing from './pages/CreateListing';
 import Orders from './pages/Orders';
@@ -23,6 +23,7 @@ import MarketIntelPage from './pages/MarketIntelPage';
 import SellerScorecardsPage from './pages/SellerScorecardsPage';
 import TransactionsPage from './pages/TransactionsPage';
 import BuyerMatchesPage from './pages/BuyerMatchesPage';
+import NotificationsPage from './pages/NotificationsPage';
 
 /**
  * Requires Clerk sign-in. Redirects unauthenticated users to /sign-in.
@@ -48,7 +49,7 @@ function MarketplaceGuard({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
-          <p className="text-gray-500">Loading your account...</p>
+          <p className="text-muted">Loading your account...</p>
         </div>
       </div>
     );
@@ -57,9 +58,9 @@ function MarketplaceGuard({ children }: { children: React.ReactNode }) {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="max-w-md rounded-lg bg-white p-8 text-center shadow-lg">
+        <div className="max-w-md rounded-lg surface p-8 text-center shadow-lg">
           <h2 className="mb-2 text-xl font-semibold text-red-600">Something went wrong</h2>
-          <p className="text-gray-500">{error}</p>
+          <p className="text-muted">{error}</p>
         </div>
       </div>
     );
@@ -67,8 +68,14 @@ function MarketplaceGuard({ children }: { children: React.ReactNode }) {
 
   switch (data?.status) {
     case 'NOT_FOUND':
-    case 'NO_ZOHO_LINK':
-      return <Navigate to="/no-access" replace />;
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="max-w-md rounded-lg surface p-8 text-center shadow-lg">
+            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
+            <p className="text-muted">Setting up your account... Please wait a moment and refresh.</p>
+          </div>
+        </div>
+      );
     case 'PENDING_APPROVAL':
       return <Navigate to="/pending" replace />;
     case 'EULA_REQUIRED':
@@ -77,23 +84,40 @@ function MarketplaceGuard({ children }: { children: React.ReactNode }) {
     case 'ACTIVE':
       return <>{children}</>;
     default:
-      return <Navigate to="/no-access" replace />;
+      return <Navigate to="/onboarding" replace />;
   }
+}
+
+function NotFound() {
+  return (
+    <div className="flex min-h-screen items-center justify-center surface-base px-4">
+      <div className="w-full max-w-md rounded-lg surface p-8 text-center shadow-lg">
+        <div className="mx-auto mb-4 text-6xl font-bold text-brand-teal/30">404</div>
+        <h2 className="mb-2 text-xl font-semibold text-primary">Page not found</h2>
+        <p className="mb-6 text-sm text-muted">The page you're looking for doesn't exist or has been moved.</p>
+        <Link
+          to="/"
+          className="inline-block rounded-lg bg-brand-teal px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-blue"
+        >
+          Go Home
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen surface-base text-primary">
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Landing />} />
-        <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />
-        <Route path="/sign-up/*" element={<SignUp routing="path" path="/sign-up" />} />
+        <Route path="/sign-in/*" element={<div className="flex min-h-screen items-center justify-center"><SignIn routing="path" path="/sign-in" /></div>} />
+        <Route path="/sign-up/*" element={<div className="flex min-h-screen items-center justify-center"><SignUp routing="path" path="/sign-up" /></div>} />
 
         {/* Authenticated but pre-approval routes */}
         <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
         <Route path="/pending" element={<RequireAuth><PendingApproval /></RequireAuth>} />
-        <Route path="/no-access" element={<RequireAuth><NoZohoLink /></RequireAuth>} />
 
         {/* Fully protected marketplace routes */}
         <Route path="/dashboard" element={
@@ -116,6 +140,9 @@ export default function App() {
         } />
         <Route path="/my-matches" element={
           <RequireAuth><MarketplaceGuard><BuyerMatchesPage /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/notifications" element={
+          <RequireAuth><MarketplaceGuard><NotificationsPage /></MarketplaceGuard></RequireAuth>
         } />
 
         {/* Intelligence routes (admin) */}
@@ -148,13 +175,16 @@ export default function App() {
         <Route path="/shares" element={
           <RequireAuth><MarketplaceGuard><CuratedShares /></MarketplaceGuard></RequireAuth>
         } />
+        <Route path="/users" element={
+          <RequireAuth><MarketplaceGuard><UserManagement /></MarketplaceGuard></RequireAuth>
+        } />
 
         {/* Public share routes (NO auth) */}
         <Route path="/share/:token" element={<ShareViewer />} />
         <Route path="/share/:token/product/:id" element={<SharedProductDetail />} />
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
   );

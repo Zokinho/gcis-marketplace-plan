@@ -5,6 +5,8 @@
  */
 
 import { prisma } from '../index';
+import logger from '../utils/logger';
+import { createNotification } from './notificationService';
 
 function daysBetween(date1: Date, date2: Date): number {
   const oneDay = 24 * 60 * 60 * 1000;
@@ -120,6 +122,42 @@ export async function generatePredictions(): Promise<{ buyersProcessed: number; 
   let totalPredictions = 0;
   for (const buyer of buyers) {
     totalPredictions += await generatePredictionsForBuyer(buyer.id);
+  }
+
+  // Send PREDICTION_DUE notifications for approaching predictions
+  try {
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+    const duePredictions = await prisma.prediction.findMany({
+      where: {
+        predictedDate: { lte: sevenDaysFromNow },
+        notifiedAt: null,
+      },
+      select: { id: true, buyerId: true, categoryName: true, predictedDate: true },
+    });
+
+    for (const pred of duePredictions) {
+      const daysUntil = Math.ceil(
+        (new Date(pred.predictedDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+      );
+      const timeText = daysUntil <= 0 ? 'overdue' : `in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`;
+
+      await createNotification({
+        userId: pred.buyerId,
+        type: 'PREDICTION_DUE',
+        title: 'Reorder prediction approaching',
+        body: `Your ${pred.categoryName} reorder is predicted ${timeText}`,
+        data: { categoryName: pred.categoryName },
+      });
+
+      await prisma.prediction.update({
+        where: { id: pred.id },
+        data: { notifiedAt: new Date() },
+      });
+    }
+  } catch (err) {
+    logger.error({ err }, '[PREDICTIONS] PREDICTION_DUE notification error');
   }
 
   return { buyersProcessed: buyers.length, predictionsCreated: totalPredictions };

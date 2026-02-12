@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { Prisma } from '@prisma/client';
+import logger from '../utils/logger';
 import { prisma } from '../index';
 import { getCoaClient } from '../services/coaClient';
 import { mapCoaToProductFields } from '../utils/coaMapper';
+import { createNotification } from '../services/notificationService';
 
 const router = Router();
 
@@ -54,7 +56,7 @@ router.post('/upload', upload.single('coaPdf'), async (req: Request, res: Respon
       status: job.status,
     });
   } catch (err: any) {
-    console.error('[COA] Upload failed:', err?.message);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[COA] Upload failed');
     res.status(502).json({
       error: 'CoA processing service unavailable',
       details: err?.message,
@@ -92,6 +94,17 @@ router.get('/jobs/:jobId/status', async (req: Request<{ jobId: string }>, res: R
             coaProductId: job.product_id,
           },
         });
+
+        // Notify seller that CoA is ready (fire-and-forget)
+        if (syncRecord.suggestedSellerId) {
+          createNotification({
+            userId: syncRecord.suggestedSellerId,
+            type: 'COA_PROCESSED',
+            title: 'CoA extraction complete',
+            body: `CoA for ${syncRecord.coaProductName || 'your product'} is ready for review`,
+            data: { jobId },
+          });
+        }
       }
     }
 
@@ -103,7 +116,7 @@ router.get('/jobs/:jobId/status', async (req: Request<{ jobId: string }>, res: R
       pageCount: job.page_count,
     });
   } catch (err: any) {
-    console.error('[COA] Status check failed:', err?.message);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[COA] Status check failed');
     res.status(502).json({ error: 'CoA service unavailable' });
   }
 });
@@ -164,7 +177,7 @@ router.get('/jobs/:jobId/preview', async (req: Request<{ jobId: string }>, res: 
       } : null,
     });
   } catch (err: any) {
-    console.error('[COA] Preview failed:', err?.message);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[COA] Preview failed');
     res.status(502).json({ error: 'CoA service unavailable' });
   }
 });
@@ -242,7 +255,7 @@ router.post('/jobs/:jobId/confirm', async (req: Request<{ jobId: string }>, res:
 
     res.json({ product });
   } catch (err: any) {
-    console.error('[COA] Confirm failed:', err?.message);
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[COA] Confirm failed');
     res.status(500).json({ error: 'Failed to create product', details: err?.message });
   }
 });

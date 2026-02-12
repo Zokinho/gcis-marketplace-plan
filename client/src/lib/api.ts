@@ -21,7 +21,7 @@ export function setAuthTokenGetter(getToken: () => Promise<string | null>) {
 // ─── User types ───
 
 export interface UserStatus {
-  status: 'NOT_FOUND' | 'NO_ZOHO_LINK' | 'PENDING_APPROVAL' | 'EULA_REQUIRED' | 'DOC_REQUIRED' | 'ACTIVE';
+  status: 'NOT_FOUND' | 'PENDING_APPROVAL' | 'EULA_REQUIRED' | 'DOC_REQUIRED' | 'ACTIVE';
   message?: string;
   user?: {
     id: string;
@@ -33,6 +33,7 @@ export interface UserStatus {
     approved: boolean;
     eulaAcceptedAt: string | null;
     docUploaded: boolean;
+    isAdmin: boolean;
   };
 }
 
@@ -94,6 +95,7 @@ export interface ProductFilters {
   category?: string;
   type?: string;
   certification?: string;
+  terpene?: string;
   thcMin?: number;
   thcMax?: number;
   cbdMin?: number;
@@ -114,6 +116,7 @@ export interface FilterOptions {
   categories: string[];
   types: string[];
   certifications: string[];
+  terpenes: string[];
 }
 
 // ─── User API ───
@@ -427,6 +430,37 @@ export async function triggerCoaEmailPoll(): Promise<{ processed: number; errors
   return res.data;
 }
 
+// ─── Admin User Management API ───
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  companyName: string | null;
+  contactType: string | null;
+  zohoLinked: boolean;
+  eulaAcceptedAt: string | null;
+  docUploaded: boolean;
+  approved: boolean;
+  createdAt: string;
+}
+
+export async function fetchAdminUsers(filter?: 'pending' | 'approved' | 'all'): Promise<AdminUser[]> {
+  const params: Record<string, string> = {};
+  if (filter) params.filter = filter;
+  const res = await api.get<{ users: AdminUser[] }>('/admin/users', { params });
+  return res.data.users;
+}
+
+export async function approveUser(userId: string, contactType?: string): Promise<void> {
+  await api.post(`/admin/users/${userId}/approve`, contactType ? { contactType } : {});
+}
+
+export async function rejectUser(userId: string): Promise<void> {
+  await api.post(`/admin/users/${userId}/reject`);
+}
+
 // ─── Curated Shares Types ───
 
 export interface CuratedShareData {
@@ -495,6 +529,75 @@ export async function fetchSharedProducts(token: string): Promise<{ label: strin
 
 export function getSharedProductPdfUrl(token: string, productId: string): string {
   return `/api/shares/public/${token}/products/${productId}/pdf`;
+}
+
+// ─── Notification Types ───
+
+export type NotificationTypeEnum =
+  | 'BID_RECEIVED' | 'BID_ACCEPTED' | 'BID_REJECTED' | 'BID_COUNTERED' | 'BID_OUTCOME'
+  | 'PRODUCT_NEW' | 'PRODUCT_PRICE' | 'PRODUCT_STOCK'
+  | 'MATCH_SUGGESTION' | 'COA_PROCESSED' | 'PREDICTION_DUE' | 'SYSTEM_ANNOUNCEMENT';
+
+export interface NotificationRecord {
+  id: string;
+  userId: string;
+  type: NotificationTypeEnum;
+  title: string;
+  body: string;
+  data: Record<string, any> | null;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export type NotificationPreferences = Record<NotificationTypeEnum, boolean>;
+
+// ─── Notification API ───
+
+export async function fetchNotifications(params?: {
+  page?: number;
+  limit?: number;
+  unreadOnly?: boolean;
+}): Promise<{ notifications: NotificationRecord[]; pagination: Pagination }> {
+  const query: Record<string, string> = {};
+  if (params?.page) query.page = String(params.page);
+  if (params?.limit) query.limit = String(params.limit);
+  if (params?.unreadOnly) query.unreadOnly = 'true';
+  const res = await api.get('/notifications', { params: query });
+  return res.data;
+}
+
+export async function fetchUnreadCount(): Promise<number> {
+  const res = await api.get<{ count: number }>('/notifications/unread-count');
+  return res.data.count;
+}
+
+export async function markNotificationsRead(ids: string[]): Promise<void> {
+  await api.patch('/notifications/read', { ids });
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await api.patch('/notifications/read', { all: true });
+}
+
+export async function fetchNotificationPreferences(): Promise<{
+  preferences: NotificationPreferences;
+  defaults: NotificationPreferences;
+}> {
+  const res = await api.get('/notifications/preferences');
+  return res.data;
+}
+
+export async function updateNotificationPreferences(
+  updates: Partial<NotificationPreferences>,
+): Promise<{ preferences: NotificationPreferences }> {
+  const res = await api.patch('/notifications/preferences', updates);
+  return res.data;
+}
+
+export async function broadcastNotification(title: string, body: string): Promise<{ sent: number }> {
+  const res = await api.post('/notifications/admin/broadcast', { title, body });
+  return res.data;
 }
 
 // ─── Intelligence Types ───

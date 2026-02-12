@@ -7,6 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
+import logger from './utils/logger';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -68,19 +69,60 @@ app.get('/api/zoho-files/:zohoProductId/:fileId', async (req, res) => {
     res.set('Cache-Control', 'public, max-age=3600');
     res.send(data);
   } catch (err: any) {
-    console.error(`[ZOHO-FILES] Download failed for ${zohoProductId}/${fileId}:`, err?.message);
+    logger.error({ err, zohoProductId, fileId }, 'ZOHO-FILES download failed');
     res.status(502).json({ error: 'Failed to fetch file from Zoho' });
   }
 });
 
 // ─── Health check (public) ───
-app.get('/api/health', async (_req, res) => {
+app.get('/api/health', async (req, res) => {
+  const detailed = req.query.detailed === 'true';
+  const checks: Record<string, string> = {};
+  let healthy = true;
+
+  // Database (always checked)
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', database: 'connected', timestamp: new Date().toISOString() });
+    checks.database = 'connected';
   } catch {
-    res.status(503).json({ status: 'error', database: 'disconnected', timestamp: new Date().toISOString() });
+    checks.database = 'disconnected';
+    healthy = false;
   }
+
+  if (detailed) {
+    // Clerk
+    checks.clerk = process.env.CLERK_SECRET_KEY ? 'configured' : 'not_configured';
+
+    // Zoho
+    if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_REFRESH_TOKEN) {
+      try {
+        const { getAccessToken } = await import('./services/zohoAuth');
+        const token = await getAccessToken();
+        checks.zoho = token ? 'connected' : 'token_error';
+      } catch {
+        checks.zoho = 'unreachable';
+        healthy = false;
+      }
+    } else {
+      checks.zoho = 'not_configured';
+    }
+
+    // CoA service
+    if (process.env.COA_API_URL) {
+      try {
+        const { default: axios } = await import('axios');
+        const resp = await axios.get(`${process.env.COA_API_URL}/health`, { timeout: 3000 });
+        checks.coa = resp.status === 200 ? 'connected' : 'unhealthy';
+      } catch {
+        checks.coa = 'unreachable';
+      }
+    } else {
+      checks.coa = 'not_configured';
+    }
+  }
+
+  const status = healthy ? 'ok' : 'degraded';
+  res.status(healthy ? 200 : 503).json({ status, ...checks, timestamp: new Date().toISOString() });
 });
 
 // ─── Rate limiters ───
@@ -135,6 +177,7 @@ async function mountRoutes() {
   const coaRoutes = (await import('./routes/coa')).default;
   const shareRoutes = (await import('./routes/shares')).default;
   const { publicShareRouter } = await import('./routes/shares');
+  const notificationRoutes = (await import('./routes/notifications')).default;
 
   // Webhooks — no auth required (Svix signature verification instead)
   app.use('/api/webhooks', webhookRoutes);
@@ -156,6 +199,9 @@ async function mountRoutes() {
 
   // Public share endpoints — NO auth (token-based access)
   app.use('/api/shares/public', publicLimiter, publicShareRouter);
+
+  // Notifications — requires Clerk auth + marketplace auth
+  app.use('/api/notifications', apiLimiter, requireAuth(), marketplaceAuth, notificationRoutes);
 
   // Protected marketplace routes — requires full approval chain
   app.use('/api/marketplace', apiLimiter, requireAuth(), marketplaceAuth, marketplaceRoutes);
@@ -232,16 +278,16 @@ function startIntelligenceCrons() {
     }, 24 * ONE_HOUR);
   }, getMillisUntilHour(2));
 
-  console.log('[GCIS] Intelligence cron jobs scheduled (midnight, 1am, 2am daily)');
+  logger.info('Intelligence cron jobs scheduled (midnight, 1am, 2am daily)');
 }
 
 async function runIntelJob(name: string, fn: () => Promise<unknown>) {
-  console.log(`[INTEL-CRON] Starting ${name}...`);
+  logger.info({ job: name }, 'INTEL-CRON starting');
   try {
     const result = await fn();
-    console.log(`[INTEL-CRON] ${name} completed:`, JSON.stringify(result));
+    logger.info({ job: name, result }, 'INTEL-CRON completed');
   } catch (err) {
-    console.error(`[INTEL-CRON] ${name} failed:`, err);
+    logger.error({ err, job: name }, 'INTEL-CRON failed');
   }
 }
 
@@ -253,14 +299,42 @@ function getMillisUntilHour(hour: number): number {
   return target.getTime() - now.getTime();
 }
 
+// ─── Global error handler (must be after all routes) ───
+function mountErrorHandler() {
+  // Catch-all for unhandled route errors
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message || 'Internal server error';
+
+    logger.error({ err, status }, 'Unhandled route error');
+    if (!res.headersSent) {
+      res.status(status).json({ error: message });
+    }
+  });
+}
+
+// ─── Process-level error handlers ───
+process.on('unhandledRejection', (reason: any) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+});
+
+process.on('uncaughtException', (err: Error) => {
+  logger.fatal({ err }, 'Uncaught exception');
+  // Give time for logs to flush, then exit
+  setTimeout(() => process.exit(1), 1000);
+});
+
 // ─── Start server ───
 mountRoutes().then(async () => {
+  mountErrorHandler();
   // Start sync cron job (only if Zoho credentials are configured)
   if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_REFRESH_TOKEN) {
     const { startSyncCron } = await import('./services/zohoSync');
     startSyncCron();
   } else {
-    console.log('[GCIS] Zoho credentials not configured — sync cron disabled');
+    logger.info('Zoho credentials not configured — sync cron disabled');
   }
 
   // Start CoA email sync cron (only if COA_API_URL is configured)
@@ -268,25 +342,25 @@ mountRoutes().then(async () => {
     const { startCoaEmailSync } = await import('./services/coaEmailSync');
     startCoaEmailSync();
   } else {
-    console.log('[GCIS] COA_API_URL not configured — CoA email sync disabled');
+    logger.info('COA_API_URL not configured — CoA email sync disabled');
   }
 
   // ─── Intelligence cron jobs ───
   // Only run if there are transactions in the database
   const txCount = await prisma.transaction.count();
   if (txCount > 0) {
-    console.log(`[GCIS] ${txCount} transactions found — starting intelligence cron jobs`);
+    logger.info({ txCount }, 'Transactions found — starting intelligence cron jobs');
     startIntelligenceCrons();
   } else {
-    console.log('[GCIS] No transactions yet — intelligence cron jobs will be available on-demand via API');
+    logger.info('No transactions yet — intelligence cron jobs will be available on-demand via API');
   }
 
   app.listen(PORT, () => {
-    console.log(`[GCIS] Server running on http://localhost:${PORT}`);
-    console.log(`[GCIS] Health check: http://localhost:${PORT}/api/health`);
+    logger.info({ port: PORT }, `Server running on http://localhost:${PORT}`);
+    logger.info({ port: PORT }, `Health check: http://localhost:${PORT}/api/health`);
   });
 }).catch((err) => {
-  console.error('[GCIS] Failed to mount routes:', err);
+  logger.fatal({ err }, 'Failed to mount routes');
   process.exit(1);
 });
 

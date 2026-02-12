@@ -8,6 +8,8 @@ import { prisma } from '../index';
 import * as sellerScoreService from './sellerScoreService';
 import * as marketContextService from './marketContextService';
 import * as propensityService from './propensityService';
+import logger from '../utils/logger';
+import { createNotification } from './notificationService';
 
 interface ScoreBreakdown {
   category: number;
@@ -320,7 +322,7 @@ export async function scoreMatch(buyerId: string, productId: string): Promise<Ma
 export async function generateMatchesForProduct(productId: string): Promise<number> {
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { id: true, sellerId: true, isActive: true },
+    select: { id: true, sellerId: true, isActive: true, name: true },
   });
 
   if (!product || !product.isActive) return 0;
@@ -341,7 +343,7 @@ export async function generateMatchesForProduct(productId: string): Promise<numb
       const result = await scoreMatch(buyer.id, productId);
 
       if (result.score >= MATCH_THRESHOLD) {
-        await prisma.match.upsert({
+        const match = await prisma.match.upsert({
           where: { buyerId_productId: { buyerId: buyer.id, productId } },
           create: {
             buyerId: buyer.id,
@@ -359,9 +361,20 @@ export async function generateMatchesForProduct(productId: string): Promise<numb
           },
         });
         matchCount++;
+
+        // Notify buyer of high-score match (fire-and-forget)
+        if (result.score >= 70) {
+          createNotification({
+            userId: buyer.id,
+            type: 'MATCH_SUGGESTION',
+            title: 'New product match',
+            body: `${product.name} scored ${result.score}% match for you`,
+            data: { matchId: match.id, productId },
+          });
+        }
       }
     } catch (error) {
-      console.error(`[MATCHING] Error scoring match for buyer ${buyer.id}:`, error);
+      logger.error({ err: error, buyerId: buyer.id }, '[MATCHING] Error scoring match for buyer');
     }
   }
 

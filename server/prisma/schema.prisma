@@ -12,7 +12,7 @@ datasource db {
 model User {
   id             String    @id @default(cuid())
   clerkUserId    String    @unique
-  zohoContactId  String    @unique
+  zohoContactId  String?   @unique
   email          String    @unique
   firstName      String?
   lastName       String?
@@ -45,6 +45,8 @@ model User {
   predictions        Prediction[]
   churnSignals       ChurnSignal[]
   propensityScores   PropensityScore[]
+  notificationPrefs  Json?
+  notifications      Notification[]
   curatedShares      CuratedShare[]
 }
 
@@ -126,6 +128,10 @@ model Product {
   bids         Bid[]
   transactions Transaction[]
   matches      Match[]
+
+  @@index([sellerId])
+  @@index([category])
+  @@index([isActive])
 }
 
 // ─── Bids ───
@@ -149,6 +155,10 @@ model Bid {
   updatedAt DateTime @updatedAt
 
   transaction Transaction?
+
+  @@index([buyerId])
+  @@index([productId])
+  @@index([status])
 }
 
 enum BidStatus {
@@ -188,6 +198,11 @@ model Transaction {
   zohoDealId              String?   @unique
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([productId])
+  @@index([status])
 }
 
 // ─── Matches (auto-generated buyer-product suggestions) ───
@@ -208,6 +223,8 @@ model Match {
   updatedAt      DateTime  @updatedAt
 
   @@unique([buyerId, productId])
+  @@index([buyerId])
+  @@index([status])
 }
 
 // ─── Seller Scores ───
@@ -244,6 +261,7 @@ model Prediction {
   updatedAt             DateTime  @updatedAt
 
   @@unique([buyerId, categoryName])
+  @@index([buyerId])
 }
 
 // ─── Churn Signals ───
@@ -262,6 +280,10 @@ model ChurnSignal {
   resolvedReason    String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  @@index([buyerId])
+  @@index([riskLevel])
+  @@index([isActive])
 }
 
 // ─── Propensity Scores ───
@@ -315,6 +337,39 @@ model Category {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ─── Notifications ───
+
+enum NotificationType {
+  BID_RECEIVED
+  BID_ACCEPTED
+  BID_REJECTED
+  BID_COUNTERED
+  BID_OUTCOME
+  PRODUCT_NEW
+  PRODUCT_PRICE
+  PRODUCT_STOCK
+  MATCH_SUGGESTION
+  COA_PROCESSED
+  PREDICTION_DUE
+  SYSTEM_ANNOUNCEMENT
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  read      Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }
 
 // ─── Sync Log (audit trail) ───
