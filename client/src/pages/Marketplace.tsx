@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import ProductCard from '../components/ProductCard';
 import ProductListItem from '../components/ProductListItem';
+import ProductModal from '../components/ProductModal';
 import FilterSidebar from '../components/FilterSidebar';
 import { fetchProducts, type ProductCard as ProductCardType, type ProductFilters, type Pagination } from '../lib/api';
 
@@ -12,6 +13,7 @@ export default function Marketplace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'grid' | 'grid-lg' | 'list'>('grid-lg');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   const loadProducts = useCallback(async (f: ProductFilters) => {
     setLoading(true);
@@ -32,6 +34,12 @@ export default function Marketplace() {
   }, [filters, loadProducts]);
 
   function handleFiltersChange(newFilters: ProductFilters) {
+    // Auto-switch to relevance sort when search is entered, revert when cleared
+    if (newFilters.search && !filters.search) {
+      newFilters = { ...newFilters, sort: 'relevance', order: 'desc' };
+    } else if (!newFilters.search && filters.sort === 'relevance') {
+      newFilters = { ...newFilters, sort: 'name', order: 'asc' };
+    }
     setFilters(newFilters);
   }
 
@@ -43,30 +51,29 @@ export default function Marketplace() {
   return (
     <Layout>
       {/* Page header */}
-      <div className="mb-6 flex items-center justify-between rounded-lg bg-gradient-to-r from-brand-teal to-brand-blue px-6 py-5 text-white">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Marketplace</h2>
-          <p className="mt-0.5 text-sm text-white/70">Browse cannabis products from licensed Canadian producers</p>
+          <h2 className="text-2xl font-semibold text-primary">Marketplace</h2>
+          <p className="text-sm text-muted">Browse cannabis products from licensed Canadian producers</p>
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
         </div>
         {pagination && (
-          <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-medium backdrop-blur-sm">
+          <span className="rounded-full bg-brand-teal/10 px-3 py-1 text-sm font-medium text-brand-teal">
             {pagination.total} product{pagination.total !== 1 ? 's' : ''}
           </span>
         )}
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
-        <FilterSidebar filters={filters} onChange={handleFiltersChange} />
-
         <div className="min-w-0 flex-1">
           {/* Sort bar + view toggle */}
-          <div className="mb-4 flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
+          <div className="mb-4 flex items-center justify-between rounded-lg bg-brand-blue/5 dark:bg-brand-dark px-3 py-2 shadow-md sticky top-16 z-20 backdrop-blur-sm">
             {/* View toggle */}
-            <div className="flex rounded-lg border border-gray-200 p-0.5">
+            <div className="flex rounded-lg border border-subtle p-0.5">
               {/* Large grid (2 cols) */}
               <button
                 onClick={() => setView('grid-lg')}
-                className={`rounded-md p-1.5 transition ${view === 'grid-lg' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                className={`rounded-md p-1.5 transition ${view === 'grid-lg' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
                 aria-label="Large grid view"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -76,7 +83,7 @@ export default function Marketplace() {
               {/* Compact grid (3 cols) */}
               <button
                 onClick={() => setView('grid')}
-                className={`rounded-md p-1.5 transition ${view === 'grid' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                className={`rounded-md p-1.5 transition ${view === 'grid' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
                 aria-label="Grid view"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -86,7 +93,7 @@ export default function Marketplace() {
               {/* List view */}
               <button
                 onClick={() => setView('list')}
-                className={`rounded-md p-1.5 transition ${view === 'list' ? 'bg-brand-teal text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                className={`rounded-md p-1.5 transition ${view === 'list' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
                 aria-label="List view"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -97,15 +104,16 @@ export default function Marketplace() {
 
             {/* Sort */}
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-gray-500">Sort by</label>
+              <label className="text-xs font-medium text-secondary">Sort by</label>
               <select
                 value={`${filters.sort || 'name'}_${filters.order || 'asc'}`}
                 onChange={(e) => {
                   const [sort, order] = e.target.value.split('_');
                   setFilters((prev) => ({ ...prev, sort, order: order as 'asc' | 'desc' }));
                 }}
-                className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-teal focus:outline-none"
+                className="input-field"
               >
+                {filters.search && <option value="relevance_desc">Relevance</option>}
                 <option value="name_asc">Name A-Z</option>
                 <option value="name_desc">Name Z-A</option>
                 <option value="thcMax_desc">THC: High to Low</option>
@@ -124,7 +132,7 @@ export default function Marketplace() {
 
           {/* Error */}
           {error && !loading && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
               <p className="font-medium text-red-700">{error}</p>
               <button
                 onClick={() => loadProducts(filters)}
@@ -137,14 +145,14 @@ export default function Marketplace() {
 
           {/* Empty state */}
           {!loading && !error && products.length === 0 && (
-            <div className="rounded-lg border border-brand-gray bg-white p-12 text-center">
+            <div className="rounded-lg border border-brand-gray surface p-12 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10">
                 <svg className="h-8 w-8 text-brand-teal/50" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
               </div>
-              <h3 className="mb-1 text-lg font-semibold text-gray-700">No products found</h3>
-              <p className="text-sm text-gray-500">Try adjusting your filters or search terms.</p>
+              <h3 className="mb-1 text-lg font-semibold text-secondary">No products found</h3>
+              <p className="text-sm text-muted">Try adjusting your filters or search terms.</p>
             </div>
           )}
 
@@ -153,19 +161,19 @@ export default function Marketplace() {
             view === 'grid-lg' ? (
               <div className="grid gap-6 sm:grid-cols-2">
                 {products.map((product) => (
-                  <ProductCard key={product.id} product={product} large />
+                  <ProductCard key={product.id} product={product} large onClick={setSelectedProductId} />
                 ))}
               </div>
             ) : view === 'grid' ? (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard key={product.id} product={product} onClick={setSelectedProductId} />
                 ))}
               </div>
             ) : (
               <div className="space-y-3">
                 {products.map((product) => (
-                  <ProductListItem key={product.id} product={product} />
+                  <ProductListItem key={product.id} product={product} onClick={setSelectedProductId} />
                 ))}
               </div>
             )
@@ -177,14 +185,14 @@ export default function Marketplace() {
               <button
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="rounded-lg border px-3 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+                className="rounded-lg border border-default px-3 py-1.5 text-sm font-medium text-secondary transition hover-surface-muted disabled:opacity-40"
               >
                 Previous
               </button>
 
               {generatePageNumbers(pagination.page, pagination.totalPages).map((p, i) =>
                 p === '...' ? (
-                  <span key={`dots-${i}`} className="px-1 text-gray-400">...</span>
+                  <span key={`dots-${i}`} className="px-1 text-faint">...</span>
                 ) : (
                   <button
                     key={p}
@@ -192,7 +200,7 @@ export default function Marketplace() {
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                       p === pagination.page
                         ? 'bg-brand-teal text-white'
-                        : 'border text-gray-600 hover:bg-gray-50'
+                        : 'border border-default text-secondary hover-surface-muted'
                     }`}
                   >
                     {p}
@@ -203,14 +211,18 @@ export default function Marketplace() {
               <button
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page >= pagination.totalPages}
-                className="rounded-lg border px-3 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
+                className="rounded-lg border border-default px-3 py-1.5 text-sm font-medium text-secondary transition hover-surface-muted disabled:opacity-40"
               >
                 Next
               </button>
             </div>
           )}
         </div>
+
+        <FilterSidebar filters={filters} onChange={handleFiltersChange} />
       </div>
+
+      <ProductModal productId={selectedProductId} onClose={() => setSelectedProductId(null)} />
     </Layout>
   );
 }

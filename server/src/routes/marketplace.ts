@@ -13,6 +13,7 @@ router.get('/products', async (req: Request, res: Response) => {
     category,
     type,
     certification,
+    terpene,
     thcMin, thcMax,
     cbdMin, cbdMax,
     priceMin, priceMax,
@@ -37,7 +38,27 @@ router.get('/products', async (req: Request, res: Response) => {
 
   if (category) where.category = category;
   if (type) where.type = type;
-  if (certification) where.certification = certification;
+  if (certification) {
+    const certs = (certification as string).split(',').map((c) => c.trim()).filter(Boolean);
+    if (certs.length === 1) {
+      where.certification = { contains: certs[0], mode: 'insensitive' };
+    } else if (certs.length > 1) {
+      where.AND = [
+        ...((where.AND as any[]) || []),
+        ...certs.map((c) => ({ certification: { contains: c, mode: 'insensitive' as const } })),
+      ];
+    }
+  }
+
+  // Terpene filter — matches against semicolon-separated dominantTerpene field
+  if (terpene) {
+    const terpenes = (terpene as string).split(',').map((t) => t.trim()).filter(Boolean);
+    if (terpenes.length > 0) {
+      where.AND = terpenes.map((t) => ({
+        dominantTerpene: { contains: t, mode: 'insensitive' as const },
+      }));
+    }
+  }
 
   if (thcMin || thcMax) {
     where.thcMax = {};
@@ -94,26 +115,53 @@ router.get('/products', async (req: Request, res: Response) => {
     }
   }
 
+  // Full-text search: use tsvector for terms >= 3 chars, fallback to ILIKE for shorter
+  let ftsOrderedIds: string[] | null = null;
+
   if (search) {
-    where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { lineage: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-    ];
+    if (search.length >= 3) {
+      const ftsResults: { id: string }[] = await prisma.$queryRawUnsafe(
+        `SELECT id FROM "Product"
+         WHERE "search_vector" @@ plainto_tsquery('english', $1)
+         ORDER BY ts_rank("search_vector", plainto_tsquery('english', $1)) DESC`,
+        search,
+      );
+      const ids = ftsResults.map((r) => r.id);
+      if (ids.length === 0) {
+        // FTS found nothing — fall back to ILIKE so partial matches still work
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { lineage: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ];
+      } else {
+        where.id = { ...((where.id as any) || {}), in: ids };
+        ftsOrderedIds = ids;
+      }
+    } else {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { lineage: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
   }
 
   // Build orderBy
+  const useRelevanceSort = sort === 'relevance' && ftsOrderedIds !== null;
   const validSortFields = ['name', 'pricePerUnit', 'thcMax', 'cbdMax', 'gramsAvailable', 'createdAt'];
   const sortField = validSortFields.includes(sort || '') ? sort! : 'name';
   const sortOrder = order === 'desc' ? 'desc' : 'asc';
-  const orderBy: Prisma.ProductOrderByWithRelationInput = { [sortField]: sortOrder };
+  const orderBy: Prisma.ProductOrderByWithRelationInput | undefined = useRelevanceSort
+    ? undefined
+    : { [sortField]: sortOrder };
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
-      orderBy,
-      skip,
-      take: limitNum,
+      ...(orderBy ? { orderBy } : {}),
+      skip: useRelevanceSort ? undefined : skip,
+      take: useRelevanceSort ? undefined : limitNum,
       select: {
         id: true,
         name: true,
@@ -135,13 +183,23 @@ router.get('/products', async (req: Request, res: Response) => {
     prisma.product.count({ where }),
   ]);
 
+  // When using relevance sort, re-order by FTS rank and paginate manually
+  let finalProducts = products;
+  let finalTotal = total;
+  if (useRelevanceSort && ftsOrderedIds) {
+    const idOrder = new Map(ftsOrderedIds.map((id, i) => [id, i]));
+    finalProducts = [...products].sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+    finalTotal = finalProducts.length;
+    finalProducts = finalProducts.slice(skip, skip + limitNum);
+  }
+
   res.json({
-    products,
+    products: finalProducts,
     pagination: {
       page: pageNum,
       limit: limitNum,
-      total,
-      totalPages: Math.ceil(total / limitNum),
+      total: useRelevanceSort ? finalTotal : total,
+      totalPages: Math.ceil((useRelevanceSort ? finalTotal : total) / limitNum),
     },
   });
 });
@@ -237,7 +295,7 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
  * Returns available filter options (distinct values from active products).
  */
 router.get('/filters', async (_req: Request, res: Response) => {
-  const [categories, types, certifications] = await Promise.all([
+  const [categories, types, certifications, terpeneProducts] = await Promise.all([
     prisma.product.findMany({
       where: { isActive: true, category: { not: null } },
       distinct: ['category'],
@@ -250,15 +308,41 @@ router.get('/filters', async (_req: Request, res: Response) => {
     }),
     prisma.product.findMany({
       where: { isActive: true, certification: { not: null } },
-      distinct: ['certification'],
       select: { certification: true },
     }),
+    prisma.product.findMany({
+      where: { isActive: true, dominantTerpene: { not: null } },
+      select: { dominantTerpene: true },
+    }),
   ]);
+
+  // Extract unique terpene names from semicolon-separated dominantTerpene fields
+  const terpeneSet = new Set<string>();
+  for (const p of terpeneProducts) {
+    if (p.dominantTerpene) {
+      for (const t of p.dominantTerpene.split(';')) {
+        const trimmed = t.trim();
+        if (trimmed) terpeneSet.add(trimmed);
+      }
+    }
+  }
+
+  // Extract unique certification names from comma-separated certification fields
+  const certSet = new Set<string>();
+  for (const c of certifications) {
+    if (c.certification) {
+      for (const cert of c.certification.split(',')) {
+        const trimmed = cert.trim();
+        if (trimmed) certSet.add(trimmed);
+      }
+    }
+  }
 
   res.json({
     categories: categories.map((c) => c.category).filter(Boolean),
     types: types.map((t) => t.type).filter(Boolean),
-    certifications: certifications.map((c) => c.certification).filter(Boolean),
+    certifications: Array.from(certSet).sort(),
+    terpenes: Array.from(terpeneSet).sort(),
   });
 });
 
