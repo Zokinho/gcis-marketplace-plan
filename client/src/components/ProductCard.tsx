@@ -62,41 +62,39 @@ export default function ProductCard({ product, large, onClick }: { product: Prod
 
         {/* Priced to Sell badge — hidden while Spot Sales is active */}
 
-        {/* Name */}
-        <h3 className="mb-1 text-sm font-semibold text-primary group-hover:text-brand-teal dark:group-hover:text-brand-yellow">
-          {product.name}
-        </h3>
-
-        {/* THC / CBD */}
-        <div className="mb-3 flex gap-3 text-xs">
-          {(product.thcMin != null || product.thcMax != null) && (
-            <span className="text-secondary">
-              THC {formatRange(product.thcMin, product.thcMax)}%
-            </span>
-          )}
-          {(product.cbdMin != null || product.cbdMax != null) && (
-            <span className="text-secondary">
-              CBD {formatRange(product.cbdMin, product.cbdMax)}%
-            </span>
-          )}
-        </div>
-
-        {/* Availability */}
-        <div className="mt-auto flex items-end justify-end">
-          <div className="text-right text-xs">
+        {/* Name + Available */}
+        <div className="mb-1 flex items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold text-primary group-hover:text-brand-teal dark:group-hover:text-brand-yellow truncate">
+            {product.name}
+          </h3>
+          <span className="flex-shrink-0 text-xs font-medium">
             {available ? (
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="font-medium text-brand-teal">{product.gramsAvailable?.toLocaleString()}g available</span>
-                {upcoming && (
-                  <span className="font-medium text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</span>
-                )}
-              </div>
+              <span className="text-brand-teal">{product.gramsAvailable?.toLocaleString()}g</span>
             ) : upcoming ? (
-              <span className="font-medium text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</span>
+              <span className="text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</span>
             ) : (
               <span className="text-faint">Out of stock</span>
             )}
+          </span>
+        </div>
+
+        {/* THC / CBD + Upcoming */}
+        <div className="mb-1.5 flex items-baseline justify-between gap-2 text-xs">
+          <div className="flex gap-3">
+            {(product.thcMin != null || product.thcMax != null) && (
+              <span className="text-secondary">
+                THC {formatRange(product.thcMin, product.thcMax)}%
+              </span>
+            )}
+            {(product.cbdMin != null || product.cbdMax != null) && (
+              <span className="text-secondary">
+                CBD {formatRange(product.cbdMin, product.cbdMax)}%
+              </span>
+            )}
           </div>
+          {available && upcoming && (
+            <span className="flex-shrink-0 font-medium text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</span>
+          )}
         </div>
       </div>
     </>
