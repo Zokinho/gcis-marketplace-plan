@@ -28,7 +28,7 @@ function GuideNavLink({ onClick }: { onClick?: () => void }) {
     <Link
       to="/guide"
       onClick={onClick}
-      className={`flex items-center gap-1.5 text-sm font-medium transition ${active ? 'text-brand-yellow' : 'text-white/80 hover:text-white'}`}
+      className={`flex items-center gap-2 text-sm font-medium transition ${active ? 'text-brand-yellow' : 'text-white/80 hover:text-white'}`}
     >
       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-yellow/25 text-xs font-bold text-brand-yellow">?</span>
       Guide
@@ -62,10 +62,10 @@ function AdminDropdown() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1 text-sm font-medium transition ${isOnAdminPage ? 'text-brand-yellow' : 'text-white/80 hover:text-white'}`}
+        className={`flex items-center gap-1.5 text-sm font-medium transition ${isOnAdminPage ? 'text-brand-yellow' : 'text-white/80 hover:text-white'}`}
       >
         Admin
-        <svg className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <svg className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
       </button>
@@ -152,23 +152,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div>
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
             <Link to="/marketplace">
-              <HarvexLogo size="sm" color="white" />
+              <HarvexLogo size="md-lg" color="white" className="translate-y-0.5" />
             </Link>
             <div className="flex items-center gap-5">
               <nav className="hidden items-center gap-5 sm:flex">
                 {navLinks}
                 {isAdmin && <AdminDropdown />}
               </nav>
-              <ThemeToggle />
-              <NotificationBell />
-              <UserButton />
+              <div className="flex items-center gap-3">
+                <ThemeToggle />
+                <NotificationBell />
+                <UserButton />
+              </div>
               {/* Hamburger button — mobile only */}
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
-                className="rounded-lg p-1.5 text-white/70 hover:text-white sm:hidden"
+                className="rounded-lg p-2 text-white/70 hover:text-white sm:hidden"
                 aria-label="Toggle menu"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   {mobileOpen ? (
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                   ) : (

@@ -1,5 +1,5 @@
 interface HarvexLogoProps {
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'md-lg' | 'lg' | 'xl';
   color?: 'white' | 'dark' | 'teal' | 'gray';
   showText?: boolean;
   className?: string;
@@ -8,6 +8,7 @@ interface HarvexLogoProps {
 const SIZES = {
   sm: { icon: 'h-7 w-7', text: 'text-lg', gap: 'gap-2' },
   md: { icon: 'h-9 w-9', text: 'text-xl', gap: 'gap-2.5' },
+  'md-lg': { icon: 'h-10 w-10', text: 'text-2xl', gap: 'gap-2.5' },
   lg: { icon: 'h-12 w-12', text: 'text-3xl', gap: 'gap-3' },
   xl: { icon: 'h-16 w-16', text: 'text-5xl', gap: 'gap-4' },
 };
@@ -35,7 +36,7 @@ export default function HarvexLogo({ size = 'md', color = 'teal', showText = tru
         />
       </svg>
       {showText && (
-        <span className={`font-logo font-medium tracking-tight ${s.text} ${c.text}`}>
+        <span className={`font-logo font-normal tracking-tight ${s.text} ${c.text}`}>
           Harvex
         </span>
       )}

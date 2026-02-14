@@ -7,7 +7,7 @@ import './setup';
 
 import { prisma } from '../index';
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = prisma as any;
 
 // ─── Test helpers ───
 
