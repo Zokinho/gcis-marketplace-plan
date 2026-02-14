@@ -249,6 +249,13 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
           placeholder="Search products..."
           className="mb-2 w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
         />
+        <div className="flex items-center gap-2 px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-faint">
+          <span className="w-4 flex-shrink-0" />
+          <span className="min-w-0 flex-1">Product</span>
+          <span className="w-24 flex-shrink-0 text-right">Available</span>
+          <span className="w-24 flex-shrink-0 text-right">Upcoming</span>
+          <span className="w-20 flex-shrink-0 text-right">Price</span>
+        </div>
         <div className="max-h-48 overflow-auto rounded-lg border border-subtle p-2">
           {loadingProducts ? (
             <p className="text-xs text-faint">Loading products...</p>
@@ -260,10 +267,18 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
                   name="spotProduct"
                   checked={selectedProductId === p.id}
                   onChange={() => setSelectedProductId(p.id)}
-                  className="border-default"
+                  className="flex-shrink-0 border-default"
                 />
-                <span className="text-sm text-secondary">{p.name}</span>
-                <span className="ml-auto text-xs text-faint">${p.pricePerUnit?.toFixed(2)}/g</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-secondary">{p.name}</span>
+                <span className="w-24 flex-shrink-0 text-right text-xs tabular-nums text-brand-teal">
+                  {(p.gramsAvailable ?? 0) > 0 ? `${p.gramsAvailable?.toLocaleString()}g` : '—'}
+                </span>
+                <span className="w-24 flex-shrink-0 text-right text-xs tabular-nums text-amber-600">
+                  {(p.upcomingQty ?? 0) > 0 ? `${p.upcomingQty?.toLocaleString()}g` : '—'}
+                </span>
+                <span className="w-20 flex-shrink-0 text-right text-xs tabular-nums text-faint">
+                  ${p.pricePerUnit?.toFixed(2)}/g
+                </span>
               </label>
             ))
           )}

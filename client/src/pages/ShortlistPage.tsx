@@ -15,6 +15,12 @@ export default function ShortlistPage() {
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const { preload } = useShortlist();
+  const [infoDismissed, setInfoDismissed] = useState(() => localStorage.getItem('shortlist-info-dismissed') === '1');
+
+  function handleDismissInfo() {
+    setInfoDismissed(true);
+    localStorage.setItem('shortlist-info-dismissed', '1');
+  }
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -52,6 +58,32 @@ export default function ShortlistPage() {
         </div>
         <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-coral to-brand-teal dark:from-brand-yellow" />
       </div>
+
+      {/* How it works — dismissible */}
+      {!infoDismissed && (
+        <div className="mb-6 rounded-lg border border-brand-blue/10 dark:border-slate-700 bg-brand-blue/5 dark:bg-slate-800/50 p-4">
+          <div className="flex items-start gap-3">
+            <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand-blue dark:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+            </svg>
+            <div className="min-w-0 flex-1 text-sm text-secondary">
+              <p className="mb-1 font-medium text-primary">How your shortlist works</p>
+              <p className="text-muted">
+                Save products you're interested in by clicking the bookmark icon on any product card. Shortlisted products are used to improve your match recommendations and you'll be notified when a shortlisted product drops in price.
+              </p>
+            </div>
+            <button
+              onClick={handleDismissInfo}
+              className="flex-shrink-0 rounded-md p-1 text-muted hover:text-primary transition"
+              aria-label="Dismiss"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sort bar */}
       <div className="mb-4 flex items-center justify-between rounded-lg bg-brand-blue/5 dark:bg-brand-dark px-3 py-2 shadow-md">
