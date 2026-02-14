@@ -74,11 +74,14 @@ export default function ProductListItem({ product, onClick }: { product: Product
           {available ? (
             <span className="font-medium text-brand-teal">{product.gramsAvailable?.toLocaleString()}g available</span>
           ) : upcoming ? (
-            <span className="font-medium text-amber-600">Upcoming</span>
+            <span className="font-medium text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</span>
           ) : (
             <span className="text-faint">Out of stock</span>
           )}
         </p>
+        {available && upcoming && (
+          <p className="mt-0.5 text-xs font-medium text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</p>
+        )}
       </div>
 
       {/* Shortlist */}

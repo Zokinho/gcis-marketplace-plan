@@ -69,7 +69,7 @@ export default function ProductCard({ product, large, onClick }: { product: Prod
           </h3>
           <span className="flex-shrink-0 text-xs font-medium">
             {available ? (
-              <span className="text-brand-teal">{product.gramsAvailable?.toLocaleString()}g</span>
+              <span className="text-brand-teal">{product.gramsAvailable?.toLocaleString()}g available</span>
             ) : upcoming ? (
               <span className="text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</span>
             ) : (

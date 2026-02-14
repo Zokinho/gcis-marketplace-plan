@@ -11,7 +11,13 @@ export default function BuyerMatchesPage() {
   const [error, setError] = useState<string | null>(null);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
+  const [infoDismissed, setInfoDismissed] = useState(() => localStorage.getItem('matches-info-dismissed') === '1');
   const { user } = useUser();
+
+  function handleDismissInfo() {
+    setInfoDismissed(true);
+    localStorage.setItem('matches-info-dismissed', '1');
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +66,32 @@ export default function BuyerMatchesPage() {
           Need help?
         </button>
       </div>
+
+      {/* How it works — dismissible */}
+      {!infoDismissed && (
+        <div className="mb-6 rounded-lg border border-brand-blue/10 dark:border-slate-700 bg-brand-blue/5 dark:bg-slate-800/50 p-4">
+          <div className="flex items-start gap-3">
+            <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand-blue dark:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+            </svg>
+            <div className="min-w-0 flex-1 text-sm text-secondary">
+              <p className="mb-1 font-medium text-primary">How matching works</p>
+              <p className="text-muted">
+                Our system analyzes your bidding history, past purchases, shortlisted products, and browsing activity to recommend products you're most likely to be interested in. Each match includes a score — the higher the score, the stronger the fit. Matches improve over time as you interact with the marketplace. Dismiss any match that isn't relevant to help refine future suggestions.
+              </p>
+            </div>
+            <button
+              onClick={handleDismissInfo}
+              className="flex-shrink-0 rounded-md p-1 text-muted hover:text-primary transition"
+              aria-label="Dismiss"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center py-20">
