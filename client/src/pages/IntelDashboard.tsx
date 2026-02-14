@@ -135,6 +135,41 @@ export default function IntelDashboard() {
             </div>
           )}
         </div>
+        {/* Match Conversion */}
+        {data.matchConversion && (
+          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="border-l-2 border-brand-blue pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Match Conversion</h3>
+              <Link to="/intelligence/matches" className="text-xs font-medium text-brand-blue hover:underline">View Matches</Link>
+            </div>
+            {data.matchConversion.totalMatches === 0 ? (
+              <p className="text-sm text-faint">No match data yet</p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Conversion Rate</span>
+                  <span className="font-semibold text-brand-blue">{Math.round(data.matchConversion.conversionRate * 100)}%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Converted / Viewed / Rejected</span>
+                  <span className="text-secondary">{data.matchConversion.convertedCount} / {data.matchConversion.viewedCount} / {data.matchConversion.rejectedCount}</span>
+                </div>
+                {data.matchConversion.avgScoreConverted != null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted">Avg Score (Converted)</span>
+                    <span className="font-semibold text-green-600 dark:text-green-400">{data.matchConversion.avgScoreConverted}%</span>
+                  </div>
+                )}
+                {data.matchConversion.avgScoreRejected != null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted">Avg Score (Rejected)</span>
+                    <span className="font-semibold text-brand-coral">{data.matchConversion.avgScoreRejected}%</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}

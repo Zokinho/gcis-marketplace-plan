@@ -61,6 +61,7 @@ export interface ProductCard {
   testResults: any | null;
   coaPdfUrl: string | null;
   source: string;
+  pricedToSell?: boolean;
 }
 
 export interface ProductDetail extends ProductCard {
@@ -82,6 +83,7 @@ export interface ProductDetail extends ProductCard {
   requestPending: boolean;
   coaUrls: string[];
   seller: { companyName: string | null };
+  viewStats?: { totalViews: number; uniqueViewers: number; shortlistCount: number };
 }
 
 export interface Pagination {
@@ -219,6 +221,7 @@ export interface SellerListing {
   licensedProducer: string | null;
   lineage: string | null;
   dominantTerpene: string | null;
+  totalTerpenePercent: number | null;
   certification: string | null;
   harvestDate: string | null;
   isActive: boolean;
@@ -245,7 +248,16 @@ export async function fetchMyListings(): Promise<SellerListing[]> {
 
 export async function updateMyListing(
   id: string,
-  updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number; minQtyRequest?: number; description?: string },
+  updates: {
+    pricePerUnit?: number;
+    gramsAvailable?: number;
+    upcomingQty?: number;
+    minQtyRequest?: number;
+    description?: string;
+    certification?: string;
+    dominantTerpene?: string;
+    totalTerpenePercent?: number;
+  },
 ): Promise<void> {
   await api.patch(`/my-listings/${id}`, updates);
 }
@@ -536,7 +548,7 @@ export function getSharedProductPdfUrl(token: string, productId: string): string
 export type NotificationTypeEnum =
   | 'BID_RECEIVED' | 'BID_ACCEPTED' | 'BID_REJECTED' | 'BID_COUNTERED' | 'BID_OUTCOME'
   | 'PRODUCT_NEW' | 'PRODUCT_PRICE' | 'PRODUCT_STOCK'
-  | 'MATCH_SUGGESTION' | 'COA_PROCESSED' | 'PREDICTION_DUE' | 'SYSTEM_ANNOUNCEMENT';
+  | 'MATCH_SUGGESTION' | 'COA_PROCESSED' | 'PREDICTION_DUE' | 'SHORTLIST_PRICE_DROP' | 'SYSTEM_ANNOUNCEMENT';
 
 export interface NotificationRecord {
   id: string;
@@ -686,6 +698,17 @@ export interface IntelDashboard {
   marketTrends: MarketTrend[];
   topSellers: SellerScoreRecord[];
   topBuyers: Array<{ id: string; companyName: string | null; propensityScore: number }>;
+  matchConversion?: {
+    totalMatches: number;
+    pendingCount: number;
+    viewedCount: number;
+    convertedCount: number;
+    rejectedCount: number;
+    conversionRate: number;
+    avgScoreConverted: number | null;
+    avgScoreRejected: number | null;
+    avgScoreAll: number | null;
+  };
 }
 
 export interface TransactionRecord {
@@ -861,6 +884,119 @@ export async function fetchSellerBids(params?: { page?: number; limit?: number; 
   if (params?.limit) query.limit = String(params.limit);
   if (params?.status) query.status = params.status;
   const res = await api.get('/bids/seller', { params: query });
+  return res.data;
+}
+
+// ─── Shortlist Types ───
+
+export interface ShortlistItem extends ProductCard {
+  shortlistedAt: string;
+}
+
+// ─── Shortlist API ───
+
+export async function toggleShortlist(productId: string): Promise<{ shortlisted: boolean }> {
+  const res = await api.post<{ shortlisted: boolean }>('/shortlist/toggle', { productId });
+  return res.data;
+}
+
+export async function fetchShortlist(params?: {
+  page?: number;
+  limit?: number;
+  category?: string;
+  sort?: 'date' | 'name' | 'price';
+  order?: 'asc' | 'desc';
+}): Promise<{ items: ShortlistItem[]; pagination: Pagination }> {
+  const query: Record<string, string> = {};
+  if (params?.page) query.page = String(params.page);
+  if (params?.limit) query.limit = String(params.limit);
+  if (params?.category) query.category = params.category;
+  if (params?.sort) query.sort = params.sort;
+  if (params?.order) query.order = params.order;
+  const res = await api.get('/shortlist', { params: query });
+  return res.data;
+}
+
+export async function checkShortlist(productIds: string[]): Promise<Record<string, boolean>> {
+  const res = await api.get<{ shortlisted: Record<string, boolean> }>('/shortlist/check', {
+    params: { productIds: productIds.join(',') },
+  });
+  return res.data.shortlisted;
+}
+
+export async function fetchShortlistCount(): Promise<number> {
+  const res = await api.get<{ count: number }>('/shortlist/count');
+  return res.data.count;
+}
+
+// ─── Spot Sale Types ───
+
+export interface SpotSaleRecord {
+  id: string;
+  productId: string;
+  originalPrice: number;
+  spotPrice: number;
+  discountPercent: number;
+  quantity: number | null;
+  active: boolean;
+  expiresAt: string;
+  createdAt: string;
+  product: ProductCard;
+}
+
+export interface SpotSaleAdminRecord extends SpotSaleRecord {
+  createdById: string;
+  updatedAt: string;
+  createdBy: { email: string; firstName: string | null; lastName: string | null };
+}
+
+// ─── Spot Sale API ───
+
+export async function fetchSpotSales(): Promise<{ spotSales: SpotSaleRecord[] }> {
+  const res = await api.get('/spot-sales');
+  return res.data;
+}
+
+export async function fetchSpotSalesAdmin(params?: {
+  page?: number;
+  limit?: number;
+  status?: 'active' | 'expired' | 'deactivated' | 'all';
+}): Promise<{ spotSales: SpotSaleAdminRecord[]; pagination: Pagination }> {
+  const query: Record<string, string> = {};
+  if (params?.page) query.page = String(params.page);
+  if (params?.limit) query.limit = String(params.limit);
+  if (params?.status) query.status = params.status;
+  const res = await api.get('/spot-sales/admin', { params: query });
+  return res.data;
+}
+
+export async function createSpotSale(data: {
+  productId: string;
+  spotPrice: number;
+  quantity?: number;
+  expiresAt: string;
+}): Promise<{ spotSale: SpotSaleAdminRecord }> {
+  const res = await api.post('/spot-sales/admin', data);
+  return res.data;
+}
+
+export async function updateSpotSale(
+  id: string,
+  data: { active?: boolean; spotPrice?: number; quantity?: number | null; expiresAt?: string },
+): Promise<{ spotSale: SpotSaleAdminRecord }> {
+  const res = await api.patch(`/spot-sales/admin/${id}`, data);
+  return res.data;
+}
+
+export async function deleteSpotSale(id: string): Promise<void> {
+  await api.delete(`/spot-sales/admin/${id}`);
+}
+
+export async function recordSpotSale(
+  spotSaleId: string,
+  data: { buyerId: string; quantity: number },
+): Promise<{ transaction: { id: string; status: string } }> {
+  const res = await api.post(`/spot-sales/admin/${spotSaleId}/record-sale`, data);
   return res.data;
 }
 

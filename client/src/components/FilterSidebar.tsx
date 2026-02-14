@@ -128,7 +128,7 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-brand-teal/30 surface py-2 text-sm font-medium text-brand-teal lg:hidden"
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border card-blue py-2 text-sm font-medium text-brand-teal backdrop-blur-sm lg:hidden"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
@@ -138,11 +138,11 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
 
       {/* Mobile panel */}
       {mobileOpen && (
-        <div className="mb-4 rounded-lg border border-brand-blue/20 bg-brand-blue/5 p-4 shadow-md lg:hidden">{content}</div>
+        <div className="mb-4 rounded-lg border card-blue p-4 shadow-md backdrop-blur-sm lg:hidden">{content}</div>
       )}
 
       {/* Desktop sidebar — sticky, snug height */}
-      <aside className="hidden w-64 shrink-0 self-start sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-lg border border-brand-blue/20 bg-brand-blue/5 shadow-md lg:block">
+      <aside className="hidden w-64 shrink-0 self-start sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-lg border card-blue shadow-md backdrop-blur-sm lg:block">
         <div className="bg-brand-teal px-4 py-3 sticky top-0 z-10">
           <h3 className="text-sm font-bold uppercase tracking-wide text-white">Filters</h3>
         </div>

@@ -69,7 +69,67 @@ export async function analyzeChurnRisk(buyerId: string, categoryName?: string) {
     const lastPurchaseDate = new Date(sortedTx[0].transactionDate);
     const daysSincePurchase = Math.floor((Date.now() - lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const { level, score } = calculateRiskLevel(daysSincePurchase, avgIntervalDays);
+    let { level, score } = calculateRiskLevel(daysSincePurchase, avgIntervalDays);
+
+    // Shortlist engagement discount: -5 per shortlist in last 90 days, max -20
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const shortlistWhere: any = {
+      buyerId,
+      createdAt: { gte: ninetyDaysAgo },
+    };
+    if (cat) {
+      shortlistWhere.product = { category: cat };
+    }
+    const recentShortlists = await prisma.shortlistItem.count({ where: shortlistWhere });
+
+    if (recentShortlists > 0 && score > 0) {
+      const discount = Math.min(20, recentShortlists * 5);
+      score = Math.max(0, score - discount);
+      // Recalculate risk level after discount
+      if (score >= 80) level = 'critical';
+      else if (score >= 60) level = 'high';
+      else if (score >= 40) level = 'medium';
+      else level = 'low';
+    }
+
+    // View activity discount: -3 per 5 views in last 30 days, max -15
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const viewWhere: any = {
+      buyerId,
+      viewedAt: { gte: thirtyDaysAgo },
+    };
+    if (cat) {
+      viewWhere.product = { category: cat };
+    }
+    const recentViews = await prisma.productView.count({ where: viewWhere });
+
+    if (recentViews > 0 && score > 0) {
+      const viewDiscount = Math.min(15, Math.floor(recentViews / 5) * 3);
+      score = Math.max(0, score - viewDiscount);
+      if (score >= 80) level = 'critical';
+      else if (score >= 60) level = 'high';
+      else if (score >= 40) level = 'medium';
+      else level = 'low';
+    }
+
+    // Bid rejection frustration: >=3 consecutive rejected bids in last 30d → +10
+    const recentBids = await prisma.bid.findMany({
+      where: { buyerId, createdAt: { gte: thirtyDaysAgo } },
+      select: { status: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    let consecutiveRejections = 0;
+    for (const b of recentBids) {
+      if (b.status === 'REJECTED') consecutiveRejections++;
+      else break;
+    }
+    if (consecutiveRejections >= 3) {
+      score = Math.min(100, score + 10);
+      if (score >= 80) level = 'critical';
+      else if (score >= 60) level = 'high';
+      else if (score >= 40) level = 'medium';
+      else level = 'low';
+    }
 
     if (score > 0) {
       risks.push({

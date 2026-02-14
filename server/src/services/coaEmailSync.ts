@@ -4,6 +4,7 @@ import { getCoaClient } from './coaClient';
 import { detectSeller } from './sellerDetection';
 import { mapCoaToProductFields } from '../utils/coaMapper';
 import logger from '../utils/logger';
+import { withCronLock, LOCK_IDS } from '../utils/cronLock';
 
 let cronJob: cron.ScheduledTask | null = null;
 
@@ -116,11 +117,9 @@ export function startCoaEmailSync() {
   if (cronJob) return;
 
   cronJob = cron.schedule('*/5 * * * *', async () => {
-    try {
+    await withCronLock(LOCK_IDS.COA_EMAIL_SYNC, 'CoaEmailSync', async () => {
       await pollEmailIngestions();
-    } catch (err) {
-      logger.error({ err }, '[COA-EMAIL] Cron error');
-    }
+    });
   });
 
   logger.info('[COA-EMAIL] Cron scheduled: every 5 minutes');

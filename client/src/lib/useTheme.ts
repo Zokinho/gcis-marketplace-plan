@@ -2,11 +2,11 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
 
-export type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'dark' | 'teal' | 'system';
 
 interface ThemeCtx {
   theme: Theme;
-  resolved: 'light' | 'dark';
+  resolved: 'light' | 'dark' | 'teal';
   setTheme: (t: Theme) => void;
   cycle: () => void;
 }
@@ -25,26 +25,28 @@ function getSystemPref(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function resolve(theme: Theme): 'light' | 'dark' {
+function resolve(theme: Theme): 'light' | 'dark' | 'teal' {
+  if (theme === 'teal') return 'teal';
   return theme === 'system' ? getSystemPref() : theme;
 }
 
-function applyClass(resolved: 'light' | 'dark') {
+function applyClass(resolved: 'light' | 'dark' | 'teal') {
   const root = document.documentElement;
+  root.classList.remove('dark', 'theme-gradient');
   if (resolved === 'dark') {
     root.classList.add('dark');
-  } else {
-    root.classList.remove('dark');
+  } else if (resolved === 'teal') {
+    root.classList.add('theme-gradient');
   }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem('theme') as Theme | null;
-    return stored && ['light', 'dark', 'system'].includes(stored) ? stored : 'system';
+    return stored && ['light', 'dark', 'teal', 'system'].includes(stored) ? stored : 'system';
   });
 
-  const [resolved, setResolved] = useState<'light' | 'dark'>(() => resolve(theme));
+  const [resolved, setResolved] = useState<'light' | 'dark' | 'teal'>(() => resolve(theme));
 
   const setTheme = useCallback((t: Theme) => {
     localStorage.setItem('theme', t);
@@ -52,10 +54,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const cycle = useCallback(() => {
-    setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light');
+    const order: Theme[] = ['light', 'dark', 'teal', 'system'];
+    const idx = order.indexOf(theme);
+    setTheme(order[(idx + 1) % order.length]);
   }, [theme, setTheme]);
 
-  // Apply dark class whenever theme or system pref changes
+  // Apply class whenever theme or system pref changes
   useEffect(() => {
     const r = resolve(theme);
     setResolved(r);

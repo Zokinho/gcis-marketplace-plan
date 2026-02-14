@@ -24,6 +24,15 @@ interface PropensityFeatures {
   pendingMatches: number;
   churnRiskScore: number;
   overdueReorderDays: number;
+  shortlistCount: number;
+  shortlistLast30d: number;
+  shortlistCategoryCount: number;
+  viewsLast30d: number;
+  uniqueProductsViewed30d: number;
+  viewToShortlistRate: number;
+  bidRejectionRate: number;
+  totalBidsPlaced: number;
+  bidConversionRate: number;
 }
 
 async function extractFeatures(buyerId: string, categoryName?: string): Promise<PropensityFeatures> {
@@ -34,7 +43,7 @@ async function extractFeatures(buyerId: string, categoryName?: string): Promise<
   const txWhere: any = { buyerId };
   if (categoryName) txWhere.product = { category: categoryName };
 
-  const [buyer, transactions, matches, churnSignal] = await Promise.all([
+  const [buyer, transactions, matches, churnSignal, shortlistItems, recentViews, bidStatusCounts] = await Promise.all([
     prisma.user.findUnique({
       where: { id: buyerId },
       select: { transactionCount: true, totalTransactionValue: true, lastTransactionDate: true },
@@ -50,6 +59,19 @@ async function extractFeatures(buyerId: string, categoryName?: string): Promise<
     }),
     prisma.churnSignal.findFirst({
       where: { buyerId, isActive: true, ...(categoryName ? { categoryName } : {}) },
+    }),
+    prisma.shortlistItem.findMany({
+      where: { buyerId },
+      select: { createdAt: true, product: { select: { category: true } } },
+    }),
+    prisma.productView.findMany({
+      where: { buyerId, viewedAt: { gte: thirtyDaysAgo } },
+      select: { productId: true },
+    }),
+    prisma.bid.groupBy({
+      by: ['status'],
+      where: { buyerId },
+      _count: true,
     }),
   ]);
 
@@ -108,6 +130,35 @@ async function extractFeatures(buyerId: string, categoryName?: string): Promise<
     ? Math.max(0, Math.floor((today.getTime() - new Date(prediction.predictedDate).getTime()) / (24 * 60 * 60 * 1000)))
     : 0;
 
+  // Shortlist features
+  const shortlistCount = shortlistItems.length;
+  const shortlistLast30d = shortlistItems.filter(
+    (s) => new Date(s.createdAt) >= thirtyDaysAgo,
+  ).length;
+  const shortlistCategories = new Set(
+    shortlistItems.map((s) => s.product?.category).filter(Boolean),
+  );
+  const shortlistCategoryCount = shortlistCategories.size;
+
+  // View features
+  const viewsLast30d = recentViews.length;
+  const uniqueProductsViewed30d = new Set(recentViews.map(v => v.productId)).size;
+  const viewToShortlistRate = uniqueProductsViewed30d > 0
+    ? shortlistLast30d / uniqueProductsViewed30d
+    : 0;
+
+  // Bid features
+  const bidCountMap: Record<string, number> = {};
+  let totalBidsPlaced = 0;
+  for (const bc of bidStatusCounts) {
+    bidCountMap[bc.status] = bc._count;
+    totalBidsPlaced += bc._count;
+  }
+  const bidRejectedCount = bidCountMap['REJECTED'] || 0;
+  const bidAcceptedCount = bidCountMap['ACCEPTED'] || 0;
+  const bidRejectionRate = totalBidsPlaced > 0 ? bidRejectedCount / totalBidsPlaced : 0;
+  const bidConversionRate = totalBidsPlaced > 0 ? bidAcceptedCount / totalBidsPlaced : 0;
+
   return {
     daysSinceLastPurchase,
     daysSinceLastMatch,
@@ -126,6 +177,15 @@ async function extractFeatures(buyerId: string, categoryName?: string): Promise<
     pendingMatches,
     churnRiskScore,
     overdueReorderDays,
+    shortlistCount,
+    shortlistLast30d,
+    shortlistCategoryCount,
+    viewsLast30d,
+    uniqueProductsViewed30d,
+    viewToShortlistRate,
+    bidRejectionRate,
+    totalBidsPlaced,
+    bidConversionRate,
   };
 }
 
@@ -138,12 +198,25 @@ function scoreFeatures(features: PropensityFeatures) {
 
   const monetaryScore = Math.min(100, (features.avgOrderValue / 1000) * 50 + Math.min(50, features.totalSpend / 10000 * 50));
 
-  const categoryAffinity = Math.min(100, features.topCategoryTransactions * 20 + features.categoryCount * 10);
+  let categoryAffinity = Math.min(100, features.topCategoryTransactions * 20 + features.categoryCount * 10);
+  categoryAffinity = Math.min(100, categoryAffinity + features.shortlistCategoryCount * 5);
 
   let engagementScore = features.matchConversionRate * 50;
-  if (features.matchesReviewed > 0) engagementScore += 20;
-  if (features.pendingMatches > 0) engagementScore += 15;
-  engagementScore = Math.min(100, engagementScore);
+  if (features.matchesReviewed > 0) engagementScore += 15;
+  if (features.pendingMatches > 0) engagementScore += 10;
+  if (features.shortlistCount > 0) engagementScore += 10;
+  if (features.shortlistLast30d > 0) engagementScore += 10;
+  if (features.shortlistCategoryCount >= 2) engagementScore += 5;
+  // View signals
+  if (features.viewsLast30d > 10) engagementScore += 5;
+  if (features.uniqueProductsViewed30d > 5) engagementScore += 10;
+  // Bid rejection penalties
+  if (features.bidRejectionRate > 0.5 && features.totalBidsPlaced >= 3) engagementScore -= 10;
+  if (features.totalBidsPlaced >= 5 && features.bidConversionRate < 0.2) engagementScore -= 5;
+  engagementScore = Math.min(100, Math.max(0, engagementScore));
+
+  // Category affinity boost from view-to-shortlist conversion
+  if (features.viewToShortlistRate > 0.3) categoryAffinity = Math.min(100, categoryAffinity + 5);
 
   const churnPenalty = (features.churnRiskScore / 100) * 0.3;
   const overdueBoost = features.overdueReorderDays > 0 ? Math.min(20, features.overdueReorderDays / 7 * 5) : 0;

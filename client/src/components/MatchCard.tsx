@@ -24,7 +24,7 @@ export default function MatchCard({ match, onDismiss, dismissing }: Props) {
         <div className="min-w-0 flex-1">
           <Link
             to={`/marketplace/${product.id}`}
-            className="text-base font-semibold text-primary hover:text-brand-blue transition"
+            className="text-base font-semibold text-primary hover:text-brand-blue dark:hover:text-brand-yellow transition"
           >
             {product.name}
           </Link>
@@ -48,7 +48,7 @@ export default function MatchCard({ match, onDismiss, dismissing }: Props) {
       {insights.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-1.5">
           {insights.slice(0, 3).map((insight, i) => {
-            const color = insight.type === 'positive' ? 'bg-brand-sage/20 text-brand-sage'
+            const color = insight.type === 'positive' ? 'bg-brand-sage/20 text-brand-teal dark:text-brand-sage'
               : insight.type === 'urgent' ? 'bg-brand-yellow/20 text-brand-yellow'
               : insight.type === 'warning' ? 'bg-red-50 dark:bg-red-900/20 text-brand-coral'
               : 'bg-brand-offwhite dark:bg-slate-700 text-primary';

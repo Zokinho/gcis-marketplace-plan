@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import Layout from '../components/Layout';
 import SellerScoreCard from '../components/SellerScoreCard';
 import ShareModal from '../components/ShareModal';
+import ContactModal from '../components/ContactModal';
 import {
   fetchMyListings,
   updateMyListing,
@@ -11,6 +13,7 @@ import {
   type SellerListing,
   type SellerScoreRecord,
 } from '../lib/api';
+import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
 
 const TYPE_COLORS: Record<string, string> = {
   Sativa: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
@@ -24,6 +27,8 @@ export default function MyListings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const { user } = useUser();
   const location = useLocation();
   const [successMsg, setSuccessMsg] = useState<string | null>(
     (location.state as any)?.created
@@ -105,6 +110,15 @@ export default function MyListings() {
               Share Products
             </button>
           )}
+          <button
+            onClick={() => setContactOpen(true)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-teal/10 px-3 py-1 text-sm font-medium text-brand-teal transition hover:bg-brand-teal/20 dark:bg-brand-yellow/15 dark:text-brand-yellow dark:hover:bg-brand-yellow/25"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+            </svg>
+            Need help?
+          </button>
         </div>
       </div>
 
@@ -126,9 +140,9 @@ export default function MyListings() {
       )}
 
       {!loading && !error && listings.length === 0 && (
-        <div className="rounded-lg border border-brand-gray surface p-12 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10">
-            <svg className="h-8 w-8 text-brand-teal/50" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <div className="rounded-lg border border-brand-gray dark:border-slate-700 surface p-12 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-coral/10 dark:bg-brand-yellow/10">
+            <svg className="h-8 w-8 text-brand-coral/50 dark:text-brand-yellow/50" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
             </svg>
           </div>
@@ -153,6 +167,12 @@ export default function MyListings() {
           ))}
         </div>
       )}
+      <ContactModal
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+        userName={user?.fullName || user?.firstName || ''}
+        userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+      />
     </Layout>
   );
 }
@@ -176,6 +196,10 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
   const [minQty, setMinQty] = useState(String(listing.minQtyRequest ?? ''));
   const [desc, setDesc] = useState(listing.description ?? '');
   const [cert, setCert] = useState(listing.certification ?? '');
+  const [terpenes, setTerpenes] = useState<string[]>(
+    listing.dominantTerpene ? listing.dominantTerpene.split(';').map((t) => t.trim()).filter(Boolean) : [],
+  );
+  const [terpenePercent, setTerpenePercent] = useState(String(listing.totalTerpenePercent ?? ''));
 
   function resetFields() {
     setPrice(String(listing.pricePerUnit ?? ''));
@@ -184,6 +208,8 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     setMinQty(String(listing.minQtyRequest ?? ''));
     setDesc(listing.description ?? '');
     setCert(listing.certification ?? '');
+    setTerpenes(listing.dominantTerpene ? listing.dominantTerpene.split(';').map((t) => t.trim()).filter(Boolean) : []);
+    setTerpenePercent(String(listing.totalTerpenePercent ?? ''));
     setEditError(null);
   }
 
@@ -203,6 +229,12 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       if (!isNaN(newMinQty) && newMinQty !== listing.minQtyRequest) updates.minQtyRequest = newMinQty;
       if (desc.trim() !== (listing.description ?? '')) updates.description = desc.trim();
       if (cert !== (listing.certification ?? '')) updates.certification = cert;
+
+      const terpeneStr = terpenes.join('; ');
+      if (terpeneStr !== (listing.dominantTerpene ?? '')) updates.dominantTerpene = terpeneStr;
+
+      const newTerpPct = parseFloat(terpenePercent);
+      if (!isNaN(newTerpPct) && newTerpPct !== listing.totalTerpenePercent) updates.totalTerpenePercent = newTerpPct;
 
       if (Object.keys(updates).length === 0) {
         setEditing(false);
@@ -264,7 +296,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
             <img src={listing.imageUrls[0]} alt={listing.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <svg className="h-8 w-8 text-faint" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+              <svg className="h-8 w-8 text-faint dark:text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
               </svg>
             </div>
@@ -324,7 +356,8 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                   <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm sm:grid-cols-3">
                     {listing.licensedProducer && <Stat label="LP" value={listing.licensedProducer} />}
                     {listing.lineage && <Stat label="Lineage" value={listing.lineage} />}
-                    {listing.dominantTerpene && <Stat label="Terpene" value={listing.dominantTerpene} />}
+                    {listing.dominantTerpene && <Stat label="Terpene Profile" value={listing.dominantTerpene} />}
+                    {listing.totalTerpenePercent != null && <Stat label="Dominant Terpene %" value={`${listing.totalTerpenePercent}%`} />}
                     {listing.certification && <Stat label="Cert" value={listing.certification} />}
                     {listing.minQtyRequest != null && <Stat label="Min QTY" value={`${listing.minQtyRequest.toLocaleString()}g`} />}
                     {listing.harvestDate && (
@@ -377,6 +410,22 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                   rows={2}
                   className="w-full input-field"
                 />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <TerpeneAutocomplete selected={terpenes} onChange={setTerpenes} />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted">Dominant Terpene %</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={terpenePercent}
+                    onChange={(e) => setTerpenePercent(e.target.value)}
+                    placeholder="e.g. 2.5"
+                    className="w-full input-field"
+                  />
+                </div>
               </div>
               {editError && <p className="text-xs text-red-600">{editError}</p>}
               <div className="flex gap-2">

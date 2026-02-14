@@ -85,7 +85,32 @@ export async function generatePredictionsForBuyer(buyerId: string): Promise<numb
     const pattern = await calculateReorderPattern(buyerId, categoryName);
     if (!pattern) continue;
 
-    const predictedDate = addDays(pattern.lastTransaction.transactionDate, pattern.avgDays);
+    let predictedDate = addDays(pattern.lastTransaction.transactionDate, pattern.avgDays);
+    let confidence = pattern.confidence;
+
+    // Shortlist boost: recent shortlists in this category boost confidence and pull timing forward
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const recentShortlists = await prisma.shortlistItem.count({
+      where: {
+        buyerId,
+        product: { category: categoryName },
+        createdAt: { gte: thirtyDaysAgo },
+      },
+    });
+
+    if (recentShortlists > 0) {
+      // Confidence boost: +5 per recent shortlist, max +10
+      confidence = Math.min(100, confidence + Math.min(10, recentShortlists * 5));
+
+      // Timing pull-forward: if predicted date is >7 days out, pull 15% closer
+      const daysUntilPredicted = Math.floor(
+        (predictedDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+      );
+      if (daysUntilPredicted > 7) {
+        const pullForwardDays = Math.round(daysUntilPredicted * 0.15);
+        predictedDate = new Date(predictedDate.getTime() - pullForwardDays * 24 * 60 * 60 * 1000);
+      }
+    }
 
     await prisma.prediction.upsert({
       where: { buyerId_categoryName: { buyerId, categoryName } },
@@ -93,14 +118,14 @@ export async function generatePredictionsForBuyer(buyerId: string): Promise<numb
         buyerId,
         categoryName,
         predictedDate,
-        confidenceScore: pattern.confidence,
+        confidenceScore: confidence,
         basedOnTransactions: pattern.transactionCount,
         avgIntervalDays: pattern.avgDays,
         lastTransactionId: pattern.lastTransaction.id,
       },
       update: {
         predictedDate,
-        confidenceScore: pattern.confidence,
+        confidenceScore: confidence,
         basedOnTransactions: pattern.transactionCount,
         avgIntervalDays: pattern.avgDays,
         lastTransactionId: pattern.lastTransaction.id,

@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import logger from './utils/logger';
+import { withCronLock, LOCK_IDS } from './utils/cronLock';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -16,63 +17,56 @@ const PORT = process.env.PORT || 3001;
 // ─── Global middleware ───
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim()),
   credentials: true,
 }));
 app.use(express.json());
 
+// ─── CSRF protection (Origin validation on mutating requests) ───
+const ALLOWED_ORIGINS = new Set(
+  (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim()),
+);
+
+app.use((req, res, next) => {
+  // Only check mutating methods
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+
+  // Skip webhook routes (Svix signature verification is their CSRF equivalent)
+  if (req.path.startsWith('/api/webhooks')) return next();
+
+  const origin = req.headers['origin'];
+  const referer = req.headers['referer'];
+
+  // Allow requests with a valid Origin header
+  if (origin && ALLOWED_ORIGINS.has(origin)) return next();
+
+  // Fall back to Referer check
+  if (referer) {
+    try {
+      const refOrigin = new URL(referer).origin;
+      if (ALLOWED_ORIGINS.has(refOrigin)) return next();
+    } catch {
+      // malformed referer — fall through to reject
+    }
+  }
+
+  // Allow server-to-server calls (no Origin/Referer, but has Authorization)
+  // These are API calls from non-browser clients (curl, Postman, cron jobs)
+  if (!origin && !referer) return next();
+
+  logger.warn({ origin, referer, path: req.path }, 'CSRF: origin mismatch — blocked');
+  return res.status(403).json({ error: 'Forbidden: origin not allowed' });
+});
+
 // ─── Static file serving for uploads ───
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
-// ─── Zoho file proxy (serves authenticated Zoho file downloads) ───
+// ─── Zoho file proxy cache ───
 const zohoFileCache = new Map<string, { data: Buffer; contentType: string; expires: number }>();
-
-app.get('/api/zoho-files/:zohoProductId/:fileId', async (req, res) => {
-  const { zohoProductId, fileId } = req.params;
-
-  // Validate that this product exists in our database (prevents using our
-  // server as an open proxy to download arbitrary Zoho files)
-  const product = await prisma.product.findUnique({
-    where: { zohoProductId },
-    select: { id: true },
-  });
-  if (!product) {
-    return res.status(404).json({ error: 'Product not found' });
-  }
-
-  const cacheKey = `${zohoProductId}:${fileId}`;
-
-  // Check in-memory cache (1 hour TTL)
-  const cached = zohoFileCache.get(cacheKey);
-  if (cached && cached.expires > Date.now()) {
-    res.set('Content-Type', cached.contentType);
-    res.set('Cache-Control', 'public, max-age=3600');
-    return res.send(cached.data);
-  }
-
-  try {
-    const { downloadZohoFile } = await import('./services/zohoApi');
-    const { data, contentType, fileName } = await downloadZohoFile(zohoProductId, fileId);
-
-    // Cache for 1 hour
-    zohoFileCache.set(cacheKey, { data, contentType, expires: Date.now() + 3600_000 });
-
-    // Evict old entries if cache grows too large
-    if (zohoFileCache.size > 200) {
-      const now = Date.now();
-      for (const [k, v] of zohoFileCache) {
-        if (v.expires < now) zohoFileCache.delete(k);
-      }
-    }
-
-    res.set('Content-Type', contentType);
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.send(data);
-  } catch (err: any) {
-    logger.error({ err, zohoProductId, fileId }, 'ZOHO-FILES download failed');
-    res.status(502).json({ error: 'Failed to fetch file from Zoho' });
-  }
-});
 
 // ─── Health check (public) ───
 app.get('/api/health', async (req, res) => {
@@ -127,23 +121,17 @@ app.get('/api/health', async (req, res) => {
 
 // ─── Rate limiters ───
 
-// General API: 100 requests per minute per IP
+// General API: 200 requests per minute per IP
 const apiLimiter = rateLimit({
   windowMs: 60_000,
-  max: 100,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
 });
 
-// Write operations (bids, listings): 20 per minute per IP
-const writeLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests, please slow down' },
-});
+// Write limiter imported from shared module (used by CoA route mount + route-level in bids/listings)
+import { writeLimiter } from './utils/rateLimiters';
 
 // Auth/onboarding: 30 per minute per IP
 const authLimiter = rateLimit({
@@ -179,6 +167,54 @@ async function mountRoutes() {
   const { publicShareRouter } = await import('./routes/shares');
   const notificationRoutes = (await import('./routes/notifications')).default;
 
+  // Zoho file proxy (requires auth — prevents unauthenticated file downloads)
+  app.get('/api/zoho-files/:zohoProductId/:fileId', apiLimiter, requireAuth(), marketplaceAuth, async (req: express.Request<{ zohoProductId: string; fileId: string }>, res) => {
+    const { zohoProductId, fileId } = req.params;
+
+    // Validate that this product exists in our database (prevents using our
+    // server as an open proxy to download arbitrary Zoho files)
+    const product = await prisma.product.findUnique({
+      where: { zohoProductId },
+      select: { id: true },
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const cacheKey = `${zohoProductId}:${fileId}`;
+
+    // Check in-memory cache (1 hour TTL)
+    const cached = zohoFileCache.get(cacheKey);
+    if (cached && cached.expires > Date.now()) {
+      res.set('Content-Type', cached.contentType);
+      res.set('Cache-Control', 'public, max-age=3600');
+      return res.send(cached.data);
+    }
+
+    try {
+      const { downloadZohoFile } = await import('./services/zohoApi');
+      const { data, contentType, fileName } = await downloadZohoFile(zohoProductId, fileId);
+
+      // Cache for 1 hour
+      zohoFileCache.set(cacheKey, { data, contentType, expires: Date.now() + 3600_000 });
+
+      // Evict old entries if cache grows too large
+      if (zohoFileCache.size > 200) {
+        const now = Date.now();
+        for (const [k, v] of zohoFileCache) {
+          if (v.expires < now) zohoFileCache.delete(k);
+        }
+      }
+
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.send(data);
+    } catch (err: any) {
+      logger.error({ err, zohoProductId, fileId }, 'ZOHO-FILES download failed');
+      res.status(502).json({ error: 'Failed to fetch file from Zoho' });
+    }
+  });
+
   // Webhooks — no auth required (Svix signature verification instead)
   app.use('/api/webhooks', webhookRoutes);
 
@@ -203,12 +239,21 @@ async function mountRoutes() {
   // Notifications — requires Clerk auth + marketplace auth
   app.use('/api/notifications', apiLimiter, requireAuth(), marketplaceAuth, notificationRoutes);
 
+  // Shortlist — requires Clerk auth + marketplace auth
+  const shortlistRoutes = (await import('./routes/shortlist')).default;
+  app.use('/api/shortlist', apiLimiter, requireAuth(), marketplaceAuth, shortlistRoutes);
+
+  // Spot Sales — admin routes first (more specific path), then buyer routes
+  const { adminRouter: spotSaleAdminRoutes, buyerRouter: spotSaleBuyerRoutes } = await import('./routes/spotSales');
+  app.use('/api/spot-sales/admin', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, spotSaleAdminRoutes);
+  app.use('/api/spot-sales', apiLimiter, requireAuth(), marketplaceAuth, spotSaleBuyerRoutes);
+
   // Protected marketplace routes — requires full approval chain
   app.use('/api/marketplace', apiLimiter, requireAuth(), marketplaceAuth, marketplaceRoutes);
 
-  app.use('/api/bids', writeLimiter, requireAuth(), marketplaceAuth, bidRoutes);
+  app.use('/api/bids', apiLimiter, requireAuth(), marketplaceAuth, bidRoutes);
 
-  app.use('/api/my-listings', writeLimiter, requireAuth(), marketplaceAuth, requireSeller, myListingsRoutes);
+  app.use('/api/my-listings', apiLimiter, requireAuth(), marketplaceAuth, requireSeller, myListingsRoutes);
 
   // Intelligence routes (admin)
   const { adminRouter: intelAdminRoutes, buyerMatchRouter } = await import('./routes/intelligence');
@@ -225,25 +270,25 @@ function startIntelligenceCrons() {
   // Daily at midnight: predictions + churn detection
   const midnightMs = getMillisUntilHour(0);
   setTimeout(() => {
-    runIntelJob('Predictions', async () => {
+    runIntelJob('Predictions', LOCK_IDS.INTEL_PREDICTIONS, async () => {
       const { generatePredictions, cleanupStalePredictions } = await import('./services/predictionEngine');
       const result = await generatePredictions();
       const cleaned = await cleanupStalePredictions();
       return { ...result, staleCleaned: cleaned };
     });
-    runIntelJob('Churn Detection', async () => {
+    runIntelJob('Churn Detection', LOCK_IDS.INTEL_CHURN, async () => {
       const { detectAllChurnSignals } = await import('./services/churnDetectionService');
       return detectAllChurnSignals();
     });
     // Repeat daily
     setInterval(() => {
-      runIntelJob('Predictions', async () => {
+      runIntelJob('Predictions', LOCK_IDS.INTEL_PREDICTIONS, async () => {
         const { generatePredictions, cleanupStalePredictions } = await import('./services/predictionEngine');
         const result = await generatePredictions();
         const cleaned = await cleanupStalePredictions();
         return { ...result, staleCleaned: cleaned };
       });
-      runIntelJob('Churn Detection', async () => {
+      runIntelJob('Churn Detection', LOCK_IDS.INTEL_CHURN, async () => {
         const { detectAllChurnSignals } = await import('./services/churnDetectionService');
         return detectAllChurnSignals();
       });
@@ -252,12 +297,12 @@ function startIntelligenceCrons() {
 
   // Daily at 1am: propensity scores
   setTimeout(() => {
-    runIntelJob('Propensity Scores', async () => {
+    runIntelJob('Propensity Scores', LOCK_IDS.INTEL_PROPENSITY, async () => {
       const { calculateAllPropensities } = await import('./services/propensityService');
       return calculateAllPropensities();
     });
     setInterval(() => {
-      runIntelJob('Propensity Scores', async () => {
+      runIntelJob('Propensity Scores', LOCK_IDS.INTEL_PROPENSITY, async () => {
         const { calculateAllPropensities } = await import('./services/propensityService');
         return calculateAllPropensities();
       });
@@ -266,12 +311,12 @@ function startIntelligenceCrons() {
 
   // Daily at 2am: seller scores
   setTimeout(() => {
-    runIntelJob('Seller Scores', async () => {
+    runIntelJob('Seller Scores', LOCK_IDS.INTEL_SELLER_SCORES, async () => {
       const { recalculateAllSellerScores } = await import('./services/sellerScoreService');
       return recalculateAllSellerScores();
     });
     setInterval(() => {
-      runIntelJob('Seller Scores', async () => {
+      runIntelJob('Seller Scores', LOCK_IDS.INTEL_SELLER_SCORES, async () => {
         const { recalculateAllSellerScores } = await import('./services/sellerScoreService');
         return recalculateAllSellerScores();
       });
@@ -281,14 +326,12 @@ function startIntelligenceCrons() {
   logger.info('Intelligence cron jobs scheduled (midnight, 1am, 2am daily)');
 }
 
-async function runIntelJob(name: string, fn: () => Promise<unknown>) {
-  logger.info({ job: name }, 'INTEL-CRON starting');
-  try {
+async function runIntelJob(name: string, lockId: number, fn: () => Promise<unknown>) {
+  await withCronLock(lockId, name, async () => {
+    logger.info({ job: name }, 'INTEL-CRON starting');
     const result = await fn();
     logger.info({ job: name, result }, 'INTEL-CRON completed');
-  } catch (err) {
-    logger.error({ err, job: name }, 'INTEL-CRON failed');
-  }
+  });
 }
 
 function getMillisUntilHour(hour: number): number {

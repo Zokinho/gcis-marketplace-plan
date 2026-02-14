@@ -2,7 +2,6 @@ import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { SignIn, SignUp, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import { useUserStatus } from './lib/useUserStatus';
 import Landing from './pages/Landing';
-import Dashboard from './pages/Dashboard';
 import Marketplace from './pages/Marketplace';
 import ProductDetail from './pages/ProductDetail';
 import Onboarding from './pages/Onboarding';
@@ -24,6 +23,11 @@ import SellerScorecardsPage from './pages/SellerScorecardsPage';
 import TransactionsPage from './pages/TransactionsPage';
 import BuyerMatchesPage from './pages/BuyerMatchesPage';
 import NotificationsPage from './pages/NotificationsPage';
+import ShortlistPage from './pages/ShortlistPage';
+import SpotSales from './pages/SpotSales';
+import SpotSalesAdmin from './pages/SpotSalesAdmin';
+import Guide from './pages/Guide';
+import { ShortlistProvider } from './lib/useShortlist';
 
 /**
  * Requires Clerk sign-in. Redirects unauthenticated users to /sign-in.
@@ -108,6 +112,7 @@ function NotFound() {
 
 export default function App() {
   return (
+    <ShortlistProvider>
     <div className="min-h-screen surface-base text-primary">
       <Routes>
         {/* Public routes */}
@@ -120,9 +125,7 @@ export default function App() {
         <Route path="/pending" element={<RequireAuth><PendingApproval /></RequireAuth>} />
 
         {/* Fully protected marketplace routes */}
-        <Route path="/dashboard" element={
-          <RequireAuth><MarketplaceGuard><Dashboard /></MarketplaceGuard></RequireAuth>
-        } />
+        <Route path="/dashboard" element={<Navigate to="/marketplace" replace />} />
         <Route path="/marketplace" element={
           <RequireAuth><MarketplaceGuard><Marketplace /></MarketplaceGuard></RequireAuth>
         } />
@@ -138,11 +141,23 @@ export default function App() {
         <Route path="/orders" element={
           <RequireAuth><MarketplaceGuard><Orders /></MarketplaceGuard></RequireAuth>
         } />
+        <Route path="/shortlist" element={
+          <RequireAuth><MarketplaceGuard><ShortlistPage /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/spot-sales" element={
+          <RequireAuth><MarketplaceGuard><SpotSales /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/spot-sales/admin" element={
+          <RequireAuth><MarketplaceGuard><SpotSalesAdmin /></MarketplaceGuard></RequireAuth>
+        } />
         <Route path="/my-matches" element={
           <RequireAuth><MarketplaceGuard><BuyerMatchesPage /></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/notifications" element={
           <RequireAuth><MarketplaceGuard><NotificationsPage /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/guide" element={
+          <RequireAuth><MarketplaceGuard><Guide /></MarketplaceGuard></RequireAuth>
         } />
 
         {/* Intelligence routes (admin) */}
@@ -187,5 +202,6 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
+    </ShortlistProvider>
   );
 }

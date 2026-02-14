@@ -101,7 +101,7 @@ export async function fetchMarketplaceContacts(): Promise<any[]> {
  */
 export async function pushProductUpdate(
   productId: string,
-  updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number; minQtyRequest?: number; description?: string },
+  updates: Record<string, number | string | null | undefined>,
 ) {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) throw new Error(`Product ${productId} not found`);
@@ -112,13 +112,14 @@ export async function pushProductUpdate(
     data: updates,
   });
 
-  // Build Zoho update payload — only include fields that were actually changed
+  // Build Zoho update payload — only include fields that have Zoho mappings
   const zohoFields: Record<string, any> = {};
   if (updates.pricePerUnit !== undefined) zohoFields.Min_Request_G_Including_5_markup = updates.pricePerUnit;
   if (updates.gramsAvailable !== undefined) zohoFields.Grams_Available_When_submitted = updates.gramsAvailable;
   if (updates.upcomingQty !== undefined) zohoFields.Upcoming_QTY_3_Months = updates.upcomingQty;
   if (updates.minQtyRequest !== undefined) zohoFields.Min_QTY_Request = updates.minQtyRequest;
   if (updates.description !== undefined) zohoFields.Description = updates.description;
+  // Note: dominantTerpene, totalTerpenePercent, certification are local-only (no Zoho fields)
 
   if (Object.keys(zohoFields).length > 0) {
     await zohoRequest('PUT', `/Products/${product.zohoProductId}`, {
@@ -458,12 +459,12 @@ export async function uploadProductFiles(
   coaFiles: string[],    // local file paths
 ): Promise<void> {
   const imageFieldNames = ['Image_1', 'Image_2', 'Image_3', 'Image_4'];
-  const coaFieldNames = ['CoAs', 'CoAs_2'];
+  const coaFieldNames = ['CoAs', 'CoAs_2', 'CoAs_3'];
 
   const updatePayload: Record<string, any> = {};
 
-  // Upload images
-  for (let i = 0; i < Math.min(imageFiles.length, 4); i++) {
+  // Upload images to dedicated file fields (first 4)
+  for (let i = 0; i < Math.min(imageFiles.length, imageFieldNames.length); i++) {
     try {
       const fileId = await uploadToZFS(imageFiles[i]);
       updatePayload[imageFieldNames[i]] = [{ file_id: fileId }];
@@ -472,8 +473,8 @@ export async function uploadProductFiles(
     }
   }
 
-  // Upload CoAs
-  for (let i = 0; i < Math.min(coaFiles.length, 2); i++) {
+  // Upload CoAs to dedicated file fields (first 3)
+  for (let i = 0; i < Math.min(coaFiles.length, coaFieldNames.length); i++) {
     try {
       const fileId = await uploadToZFS(coaFiles[i]);
       updatePayload[coaFieldNames[i]] = [{ file_id: fileId }];
@@ -494,6 +495,31 @@ export async function uploadProductFiles(
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
     logger.info({ count: Object.keys(updatePayload).length, zohoProductId }, '[ZOHO] Uploaded files to product');
+  }
+
+  // Upload overflow files (beyond field capacity) as record-level attachments
+  const overflowFiles = [
+    ...imageFiles.slice(imageFieldNames.length),
+    ...coaFiles.slice(coaFieldNames.length),
+  ];
+  if (overflowFiles.length > 0) {
+    const token = await getAccessToken();
+    for (const filePath of overflowFiles) {
+      try {
+        const form = new FormData();
+        form.append('file', fs.createReadStream(filePath));
+        await axios.post(`${ZOHO_API_URL}/Products/${zohoProductId}/Attachments`, form, {
+          headers: {
+            Authorization: `Zoho-oauthtoken ${token}`,
+            ...form.getHeaders(),
+          },
+          maxContentLength: 20 * 1024 * 1024,
+        });
+      } catch (err: any) {
+        logger.error({ err, filePath }, '[ZOHO] Overflow attachment upload failed');
+      }
+    }
+    logger.info({ count: overflowFiles.length, zohoProductId }, '[ZOHO] Uploaded overflow files as attachments');
   }
 }
 
@@ -601,7 +627,7 @@ export async function fetchProductFileUrls(
   zohoProductId: string,
 ): Promise<{ imageUrls: string[]; coaUrls: string[] }> {
   const imageFields = ['Image_1', 'Image_2', 'Image_3', 'Image_4'];
-  const coaFields = ['CoAs', 'CoAs_2'];
+  const coaFields = ['CoAs', 'CoAs_2', 'CoAs_3'];
 
   const response = await zohoRequest('GET', `/Products/${zohoProductId}`, {
     params: {

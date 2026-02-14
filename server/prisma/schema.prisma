@@ -48,6 +48,10 @@ model User {
   notificationPrefs  Json?
   notifications      Notification[]
   curatedShares      CuratedShare[]
+  auditLogs          AuditLog[]
+  shortlistItems     ShortlistItem[]  @relation("BuyerShortlist")
+  productViews       ProductView[]    @relation("BuyerProductViews")
+  spotSalesCreated   SpotSale[]       @relation("SpotSaleCreator")
 }
 
 // ─── Products (synced from Zoho) ───
@@ -125,9 +129,12 @@ model Product {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  bids         Bid[]
-  transactions Transaction[]
-  matches      Match[]
+  bids           Bid[]
+  transactions   Transaction[]
+  matches        Match[]
+  shortlistItems ShortlistItem[]
+  productViews   ProductView[]
+  spotSales      SpotSale[]
 
   @@index([sellerId])
   @@index([category])
@@ -353,6 +360,7 @@ enum NotificationType {
   MATCH_SUGGESTION
   COA_PROCESSED
   PREDICTION_DUE
+  SHORTLIST_PRICE_DROP
   SYSTEM_ANNOUNCEMENT
 }
 
@@ -405,7 +413,57 @@ model CoaSyncRecord {
   updatedAt            DateTime @updatedAt
 }
 
+// ─── Shortlist Items (buyer product saves) ───
+
+model ShortlistItem {
+  id        String   @id @default(cuid())
+  buyerId   String
+  buyer     User     @relation("BuyerShortlist", fields: [buyerId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([buyerId, productId])
+  @@index([buyerId])
+  @@index([productId])
+}
+
+// ─── Product Views (browsing behavior tracking) ───
+
+model ProductView {
+  id        String   @id @default(cuid())
+  buyerId   String
+  buyer     User     @relation("BuyerProductViews", fields: [buyerId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  viewedAt  DateTime @default(now())
+
+  @@index([buyerId])
+  @@index([productId])
+  @@index([buyerId, productId])
+  @@index([viewedAt])
+}
+
 // ─── Curated Shares (public product catalogs) ───
+
+// ─── Audit Log ───
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  actorEmail String?
+  action     String   // e.g. "user.approve", "sync.trigger", "bid.accept"
+  targetType String?  // e.g. "User", "Product", "Bid"
+  targetId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([actorId])
+  @@index([createdAt])
+}
 
 model CuratedShare {
   id          String    @id @default(cuid())
@@ -419,4 +477,26 @@ model CuratedShare {
   useCount    Int       @default(0)
   createdById String?
   createdBy   User?     @relation(fields: [createdById], references: [id])
+}
+
+// ─── Spot Sales (admin-curated limited-time deals) ───
+
+model SpotSale {
+  id              String   @id @default(cuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  originalPrice   Float
+  spotPrice       Float
+  discountPercent Float
+  quantity        Float?   // Grams available at spot price (null = full product qty)
+  active          Boolean  @default(true)
+  expiresAt       DateTime
+  createdById     String
+  createdBy       User     @relation("SpotSaleCreator", fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([active])
+  @@index([expiresAt])
+  @@index([createdById])
 }

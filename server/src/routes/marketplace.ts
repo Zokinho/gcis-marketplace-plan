@@ -1,14 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../index';
+import { validateQuery, marketplaceQuerySchema } from '../utils/validation';
+import { get30DayAvgPricesBatch, scorePriceVsMarket } from '../services/marketContextService';
+import logger from '../utils/logger';
 
 const router = Router();
+
+const PRICED_TO_SELL_THRESHOLD = 0.15; // 15% below 30-day category average
 
 /**
  * GET /api/marketplace/products
  * Browse products with filtering, search, and pagination.
  */
-router.get('/products', async (req: Request, res: Response) => {
+router.get('/products', validateQuery(marketplaceQuerySchema), async (req: Request, res: Response) => {
   const {
     category,
     type,
@@ -21,14 +26,14 @@ router.get('/products', async (req: Request, res: Response) => {
     cbdThcRatio,
     ratioTolerance,
     search,
-    page = '1',
-    limit = '20',
-    sort = 'name',
-    order = 'asc',
-  } = req.query as Record<string, string | undefined>;
+    page,
+    limit,
+    sort,
+    order,
+  } = req.query as any;
 
-  const pageNum = Math.max(1, parseInt(page || '1', 10));
-  const limitNum = Math.min(50, Math.max(1, parseInt(limit || '20', 10)));
+  const pageNum = page as number;
+  const limitNum = limit as number;
   const skip = (pageNum - 1) * limitNum;
 
   // Build where clause
@@ -39,43 +44,43 @@ router.get('/products', async (req: Request, res: Response) => {
   if (category) where.category = category;
   if (type) where.type = type;
   if (certification) {
-    const certs = (certification as string).split(',').map((c) => c.trim()).filter(Boolean);
+    const certs = certification.split(',').map((c: string) => c.trim()).filter(Boolean);
     if (certs.length === 1) {
       where.certification = { contains: certs[0], mode: 'insensitive' };
     } else if (certs.length > 1) {
       where.AND = [
         ...((where.AND as any[]) || []),
-        ...certs.map((c) => ({ certification: { contains: c, mode: 'insensitive' as const } })),
+        ...certs.map((c: string) => ({ certification: { contains: c, mode: 'insensitive' as const } })),
       ];
     }
   }
 
   // Terpene filter — matches against semicolon-separated dominantTerpene field
   if (terpene) {
-    const terpenes = (terpene as string).split(',').map((t) => t.trim()).filter(Boolean);
+    const terpenes = terpene.split(',').map((t: string) => t.trim()).filter(Boolean);
     if (terpenes.length > 0) {
-      where.AND = terpenes.map((t) => ({
+      where.AND = terpenes.map((t: string) => ({
         dominantTerpene: { contains: t, mode: 'insensitive' as const },
       }));
     }
   }
 
-  if (thcMin || thcMax) {
+  if (thcMin != null || thcMax != null) {
     where.thcMax = {};
-    if (thcMin) where.thcMax.gte = parseFloat(thcMin);
-    if (thcMax) where.thcMax.lte = parseFloat(thcMax);
+    if (thcMin != null) where.thcMax.gte = thcMin;
+    if (thcMax != null) where.thcMax.lte = thcMax;
   }
 
-  if (cbdMin || cbdMax) {
+  if (cbdMin != null || cbdMax != null) {
     where.cbdMax = {};
-    if (cbdMin) where.cbdMax.gte = parseFloat(cbdMin);
-    if (cbdMax) where.cbdMax.lte = parseFloat(cbdMax);
+    if (cbdMin != null) where.cbdMax.gte = cbdMin;
+    if (cbdMax != null) where.cbdMax.lte = cbdMax;
   }
 
-  if (priceMin || priceMax) {
+  if (priceMin != null || priceMax != null) {
     where.pricePerUnit = {};
-    if (priceMin) where.pricePerUnit.gte = parseFloat(priceMin);
-    if (priceMax) where.pricePerUnit.lte = parseFloat(priceMax);
+    if (priceMin != null) where.pricePerUnit.gte = priceMin;
+    if (priceMax != null) where.pricePerUnit.lte = priceMax;
   }
 
   if (availability === 'in_stock') {
@@ -89,7 +94,7 @@ router.get('/products', async (req: Request, res: Response) => {
     const [cbdPart, thcPart] = cbdThcRatio.split(':').map(Number);
     if (cbdPart > 0 && thcPart > 0) {
       const targetRatio = cbdPart / thcPart; // CBD / THC
-      const tolerance = ratioTolerance ? parseFloat(ratioTolerance) / 100 : 0.25; // default 25%
+      const tolerance = ratioTolerance != null ? ratioTolerance / 100 : 0.25; // default 25%
       const lowerRatio = targetRatio * (1 - tolerance);
       const upperRatio = targetRatio * (1 + tolerance);
 
@@ -101,11 +106,9 @@ router.get('/products', async (req: Request, res: Response) => {
 
       // We need raw filtering since Prisma can't do cross-column math.
       // We'll get IDs from a raw query and add them as an IN filter.
-      const ratioProductIds: { id: string }[] = await prisma.$queryRawUnsafe(
-        `SELECT id FROM "Product" WHERE "isActive" = true AND "thcMax" > 0 AND "cbdMax" > 0 AND ("cbdMax" / "thcMax") BETWEEN $1 AND $2`,
-        lowerRatio,
-        upperRatio,
-      );
+      const ratioProductIds: { id: string }[] = await prisma.$queryRaw`
+        SELECT id FROM "Product" WHERE "isActive" = true AND "thcMax" > 0 AND "cbdMax" > 0 AND ("cbdMax" / "thcMax") BETWEEN ${lowerRatio} AND ${upperRatio}
+      `;
       const ids = ratioProductIds.map((r) => r.id);
       if (ids.length === 0) {
         // No products match — short-circuit
@@ -120,12 +123,11 @@ router.get('/products', async (req: Request, res: Response) => {
 
   if (search) {
     if (search.length >= 3) {
-      const ftsResults: { id: string }[] = await prisma.$queryRawUnsafe(
-        `SELECT id FROM "Product"
-         WHERE "search_vector" @@ plainto_tsquery('english', $1)
-         ORDER BY ts_rank("search_vector", plainto_tsquery('english', $1)) DESC`,
-        search,
-      );
+      const ftsResults: { id: string }[] = await prisma.$queryRaw`
+        SELECT id FROM "Product"
+        WHERE "search_vector" @@ plainto_tsquery('english', ${search})
+        ORDER BY ts_rank("search_vector", plainto_tsquery('english', ${search})) DESC
+      `;
       const ids = ftsResults.map((r) => r.id);
       if (ids.length === 0) {
         // FTS found nothing — fall back to ILIKE so partial matches still work
@@ -149,9 +151,8 @@ router.get('/products', async (req: Request, res: Response) => {
 
   // Build orderBy
   const useRelevanceSort = sort === 'relevance' && ftsOrderedIds !== null;
-  const validSortFields = ['name', 'pricePerUnit', 'thcMax', 'cbdMax', 'gramsAvailable', 'createdAt'];
-  const sortField = validSortFields.includes(sort || '') ? sort! : 'name';
-  const sortOrder = order === 'desc' ? 'desc' : 'asc';
+  const sortField = sort === 'relevance' ? 'name' : sort;
+  const sortOrder = order;
   const orderBy: Prisma.ProductOrderByWithRelationInput | undefined = useRelevanceSort
     ? undefined
     : { [sortField]: sortOrder };
@@ -193,8 +194,23 @@ router.get('/products', async (req: Request, res: Response) => {
     finalProducts = finalProducts.slice(skip, skip + limitNum);
   }
 
+  // Enrich with pricedToSell badge
+  const categories = [...new Set(finalProducts.map((p) => p.category).filter(Boolean))] as string[];
+  const avgPrices = categories.length > 0 ? await get30DayAvgPricesBatch(categories) : new Map<string, number>();
+
+  const enrichedProducts = finalProducts.map((p) => {
+    let pricedToSell = false;
+    if (p.pricePerUnit != null && p.category) {
+      const avgPrice = avgPrices.get(p.category);
+      if (avgPrice != null) {
+        pricedToSell = p.pricePerUnit < avgPrice * (1 - PRICED_TO_SELL_THRESHOLD);
+      }
+    }
+    return { ...p, pricedToSell };
+  });
+
   res.json({
-    products: finalProducts,
+    products: enrichedProducts,
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -267,6 +283,23 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
     return res.status(404).json({ error: 'Product not found' });
   }
 
+  // Fire-and-forget view tracking (5-minute dedup)
+  if (req.user?.id) {
+    (async () => {
+      try {
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const recentView = await prisma.productView.findFirst({
+          where: { buyerId: req.user!.id, productId: req.params.id, viewedAt: { gte: fiveMinAgo } },
+        });
+        if (!recentView) {
+          await prisma.productView.create({ data: { buyerId: req.user!.id, productId: req.params.id } });
+        }
+      } catch (err) {
+        logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MARKETPLACE] View tracking error');
+      }
+    })();
+  }
+
   // CoA visibility: only product owner or admins can see CoA data
   const isOwner = req.user?.id === product.sellerId;
   const isSeller = req.user?.contactType?.includes('Seller') ?? false;
@@ -287,7 +320,27 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
     productData.coaProcessedAt = null;
   }
 
-  res.json({ product: productData, canViewCoa });
+  // Enrich with pricedToSell badge
+  let pricedToSell = false;
+  if (productData.pricePerUnit != null && productData.category) {
+    const priceComparison = await scorePriceVsMarket(req.params.id);
+    if (priceComparison) {
+      pricedToSell = priceComparison.percentDiff <= -(PRICED_TO_SELL_THRESHOLD * 100);
+    }
+  }
+
+  // Admin-only: product view count + unique viewers + shortlist count
+  let viewStats: { totalViews: number; uniqueViewers: number; shortlistCount: number } | undefined;
+  if (isAdminEmail) {
+    const [totalViews, uniqueViewerGroups, shortlistCount] = await Promise.all([
+      prisma.productView.count({ where: { productId: req.params.id } }),
+      prisma.productView.groupBy({ by: ['buyerId'], where: { productId: req.params.id } }),
+      prisma.shortlistItem.count({ where: { productId: req.params.id } }),
+    ]);
+    viewStats = { totalViews, uniqueViewers: uniqueViewerGroups.length, shortlistCount };
+  }
+
+  res.json({ product: { ...productData, pricedToSell, viewStats }, canViewCoa });
 });
 
 /**

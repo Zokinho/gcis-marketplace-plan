@@ -199,6 +199,35 @@ export async function getSupplyDemandForCategory(categoryName: string): Promise<
   return { activeBuyersPredictedToReorder, activeListings, ratio, score, assessment };
 }
 
+export async function get30DayAvgPricesBatch(
+  categoryNames: string[]
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (categoryNames.length === 0) return result;
+
+  const thirtyDaysAgo = addDays(new Date(), -30);
+  const prices = await prisma.marketPrice.findMany({
+    where: { categoryName: { in: categoryNames }, periodStart: { gte: thirtyDaysAgo } },
+  });
+
+  // Group by category and compute volume-weighted average
+  const grouped = new Map<string, { totalWeighted: number; totalCount: number }>();
+  for (const p of prices) {
+    const entry = grouped.get(p.categoryName) || { totalWeighted: 0, totalCount: 0 };
+    entry.totalWeighted += p.avgPrice * p.transactionCount;
+    entry.totalCount += p.transactionCount;
+    grouped.set(p.categoryName, entry);
+  }
+
+  for (const [cat, { totalWeighted, totalCount }] of grouped) {
+    if (totalCount > 0) {
+      result.set(cat, totalWeighted / totalCount);
+    }
+  }
+
+  return result;
+}
+
 async function get30DayAvgPrice(categoryName: string): Promise<number | null> {
   const thirtyDaysAgo = addDays(new Date(), -30);
   const prices = await prisma.marketPrice.findMany({

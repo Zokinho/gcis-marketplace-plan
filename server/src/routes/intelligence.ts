@@ -13,6 +13,17 @@ import * as predictionEngine from '../services/predictionEngine';
 import * as churnDetectionService from '../services/churnDetectionService';
 import * as propensityService from '../services/propensityService';
 import * as marketContextService from '../services/marketContextService';
+import {
+  validate,
+  validateQuery,
+  paginationQuery,
+  intelMatchesQuerySchema,
+  intelPredictionsQuerySchema,
+  intelChurnQuerySchema,
+  intelTransactionsQuerySchema,
+  generateMatchesBodySchema,
+  limitQuerySchema,
+} from '../utils/validation';
 
 // ─── Admin Routes ───
 
@@ -34,6 +45,9 @@ adminRouter.get('/dashboard', async (_req: Request, res: Response) => {
       marketTrends,
       topSellers,
       topBuyers,
+      totalShortlists,
+      activeShortlisters,
+      matchConversion,
     ] = await Promise.all([
       prisma.match.count({ where: { status: 'pending' } }),
       prisma.match.count(),
@@ -44,6 +58,9 @@ adminRouter.get('/dashboard', async (_req: Request, res: Response) => {
       marketContextService.getMarketTrends(),
       sellerScoreService.getTopRatedSellers(5),
       propensityService.getTopPropensityBuyers(5),
+      prisma.shortlistItem.count(),
+      prisma.shortlistItem.groupBy({ by: ['buyerId'], _count: true }).then((g) => g.length),
+      matchingEngine.getMatchConversionStats(),
     ]);
 
     res.json({
@@ -65,6 +82,11 @@ adminRouter.get('/dashboard', async (_req: Request, res: Response) => {
         companyName: b.buyer.companyName,
         propensityScore: b.propensity.overallScore,
       })),
+      shortlistStats: {
+        totalShortlists,
+        activeShortlisters,
+      },
+      matchConversion,
     });
   } catch (err) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[INTEL] Dashboard error');
@@ -75,12 +97,8 @@ adminRouter.get('/dashboard', async (_req: Request, res: Response) => {
 /**
  * GET /api/intelligence/matches
  */
-adminRouter.get('/matches', async (req: Request, res: Response) => {
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
-  const minScore = parseFloat(req.query.minScore as string) || 0;
-  const status = req.query.status as string | undefined;
-  const category = req.query.category as string | undefined;
+adminRouter.get('/matches', validateQuery(intelMatchesQuerySchema), async (req: Request, res: Response) => {
+  const { page, limit, minScore, status, category } = req.query as any;
 
   const where: any = { score: { gte: minScore } };
   if (status) where.status = status;
@@ -135,7 +153,7 @@ adminRouter.get('/matches/:id', async (req: Request<{ id: string }>, res: Respon
 /**
  * POST /api/intelligence/matches/generate
  */
-adminRouter.post('/matches/generate', async (req: Request, res: Response) => {
+adminRouter.post('/matches/generate', validate(generateMatchesBodySchema), async (req: Request, res: Response) => {
   const { productId } = req.body;
 
   try {
@@ -155,10 +173,8 @@ adminRouter.post('/matches/generate', async (req: Request, res: Response) => {
 /**
  * GET /api/intelligence/predictions
  */
-adminRouter.get('/predictions', async (req: Request, res: Response) => {
-  const days = parseInt(req.query.days as string) || 30;
-  const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
-  const type = req.query.type as string; // 'upcoming' or 'overdue'
+adminRouter.get('/predictions', validateQuery(intelPredictionsQuerySchema), async (req: Request, res: Response) => {
+  const { days, limit, type } = req.query as any;
 
   try {
     if (type === 'overdue') {
@@ -211,9 +227,8 @@ adminRouter.get('/predictions/calendar', async (_req: Request, res: Response) =>
 /**
  * GET /api/intelligence/churn/at-risk
  */
-adminRouter.get('/churn/at-risk', async (req: Request, res: Response) => {
-  const minRiskLevel = (req.query.minRiskLevel as string) || 'medium';
-  const limit = parseInt(req.query.limit as string) || 20;
+adminRouter.get('/churn/at-risk', validateQuery(intelChurnQuerySchema), async (req: Request, res: Response) => {
+  const { minRiskLevel, limit } = req.query as any;
 
   try {
     const buyers = await churnDetectionService.getAtRiskBuyers({ minRiskLevel, limit });
@@ -292,8 +307,8 @@ adminRouter.get('/market/:categoryName', async (req: Request<{ categoryName: str
 /**
  * GET /api/intelligence/propensity/top
  */
-adminRouter.get('/propensity/top', async (req: Request, res: Response) => {
-  const limit = parseInt(req.query.limit as string) || 10;
+adminRouter.get('/propensity/top', validateQuery(limitQuerySchema), async (req: Request, res: Response) => {
+  const { limit } = req.query as any;
   try {
     const buyers = await propensityService.getTopPropensityBuyers(limit);
     res.json({ buyers });
@@ -362,10 +377,8 @@ adminRouter.post('/seller-scores/recalculate', async (_req: Request, res: Respon
 /**
  * GET /api/intelligence/transactions
  */
-adminRouter.get('/transactions', async (req: Request, res: Response) => {
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
-  const status = req.query.status as string | undefined;
+adminRouter.get('/transactions', validateQuery(intelTransactionsQuerySchema), async (req: Request, res: Response) => {
+  const { page, limit, status } = req.query as any;
 
   const where: any = {};
   if (status) where.status = status;
@@ -427,10 +440,9 @@ const buyerMatchRouter = Router();
  * GET /api/matches
  * Buyer's pending matches
  */
-buyerMatchRouter.get('/', async (req: Request, res: Response) => {
+buyerMatchRouter.get('/', validateQuery(paginationQuery), async (req: Request, res: Response) => {
   const buyer = req.user!;
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+  const { page, limit } = req.query as any;
 
   try {
     const [matches, total] = await Promise.all([

@@ -34,7 +34,7 @@ export default function ProductModal({ productId, onClose }: ProductModalProps) 
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute right-3 top-3 z-10 rounded-full p-1.5 text-muted transition hover:bg-gray-100 hover:text-primary dark:hover:bg-slate-700"
+          className="absolute right-7 top-3 z-10 rounded-full p-1.5 text-muted transition hover:bg-gray-100 hover:text-primary dark:hover:bg-slate-700"
           aria-label="Close"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

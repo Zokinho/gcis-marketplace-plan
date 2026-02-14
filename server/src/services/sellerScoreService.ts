@@ -70,11 +70,30 @@ export async function calculateSellerScores(sellerId: string): Promise<ScoreResu
   // Pricing score
   const pricingScore = await calculatePricingScore(sellerId, transactions);
 
-  const overallScore =
+  let overallScore =
     (fillRate * SCORE_WEIGHTS.fillRate) +
     (qualityScore * SCORE_WEIGHTS.qualityScore) +
     (deliveryScore * SCORE_WEIGHTS.deliveryScore) +
     (pricingScore * SCORE_WEIGHTS.pricingScore);
+
+  // Bid responsiveness penalty — penalize sellers who ignore incoming bids
+  try {
+    const totalBidsReceived = await prisma.bid.count({
+      where: { product: { sellerId } },
+    });
+    if (totalBidsReceived > 0) {
+      const respondedBids = await prisma.bid.count({
+        where: { product: { sellerId }, status: { in: ['ACCEPTED', 'REJECTED'] } },
+      });
+      const responseRate = respondedBids / totalBidsReceived;
+      if (responseRate < 0.5) {
+        const penalty = Math.round((0.5 - responseRate) * 20); // up to 10 points
+        overallScore = Math.max(0, overallScore - penalty);
+      }
+    }
+  } catch {
+    // Bid query failed — skip penalty
+  }
 
   return {
     fillRate: Math.round(fillRate * 100) / 100,

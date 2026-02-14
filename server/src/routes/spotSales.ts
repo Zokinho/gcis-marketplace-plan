@@ -1,0 +1,464 @@
+/**
+ * Spot Sales Routes
+ * Admin: CRUD for spot sales (limited-time discounted products).
+ * Buyer: List active + unexpired spot sales.
+ */
+
+import { Router, Request, Response } from 'express';
+import { prisma } from '../index';
+import logger from '../utils/logger';
+import { logAudit, getRequestIp } from '../services/auditService';
+import {
+  validate,
+  validateQuery,
+  validateParams,
+  createSpotSaleSchema,
+  updateSpotSaleSchema,
+  spotSaleAdminQuerySchema,
+  recordSpotSaleSchema,
+} from '../utils/validation';
+import { pushProductUpdate, createDeal } from '../services/zohoApi';
+import * as churnDetectionService from '../services/churnDetectionService';
+import * as marketContextService from '../services/marketContextService';
+import { createNotification } from '../services/notificationService';
+import { z } from 'zod';
+
+// ─── Admin router ───
+
+export const adminRouter = Router();
+
+const idParamsSchema = z.object({ id: z.string().min(1) });
+
+// Product fields to include in responses
+const productSelect = {
+  id: true,
+  name: true,
+  category: true,
+  type: true,
+  certification: true,
+  thcMin: true,
+  thcMax: true,
+  cbdMin: true,
+  cbdMax: true,
+  pricePerUnit: true,
+  gramsAvailable: true,
+  upcomingQty: true,
+  licensedProducer: true,
+  imageUrls: true,
+  isActive: true,
+  labName: true,
+  testDate: true,
+  reportNumber: true,
+  testResults: true,
+  coaPdfUrl: true,
+  source: true,
+};
+
+/**
+ * POST /api/spot-sales/admin
+ * Create a new spot sale.
+ */
+adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: Response) => {
+  const { productId, spotPrice, quantity, expiresAt } = req.body;
+  const adminId = req.user!.id;
+
+  try {
+    // Verify product exists and has a price
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, pricePerUnit: true, name: true },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (!product.pricePerUnit || product.pricePerUnit <= 0) {
+      return res.status(400).json({ error: 'Product must have a valid price' });
+    }
+
+    if (spotPrice >= product.pricePerUnit) {
+      return res.status(400).json({ error: 'Spot price must be less than the original price' });
+    }
+
+    const expiresDate = new Date(expiresAt);
+    if (expiresDate <= new Date()) {
+      return res.status(400).json({ error: 'Expiry must be in the future' });
+    }
+
+    // Check no existing active spot sale for this product
+    const existing = await prisma.spotSale.findFirst({
+      where: {
+        productId,
+        active: true,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (existing) {
+      return res.status(409).json({ error: 'An active spot sale already exists for this product' });
+    }
+
+    const originalPrice = product.pricePerUnit;
+    const discountPercent = ((originalPrice - spotPrice) / originalPrice) * 100;
+
+    const spotSale = await prisma.spotSale.create({
+      data: {
+        productId,
+        originalPrice,
+        spotPrice,
+        discountPercent: Math.round(discountPercent * 10) / 10,
+        quantity: quantity ?? null,
+        expiresAt: expiresDate,
+        createdById: adminId,
+      },
+      include: {
+        product: { select: productSelect },
+        createdBy: { select: { email: true, firstName: true, lastName: true } },
+      },
+    });
+
+    logAudit({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      action: 'spot-sale.create',
+      targetType: 'SpotSale',
+      targetId: spotSale.id,
+      metadata: { productId, spotPrice, originalPrice, quantity, discountPercent: spotSale.discountPercent },
+      ip: getRequestIp(req),
+    });
+
+    res.status(201).json({ spotSale });
+  } catch (err) {
+    logger.error({ err }, '[SPOT-SALES] Create error');
+    res.status(500).json({ error: 'Failed to create spot sale' });
+  }
+});
+
+/**
+ * GET /api/spot-sales/admin
+ * List all spot sales (paginated, filterable by status).
+ */
+adminRouter.get('/', validateQuery(spotSaleAdminQuerySchema), async (req: Request, res: Response) => {
+  const { page, limit, status } = req.query as any;
+
+  try {
+    const now = new Date();
+    let where: any = {};
+
+    switch (status) {
+      case 'active':
+        where = { active: true, expiresAt: { gt: now } };
+        break;
+      case 'expired':
+        where = { expiresAt: { lte: now } };
+        break;
+      case 'deactivated':
+        where = { active: false };
+        break;
+      // 'all' — no filter
+    }
+
+    const [spotSales, total] = await Promise.all([
+      prisma.spotSale.findMany({
+        where,
+        include: {
+          product: { select: productSelect },
+          createdBy: { select: { email: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.spotSale.count({ where }),
+    ]);
+
+    res.json({
+      spotSales,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, '[SPOT-SALES] Admin list error');
+    res.status(500).json({ error: 'Failed to fetch spot sales' });
+  }
+});
+
+/**
+ * PATCH /api/spot-sales/admin/:id
+ * Update a spot sale (active, spotPrice, expiresAt).
+ */
+adminRouter.patch('/:id', validateParams(idParamsSchema), validate(updateSpotSaleSchema), async (req: Request<{ id: string }>, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.user!.id;
+  const updates = req.body;
+
+  try {
+    const existing = await prisma.spotSale.findUnique({
+      where: { id },
+      select: { id: true, originalPrice: true, spotPrice: true, productId: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Spot sale not found' });
+    }
+
+    const data: any = {};
+
+    if (updates.active !== undefined) data.active = updates.active;
+    if (updates.expiresAt !== undefined) data.expiresAt = new Date(updates.expiresAt);
+    if (updates.quantity !== undefined) data.quantity = updates.quantity;
+
+    if (updates.spotPrice !== undefined) {
+      if (updates.spotPrice >= existing.originalPrice) {
+        return res.status(400).json({ error: 'Spot price must be less than original price' });
+      }
+      data.spotPrice = updates.spotPrice;
+      data.discountPercent = Math.round(((existing.originalPrice - updates.spotPrice) / existing.originalPrice) * 100 * 10) / 10;
+    }
+
+    const spotSale = await prisma.spotSale.update({
+      where: { id },
+      data,
+      include: {
+        product: { select: productSelect },
+        createdBy: { select: { email: true, firstName: true, lastName: true } },
+      },
+    });
+
+    logAudit({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      action: 'spot-sale.update',
+      targetType: 'SpotSale',
+      targetId: id,
+      metadata: updates,
+      ip: getRequestIp(req),
+    });
+
+    res.json({ spotSale });
+  } catch (err) {
+    logger.error({ err }, '[SPOT-SALES] Update error');
+    res.status(500).json({ error: 'Failed to update spot sale' });
+  }
+});
+
+/**
+ * DELETE /api/spot-sales/admin/:id
+ * Hard delete a spot sale.
+ */
+adminRouter.delete('/:id', validateParams(idParamsSchema), async (req: Request<{ id: string }>, res: Response) => {
+  const { id } = req.params;
+  const adminId = req.user!.id;
+
+  try {
+    const existing = await prisma.spotSale.findUnique({
+      where: { id },
+      select: { id: true, productId: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Spot sale not found' });
+    }
+
+    await prisma.spotSale.delete({ where: { id } });
+
+    logAudit({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      action: 'spot-sale.delete',
+      targetType: 'SpotSale',
+      targetId: id,
+      metadata: { productId: existing.productId },
+      ip: getRequestIp(req),
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err }, '[SPOT-SALES] Delete error');
+    res.status(500).json({ error: 'Failed to delete spot sale' });
+  }
+});
+
+/**
+ * POST /api/spot-sales/admin/:id/record-sale
+ * Record a completed spot sale — creates Transaction, decrements inventory, updates intelligence.
+ */
+adminRouter.post('/:id/record-sale', validateParams(idParamsSchema), validate(recordSpotSaleSchema), async (req: Request<{ id: string }>, res: Response) => {
+  const { id } = req.params;
+  const admin = req.user!;
+  const { buyerId, quantity } = req.body;
+
+  try {
+    // 1. Validate spot sale exists and is active + unexpired
+    const spotSale = await prisma.spotSale.findUnique({
+      where: { id },
+      include: {
+        product: {
+          select: {
+            id: true, name: true, category: true, sellerId: true,
+            zohoProductId: true, gramsAvailable: true,
+          },
+        },
+      },
+    });
+
+    if (!spotSale) return res.status(404).json({ error: 'Spot sale not found' });
+
+    if (!spotSale.active) {
+      return res.status(400).json({ error: 'Spot sale is not active' });
+    }
+
+    if (new Date(spotSale.expiresAt) <= new Date()) {
+      return res.status(400).json({ error: 'Spot sale has expired' });
+    }
+
+    // 2. Validate buyer exists and is approved
+    const buyer = await prisma.user.findUnique({
+      where: { id: buyerId },
+      select: { id: true, email: true, companyName: true, zohoContactId: true, approved: true },
+    });
+
+    if (!buyer) return res.status(404).json({ error: 'Buyer not found' });
+    if (!buyer.approved) return res.status(400).json({ error: 'Buyer is not approved' });
+
+    // 3. Validate quantity
+    const maxQty = spotSale.quantity ?? spotSale.product.gramsAvailable ?? Infinity;
+    if (quantity > maxQty) {
+      return res.status(400).json({ error: `Quantity exceeds available amount (max: ${maxQty}g)` });
+    }
+
+    // Get seller for Deal creation
+    const seller = await prisma.user.findUnique({
+      where: { id: spotSale.product.sellerId },
+      select: { id: true, zohoContactId: true },
+    });
+
+    const totalValue = spotSale.spotPrice * quantity;
+
+    // 4. Atomic transaction — create Transaction + update buyer metrics
+    const [transaction] = await prisma.$transaction([
+      prisma.transaction.create({
+        data: {
+          buyerId,
+          sellerId: spotSale.product.sellerId,
+          productId: spotSale.product.id,
+          bidId: null,
+          quantity,
+          pricePerUnit: spotSale.spotPrice,
+          totalValue,
+          status: 'pending',
+        },
+      }),
+      prisma.user.update({
+        where: { id: buyerId },
+        data: {
+          lastTransactionDate: new Date(),
+          transactionCount: { increment: 1 },
+          totalTransactionValue: { increment: totalValue },
+        },
+      }),
+    ]);
+
+    // 5. Non-blocking side effects (all try-caught, same pattern as bid accept)
+
+    // Notify buyer
+    createNotification({
+      userId: buyerId,
+      type: 'BID_ACCEPTED',
+      title: 'Spot sale completed!',
+      body: `Your spot purchase of ${spotSale.product.name} (${quantity}g at $${spotSale.spotPrice.toFixed(2)}/g) has been recorded`,
+      data: { productId: spotSale.product.id, transactionId: transaction.id },
+    });
+
+    // Resolve churn signals
+    try {
+      await churnDetectionService.resolveOnPurchase(buyerId, spotSale.product.category || undefined);
+    } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[SPOT-SALES] Churn resolve error'); }
+
+    // Update market price
+    try {
+      if (spotSale.product.category) {
+        await marketContextService.updateMarketPrice(spotSale.product.category, spotSale.spotPrice, quantity);
+      }
+    } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[SPOT-SALES] Market price update error'); }
+
+    // Decrement inventory locally + push to Zoho
+    if (spotSale.product.gramsAvailable != null && spotSale.product.gramsAvailable > 0) {
+      const newGrams = Math.max(0, spotSale.product.gramsAvailable - quantity);
+      try {
+        await pushProductUpdate(spotSale.product.id, { gramsAvailable: newGrams });
+      } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[SPOT-SALES] Inventory decrement failed'); }
+    }
+
+    // Create Zoho Deal (if enabled)
+    try {
+      const zohoDealId = await createDeal({
+        productName: spotSale.product.name,
+        buyerCompany: buyer.companyName,
+        buyerZohoContactId: buyer.zohoContactId,
+        sellerZohoContactId: seller?.zohoContactId ?? null,
+        amount: totalValue,
+        quantity,
+      });
+      if (zohoDealId) {
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: { zohoDealId },
+        });
+      }
+    } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[SPOT-SALES] Zoho Deal creation failed'); }
+
+    // 6. Audit log
+    logAudit({
+      actorId: admin.id,
+      actorEmail: admin.email,
+      action: 'spot-sale.record',
+      targetType: 'SpotSale',
+      targetId: id,
+      metadata: { productId: spotSale.product.id, buyerId, quantity, totalValue, transactionId: transaction.id },
+      ip: getRequestIp(req),
+    });
+
+    // 7. Return transaction ID
+    res.json({ transaction: { id: transaction.id, status: transaction.status } });
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SPOT-SALES] Failed to record sale');
+    res.status(500).json({ error: 'Failed to record spot sale' });
+  }
+});
+
+// ─── Buyer router ───
+
+export const buyerRouter = Router();
+
+/**
+ * GET /api/spot-sales
+ * Active + unexpired spot sales with active products. Soonest-expiring first.
+ */
+buyerRouter.get('/', async (_req: Request, res: Response) => {
+  try {
+    const now = new Date();
+
+    const spotSales = await prisma.spotSale.findMany({
+      where: {
+        active: true,
+        expiresAt: { gt: now },
+        product: { isActive: true },
+      },
+      include: {
+        product: { select: productSelect },
+      },
+      orderBy: { expiresAt: 'asc' },
+    });
+
+    res.json({ spotSales });
+  } catch (err) {
+    logger.error({ err }, '[SPOT-SALES] Buyer list error');
+    res.status(500).json({ error: 'Failed to fetch spot sales' });
+  }
+});

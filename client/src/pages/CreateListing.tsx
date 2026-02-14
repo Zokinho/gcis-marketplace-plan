@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
 import { createListing } from '../lib/api';
 
 const CATEGORIES = [
@@ -47,7 +48,7 @@ export default function CreateListing() {
   // Potency & terpenes
   const [thc, setThc] = useState('');
   const [cbd, setCbd] = useState('');
-  const [dominantTerpene, setDominantTerpene] = useState('');
+  const [terpenes, setTerpenes] = useState<string[]>([]);
   const [totalTerpenePercent, setTotalTerpenePercent] = useState('');
 
   // Inventory & pricing
@@ -102,7 +103,7 @@ export default function CreateListing() {
     if (certifications.length > 0) formData.append('certification', certifications.join(', '));
     if (thc) formData.append('thc', thc);
     if (cbd) formData.append('cbd', cbd);
-    if (dominantTerpene.trim()) formData.append('dominantTerpene', dominantTerpene.trim());
+    if (terpenes.length > 0) formData.append('dominantTerpene', terpenes.join('; '));
     if (totalTerpenePercent) formData.append('totalTerpenePercent', totalTerpenePercent);
     if (gramsAvailable) formData.append('gramsAvailable', gramsAvailable);
     if (upcomingQty) formData.append('upcomingQty', upcomingQty);
@@ -202,7 +203,7 @@ export default function CreateListing() {
                       onClick={() => setCertifications((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c])}
                       className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
                         certifications.includes(c)
-                          ? 'border-brand-teal bg-brand-sage/20 text-brand-teal'
+                          ? 'border-brand-teal bg-brand-sage/20 text-brand-teal dark:bg-brand-sage/15 dark:text-brand-sage dark:border-brand-sage/40'
                           : 'border-default text-secondary hover-surface-muted'
                       }`}
                     >
@@ -224,12 +225,10 @@ export default function CreateListing() {
                 <input type="number" step="0.01" min="0" max="100" value={cbd} onChange={(e) => setCbd(e.target.value)} placeholder="e.g. 0.5" className="input-field" />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Dominant Terpene">
-                <input type="text" value={dominantTerpene} onChange={(e) => setDominantTerpene(e.target.value)} placeholder="e.g. Myrcene, Limonene" className="input-field" />
-              </Field>
-              <Field label="Total Terpene %">
-                <input type="number" step="0.01" min="0" max="100" value={totalTerpenePercent} onChange={(e) => setTotalTerpenePercent(e.target.value)} placeholder="e.g. 3.2" className="input-field" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <TerpeneAutocomplete selected={terpenes} onChange={setTerpenes} />
+              <Field label="Dominant Terpene %">
+                <input type="number" step="0.01" min="0" max="100" value={totalTerpenePercent} onChange={(e) => setTotalTerpenePercent(e.target.value)} placeholder="e.g. 2.5" className="input-field" />
               </Field>
             </div>
           </Section>
@@ -297,13 +296,13 @@ export default function CreateListing() {
                 />
               )}
             </Field>
-            <Field label="Product Images (up to 4)">
+            <Field label="Product Images (up to 10)">
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 multiple
                 onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []).slice(0, 4);
+                  const files = Array.from(e.target.files ?? []).slice(0, 10);
                   setImages(files);
                 }}
                 className="input-field text-sm"
@@ -321,13 +320,13 @@ export default function CreateListing() {
                 </div>
               )}
             </Field>
-            <Field label="Certificates of Analysis (up to 3 PDFs)">
+            <Field label="Certificates of Analysis (up to 10 PDFs)">
               <input
                 type="file"
                 accept="application/pdf"
                 multiple
                 onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []).slice(0, 3);
+                  const files = Array.from(e.target.files ?? []).slice(0, 10);
                   setCoaFiles(files);
                 }}
                 className="input-field text-sm"
@@ -377,8 +376,8 @@ export default function CreateListing() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-default surface p-5">
-      <h3 className="mb-4 border-l-2 border-brand-teal pl-3 text-base font-semibold text-primary">{title}</h3>
+    <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 dark:bg-slate-800/60 dark:border-slate-700 shadow-md p-5">
+      <h3 className="mb-4 border-l-2 border-brand-teal dark:border-brand-yellow pl-3 text-base font-semibold text-primary">{title}</h3>
       <div className="space-y-4">{children}</div>
     </div>
   );

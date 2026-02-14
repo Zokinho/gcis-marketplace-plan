@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { prisma } from '../index';
 import logger from '../utils/logger';
+import { withCronLock, LOCK_IDS } from '../utils/cronLock';
 import {
   fetchAllProducts,
   fetchMarketplaceContacts,
@@ -284,6 +285,7 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
               distinct: ['buyerId'],
               take: 20,
             });
+            const pendingBidderIds = new Set(pendingBidders.map((b) => b.buyerId));
             const direction = fields.pricePerUnit < existing.pricePerUnit ? 'decreased' : 'increased';
             createNotificationBatch(
               pendingBidders.map((b) => ({
@@ -294,6 +296,30 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
                 data: { productId: product.id },
               })),
             );
+
+            // SHORTLIST_PRICE_DROP — notify shortlisters on price decrease (exclude pending bidders)
+            if (fields.pricePerUnit < existing.pricePerUnit) {
+              try {
+                const shortlisters = await prisma.shortlistItem.findMany({
+                  where: { productId: existing.id },
+                  select: { buyerId: true },
+                });
+                const shortlistNotifs = shortlisters
+                  .filter((s) => !pendingBidderIds.has(s.buyerId))
+                  .map((s) => ({
+                    userId: s.buyerId,
+                    type: 'SHORTLIST_PRICE_DROP' as const,
+                    title: 'Price drop on shortlisted product',
+                    body: `${fields.name} price dropped to $${fields.pricePerUnit!.toFixed(2)}/g`,
+                    data: { productId: product.id },
+                  }));
+                if (shortlistNotifs.length > 0) {
+                  createNotificationBatch(shortlistNotifs);
+                }
+              } catch (e) {
+                logger.error({ err: e }, '[SYNC] SHORTLIST_PRICE_DROP notification error');
+              }
+            }
           } catch (e) {
             logger.error({ err: e }, '[SYNC] PRODUCT_PRICE notification error');
           }
@@ -463,7 +489,7 @@ export function startSyncCron() {
 
   // Every 15 minutes — delta sync for products + full contacts
   cronJob = cron.schedule('*/15 * * * *', async () => {
-    try {
+    await withCronLock(LOCK_IDS.ZOHO_SYNC, 'ZohoSync', async () => {
       const start = Date.now();
       logger.info('[SYNC] ─── Cron sync starting (delta products + contacts) ───');
 
@@ -472,9 +498,7 @@ export function startSyncCron() {
 
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
       logger.info({ elapsed, mode: productResult.mode }, '[SYNC] ─── Cron sync complete ───');
-    } catch (err) {
-      logger.error({ err }, '[SYNC] Cron sync error');
-    }
+    });
   });
 
   logger.info('[SYNC] Cron scheduled: every 15 minutes (delta sync)');

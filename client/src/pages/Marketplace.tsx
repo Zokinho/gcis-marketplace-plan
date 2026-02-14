@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import Layout from '../components/Layout';
 import ProductCard from '../components/ProductCard';
 import ProductListItem from '../components/ProductListItem';
 import ProductModal from '../components/ProductModal';
 import FilterSidebar from '../components/FilterSidebar';
+import ContactModal from '../components/ContactModal';
 import { fetchProducts, type ProductCard as ProductCardType, type ProductFilters, type Pagination } from '../lib/api';
+import { useShortlist } from '../lib/useShortlist';
 
 export default function Marketplace() {
   const [products, setProducts] = useState<ProductCardType[]>([]);
@@ -14,6 +17,9 @@ export default function Marketplace() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'grid' | 'grid-lg' | 'list'>('grid-lg');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [contactOpen, setContactOpen] = useState(false);
+  const { user } = useUser();
+  const { preload } = useShortlist();
 
   const loadProducts = useCallback(async (f: ProductFilters) => {
     setLoading(true);
@@ -22,6 +28,8 @@ export default function Marketplace() {
       const data = await fetchProducts(f);
       setProducts(data.products);
       setPagination(data.pagination);
+      // Preload shortlist states for visible products
+      preload(data.products.map((p) => p.id));
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to load products');
     } finally {
@@ -57,17 +65,21 @@ export default function Marketplace() {
           <p className="text-sm text-muted">Browse cannabis products from licensed Canadian producers</p>
           <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
         </div>
-        {pagination && (
-          <span className="rounded-full bg-brand-teal/10 px-3 py-1 text-sm font-medium text-brand-teal">
-            {pagination.total} product{pagination.total !== 1 ? 's' : ''}
-          </span>
-        )}
+        <button
+          onClick={() => setContactOpen(true)}
+          className="flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-teal/10 px-3 py-1 text-sm font-medium text-brand-teal transition hover:bg-brand-teal/20 dark:bg-brand-yellow/15 dark:text-brand-yellow dark:hover:bg-brand-yellow/25"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+          </svg>
+          Need help?
+        </button>
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="min-w-0 flex-1">
           {/* Sort bar + view toggle */}
-          <div className="mb-4 flex items-center justify-between rounded-lg bg-brand-blue/5 dark:bg-brand-dark px-3 py-2 shadow-md sticky top-16 z-20 backdrop-blur-sm">
+          <div className="mb-4 flex items-center justify-between rounded-lg border card-blue backdrop-blur-sm px-3 py-2 shadow-md sticky top-16 z-20">
             {/* View toggle */}
             <div className="flex rounded-lg border border-subtle p-0.5">
               {/* Large grid (2 cols) */}
@@ -102,6 +114,13 @@ export default function Marketplace() {
               </button>
             </div>
 
+            {/* Product count */}
+            {pagination && (
+              <span className="ml-[6.5rem] text-xs font-medium text-muted">
+                {pagination.total} product{pagination.total !== 1 ? 's' : ''}
+              </span>
+            )}
+
             {/* Sort */}
             <div className="flex items-center gap-2">
               <label className="text-xs font-medium text-secondary">Sort by</label>
@@ -116,7 +135,7 @@ export default function Marketplace() {
                 {filters.search && <option value="relevance_desc">Relevance</option>}
                 <option value="name_asc">Name A-Z</option>
                 <option value="name_desc">Name Z-A</option>
-                <option value="thcMax_desc">THC: High to Low</option>
+<option value="thcMax_desc">THC: High to Low</option>
                 <option value="gramsAvailable_desc">Most Available</option>
                 <option value="createdAt_desc">Newest</option>
               </select>
@@ -145,9 +164,9 @@ export default function Marketplace() {
 
           {/* Empty state */}
           {!loading && !error && products.length === 0 && (
-            <div className="rounded-lg border border-brand-gray surface p-12 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10">
-                <svg className="h-8 w-8 text-brand-teal/50" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+            <div className="rounded-lg border border-brand-gray dark:border-slate-700 surface p-12 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-coral/10 dark:bg-brand-yellow/10">
+                <svg className="h-8 w-8 text-brand-coral/50 dark:text-brand-yellow/50" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
               </div>
@@ -223,6 +242,12 @@ export default function Marketplace() {
       </div>
 
       <ProductModal productId={selectedProductId} onClose={() => setSelectedProductId(null)} />
+      <ContactModal
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+        userName={user?.fullName || user?.firstName || ''}
+        userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+      />
     </Layout>
   );
 }

@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import logger from '../utils/logger';
 import { prisma } from '../index';
 import { calculateProximity } from '../utils/proximity';
-import { validate, createBidSchema, bidOutcomeSchema } from '../utils/validation';
+import { validate, validateQuery, createBidSchema, bidOutcomeSchema, bidListQuerySchema } from '../utils/validation';
 import {
   createBidTask,
   updateBidTaskStatus,
@@ -14,6 +14,8 @@ import {
 import * as churnDetectionService from '../services/churnDetectionService';
 import * as marketContextService from '../services/marketContextService';
 import { createNotification } from '../services/notificationService';
+import { logAudit, getRequestIp } from '../services/auditService';
+import { writeLimiter } from '../utils/rateLimiters';
 
 const router = Router();
 
@@ -21,7 +23,7 @@ const router = Router();
  * POST /api/bids
  * Create a new bid on a product.
  */
-router.post('/', validate(createBidSchema), async (req: Request, res: Response) => {
+router.post('/', writeLimiter, validate(createBidSchema), async (req: Request, res: Response) => {
   const buyer = req.user!;
 
   const { productId, pricePerUnit: price, quantity: qty, notes } = req.body;
@@ -68,6 +70,21 @@ router.post('/', validate(createBidSchema), async (req: Request, res: Response) 
         status: 'PENDING',
       },
     });
+
+    // Match conversion tracking (fire-and-forget)
+    try {
+      const existingMatch = await prisma.match.findUnique({
+        where: { buyerId_productId: { buyerId: buyer.id, productId } },
+      });
+      if (existingMatch && (existingMatch.status === 'pending' || existingMatch.status === 'viewed')) {
+        await prisma.match.update({
+          where: { id: existingMatch.id },
+          data: { status: 'converted', convertedBidId: bid.id },
+        });
+      }
+    } catch (e) {
+      logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Match conversion tracking error');
+    }
 
     // Notify seller of new bid (fire-and-forget)
     createNotification({
@@ -121,15 +138,13 @@ router.post('/', validate(createBidSchema), async (req: Request, res: Response) 
  * GET /api/bids
  * Get the current buyer's bid history.
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', validateQuery(bidListQuerySchema), async (req: Request, res: Response) => {
   const buyer = req.user!;
 
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
-  const status = req.query.status as string | undefined;
+  const { page, limit, status } = req.query as any;
 
   const where: any = { buyerId: buyer.id };
-  if (status && ['PENDING', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'COUNTERED', 'EXPIRED'].includes(status)) {
+  if (status) {
     where.status = status;
   }
 
@@ -178,19 +193,17 @@ router.get('/', async (req: Request, res: Response) => {
  * Get bids on the seller's products.
  * NOTE: Must be defined BEFORE /:id to avoid "seller" matching as a bid ID.
  */
-router.get('/seller', async (req: Request, res: Response) => {
+router.get('/seller', validateQuery(bidListQuerySchema), async (req: Request, res: Response) => {
   const seller = req.user!;
 
   if (!seller.contactType?.includes('Seller')) {
     return res.status(403).json({ error: 'Seller access required' });
   }
 
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
-  const status = req.query.status as string | undefined;
+  const { page, limit, status } = req.query as any;
 
   const where: any = { product: { sellerId: seller.id } };
-  if (status && ['PENDING', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'COUNTERED', 'EXPIRED'].includes(status)) {
+  if (status) {
     where.status = status;
   }
 
@@ -264,7 +277,7 @@ router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {
  * PATCH /api/bids/:id/accept
  * Seller accepts a bid → creates a Transaction.
  */
-router.patch('/:id/accept', async (req: Request<{ id: string }>, res: Response) => {
+router.patch('/:id/accept', writeLimiter, async (req: Request<{ id: string }>, res: Response) => {
   const seller = req.user!;
 
   try {
@@ -374,6 +387,7 @@ router.patch('/:id/accept', async (req: Request<{ id: string }>, res: Response) 
       }
     } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Zoho Deal creation failed'); }
 
+    logAudit({ actorId: seller.id, actorEmail: seller.email, action: 'bid.accept', targetType: 'Bid', targetId: bid.id, metadata: { productId: bid.productId, transactionId: transaction.id, buyerId: bid.buyerId }, ip: getRequestIp(req) });
     res.json({ transaction: { id: transaction.id, status: transaction.status } });
   } catch (err) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to accept bid');
@@ -385,7 +399,7 @@ router.patch('/:id/accept', async (req: Request<{ id: string }>, res: Response) 
  * PATCH /api/bids/:id/reject
  * Seller rejects a bid.
  */
-router.patch('/:id/reject', async (req: Request<{ id: string }>, res: Response) => {
+router.patch('/:id/reject', writeLimiter, async (req: Request<{ id: string }>, res: Response) => {
   const seller = req.user!;
 
   try {
@@ -425,6 +439,7 @@ router.patch('/:id/reject', async (req: Request<{ id: string }>, res: Response) 
       } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Zoho Task reject update failed'); }
     }
 
+    logAudit({ actorId: seller.id, actorEmail: seller.email, action: 'bid.reject', targetType: 'Bid', targetId: bid.id, metadata: { productId: bid.productId, buyerId: bid.buyerId }, ip: getRequestIp(req) });
     res.json({ status: 'REJECTED' });
   } catch (err) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to reject bid');
@@ -436,7 +451,7 @@ router.patch('/:id/reject', async (req: Request<{ id: string }>, res: Response) 
  * PATCH /api/bids/:id/outcome
  * Record delivery outcome for a transaction linked to a bid.
  */
-router.patch('/:id/outcome', validate(bidOutcomeSchema), async (req: Request<{ id: string }>, res: Response) => {
+router.patch('/:id/outcome', writeLimiter, validate(bidOutcomeSchema), async (req: Request<{ id: string }>, res: Response) => {
   const seller = req.user!;
 
   const { actualQuantityDelivered, deliveryOnTime, qualityAsExpected, outcomeNotes } = req.body;
@@ -503,6 +518,7 @@ router.patch('/:id/outcome', validate(bidOutcomeSchema), async (req: Request<{ i
       } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[BIDS] Zoho Deal stage update failed'); }
     }
 
+    logAudit({ actorId: seller.id, actorEmail: seller.email, action: 'bid.outcome', targetType: 'Bid', targetId: bid.id, metadata: { transactionId: transaction.id, deliveryOnTime: parsedOnTime, qualityAsExpected: parsedQuality }, ip: getRequestIp(req) });
     res.json({ transaction: { id: transaction.id, status: transaction.status } });
   } catch (err) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[BIDS] Failed to record outcome');

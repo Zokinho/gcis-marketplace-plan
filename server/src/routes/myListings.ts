@@ -8,6 +8,8 @@ import { validate, updateListingSchema, createSellerShareSchema } from '../utils
 import { prisma } from '../index';
 import { pushProductUpdate, createZohoProduct, createProductReviewTask, uploadProductFiles } from '../services/zohoApi';
 import { zohoRequest } from '../services/zohoAuth';
+import { createNotificationBatch } from '../services/notificationService';
+import { writeLimiter } from '../utils/rateLimiters';
 
 const router = Router();
 
@@ -43,10 +45,11 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 102
  */
 router.post(
   '/',
+  writeLimiter,
   upload.fields([
     { name: 'coverPhoto', maxCount: 1 },
-    { name: 'images', maxCount: 4 },
-    { name: 'coaFiles', maxCount: 3 },
+    { name: 'images', maxCount: 10 },
+    { name: 'coaFiles', maxCount: 10 },
   ]),
   async (req: Request, res: Response) => {
     const sellerId = req.user!.id;
@@ -221,6 +224,7 @@ router.get('/', async (req: Request, res: Response) => {
       licensedProducer: true,
       lineage: true,
       dominantTerpene: true,
+      totalTerpenePercent: true,
       certification: true,
       harvestDate: true,
       isActive: true,
@@ -269,32 +273,59 @@ router.get('/', async (req: Request, res: Response) => {
  * Update seller-editable fields: pricePerUnit, gramsAvailable, upcomingQty.
  * Changes sync back to Zoho.
  */
-router.patch('/:id', validate(updateListingSchema), async (req: Request<{ id: string }>, res: Response) => {
+router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Request<{ id: string }>, res: Response) => {
   const sellerId = req.user!.id;
   const productId = req.params.id;
 
   // Verify ownership
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { id: true, sellerId: true, zohoProductId: true },
+    select: { id: true, name: true, sellerId: true, zohoProductId: true, pricePerUnit: true },
   });
 
   if (!product || product.sellerId !== sellerId) {
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description } = req.body;
+  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description, certification, dominantTerpene, totalTerpenePercent } = req.body;
 
-  const updates: { pricePerUnit?: number; gramsAvailable?: number; upcomingQty?: number; minQtyRequest?: number; description?: string } = {};
+  const updates: Record<string, number | string | null> = {};
   if (pricePerUnit !== undefined) updates.pricePerUnit = pricePerUnit;
   if (gramsAvailable !== undefined) updates.gramsAvailable = gramsAvailable;
   if (upcomingQty !== undefined) updates.upcomingQty = upcomingQty;
   if (minQtyRequest !== undefined) updates.minQtyRequest = minQtyRequest;
   if (description !== undefined) updates.description = description.trim();
+  if (certification !== undefined) updates.certification = certification || null;
+  if (dominantTerpene !== undefined) updates.dominantTerpene = dominantTerpene || null;
+  if (totalTerpenePercent !== undefined) updates.totalTerpenePercent = totalTerpenePercent;
 
   try {
     await pushProductUpdate(productId, updates);
     const updated = await prisma.product.findUnique({ where: { id: productId } });
+
+    // SHORTLIST_PRICE_DROP — notify shortlisters when seller lowers price
+    if (pricePerUnit !== undefined && product.pricePerUnit != null && pricePerUnit < product.pricePerUnit) {
+      try {
+        const shortlisters = await prisma.shortlistItem.findMany({
+          where: { productId },
+          select: { buyerId: true },
+        });
+        if (shortlisters.length > 0) {
+          createNotificationBatch(
+            shortlisters.map((s) => ({
+              userId: s.buyerId,
+              type: 'SHORTLIST_PRICE_DROP' as const,
+              title: 'Price drop on shortlisted product',
+              body: `${product.name} price dropped to $${pricePerUnit.toFixed(2)}/g`,
+              data: { productId },
+            })),
+          );
+        }
+      } catch (e) {
+        logger.error({ err: e }, '[MY-LISTINGS] SHORTLIST_PRICE_DROP notification error');
+      }
+    }
+
     res.json({ message: 'Product updated', product: updated });
   } catch (err: any) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Update failed');
@@ -306,7 +337,7 @@ router.patch('/:id', validate(updateListingSchema), async (req: Request<{ id: st
  * PATCH /api/my-listings/:id/toggle-active
  * Pause or unpause a product listing.
  */
-router.patch('/:id/toggle-active', async (req: Request<{ id: string }>, res: Response) => {
+router.patch('/:id/toggle-active', writeLimiter, async (req: Request<{ id: string }>, res: Response) => {
   const sellerId = req.user!.id;
   const productId = req.params.id;
 
@@ -350,7 +381,7 @@ router.patch('/:id/toggle-active', async (req: Request<{ id: string }>, res: Res
  * POST /api/my-listings/share
  * Create a shareable link for selected products (or all active).
  */
-router.post('/share', validate(createSellerShareSchema), async (req: Request, res: Response) => {
+router.post('/share', writeLimiter, validate(createSellerShareSchema), async (req: Request, res: Response) => {
   const sellerId = req.user!.id;
   const { label, productIds, expiresInDays } = req.body;
 
@@ -425,7 +456,7 @@ router.get('/shares', async (req: Request, res: Response) => {
  * DELETE /api/my-listings/shares/:id
  * Deactivate a seller's share link.
  */
-router.delete('/shares/:id', async (req: Request<{ id: string }>, res: Response) => {
+router.delete('/shares/:id', writeLimiter, async (req: Request<{ id: string }>, res: Response) => {
   const sellerId = req.user!.id;
 
   try {

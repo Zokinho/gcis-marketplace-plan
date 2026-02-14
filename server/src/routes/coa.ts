@@ -6,6 +6,7 @@ import { prisma } from '../index';
 import { getCoaClient } from '../services/coaClient';
 import { mapCoaToProductFields } from '../utils/coaMapper';
 import { createNotification } from '../services/notificationService';
+import { validate, coaConfirmBodySchema } from '../utils/validation';
 
 const router = Router();
 
@@ -29,6 +30,11 @@ const upload = multer({
 router.post('/upload', upload.single('coaPdf'), async (req: Request, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No PDF file provided' });
+  }
+
+  // Verify PDF magic bytes (%PDF-)
+  if (!req.file.buffer.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+    return res.status(400).json({ error: 'File is not a valid PDF' });
   }
 
   try {
@@ -186,12 +192,9 @@ router.get('/jobs/:jobId/preview', async (req: Request<{ jobId: string }>, res: 
  * POST /api/coa/jobs/:jobId/confirm
  * Confirm an extraction and create/update a marketplace Product.
  */
-router.post('/jobs/:jobId/confirm', async (req: Request<{ jobId: string }>, res: Response) => {
+router.post('/jobs/:jobId/confirm', validate(coaConfirmBodySchema), async (req: Request<{ jobId: string }>, res: Response) => {
   const { jobId } = req.params;
-  const { overrides, sellerId } = req.body as {
-    overrides?: Record<string, any>;
-    sellerId?: string;
-  };
+  const { overrides, sellerId } = req.body;
 
   try {
     const coaClient = getCoaClient();

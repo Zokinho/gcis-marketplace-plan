@@ -1,13 +1,14 @@
 import { Router, Request, Response } from 'express';
 import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
-import { validate, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema } from '../utils/validation';
+import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema } from '../utils/validation';
 import { prisma } from '../index';
 import { runFullSync, syncProducts, syncContacts, syncProductsDelta } from '../services/zohoSync';
 import { getCoaClient } from '../services/coaClient';
 import { mapCoaToProductFields } from '../utils/coaMapper';
 import { detectSeller } from '../services/sellerDetection';
 import { pollEmailIngestions } from '../services/coaEmailSync';
+import { logAudit, getRequestIp } from '../services/auditService';
 
 const router = Router();
 
@@ -66,6 +67,7 @@ router.post('/sync-now', validate(syncNowSchema), async (req: Request, res: Resp
       result = await runFullSync();
     }
 
+    logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'sync.trigger', metadata: { type: type || 'full', result }, ip: getRequestIp(req) });
     res.json({ message: 'Sync completed', result });
   } catch (err: any) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] Manual sync failed');
@@ -170,6 +172,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       },
     });
 
+    logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'coa.confirm', targetType: 'Product', targetId: product.id, metadata: { syncRecordId, sellerId }, ip: getRequestIp(req) });
     res.json({ product });
   } catch (err: any) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] CoA email confirm failed');
@@ -189,6 +192,7 @@ router.post('/coa-email-dismiss', validate(adminCoaDismissSchema), async (req: R
     data: { status: 'dismissed' },
   });
 
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'coa.dismiss', targetType: 'CoaSyncRecord', targetId: syncRecordId, ip: getRequestIp(req) });
   res.json({ syncRecord: updated });
 });
 
@@ -233,14 +237,16 @@ router.post('/coa-email-poll', async (_req: Request, res: Response) => {
  * GET /api/admin/users
  * List users with optional filter: pending, approved, all
  */
-router.get('/users', async (req: Request, res: Response) => {
-  const filter = (req.query.filter as string) || 'all';
+router.get('/users', validateQuery(adminUsersQuerySchema), async (req: Request, res: Response) => {
+  const { filter } = req.query as any;
 
   let where: Prisma.UserWhereInput = {};
   if (filter === 'pending') {
     where = { approved: false, docUploaded: true };
   } else if (filter === 'approved') {
     where = { approved: true };
+  } else if (filter === 'rejected') {
+    where = { approved: false, docUploaded: false };
   }
 
   const users = await prisma.user.findMany({
@@ -291,6 +297,7 @@ router.post('/users/:userId/approve', validate(approveUserSchema), async (req: R
 
   const updated = await prisma.user.update({ where: { id: userId }, data });
   logger.info({ userEmail: updated.email, approvedBy: req.user?.email }, '[ADMIN] User approved');
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.approve', targetType: 'User', targetId: userId, metadata: { userEmail: updated.email, contactType }, ip: getRequestIp(req) });
 
   res.json({ message: 'User approved', user: { id: updated.id, email: updated.email, approved: updated.approved } });
 });
@@ -309,8 +316,52 @@ router.post('/users/:userId/reject', async (req: Request<{ userId: string }>, re
 
   await prisma.user.delete({ where: { id: userId } });
   logger.info({ userEmail: user.email, rejectedBy: req.user?.email }, '[ADMIN] User rejected (deleted)');
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.reject', targetType: 'User', targetId: userId, metadata: { userEmail: user.email }, ip: getRequestIp(req) });
 
   res.json({ message: 'User rejected and removed' });
+});
+
+// ─── Audit Log ───
+
+/**
+ * GET /api/admin/audit-log
+ * Paginated, filterable audit log.
+ */
+router.get('/audit-log', validateQuery(auditLogQuerySchema), async (req: Request, res: Response) => {
+  const { page, limit, action, actorId, targetType, from, to } = req.query as any;
+
+  const where: Prisma.AuditLogWhereInput = {};
+  if (action) where.action = action;
+  if (actorId) where.actorId = actorId;
+  if (targetType) where.targetType = targetType;
+  if (from || to) {
+    where.createdAt = {};
+    if (from) where.createdAt.gte = new Date(from);
+    if (to) where.createdAt.lte = new Date(to);
+  }
+
+  try {
+    const [entries, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        include: {
+          actor: { select: { id: true, email: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+
+    res.json({
+      entries,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    logger.error({ err }, '[ADMIN] Audit log query failed');
+    res.status(500).json({ error: 'Failed to fetch audit log' });
+  }
 });
 
 export default router;

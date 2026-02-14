@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import Layout from '../components/Layout';
 import OutcomeForm from '../components/OutcomeForm';
+import ContactModal from '../components/ContactModal';
 import { fetchMyBids, fetchSellerBids, acceptBid, rejectBid, type BidRecord, type BidStatusType, type SellerBidRecord } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
@@ -34,6 +36,8 @@ export default function Orders() {
   const { data: userStatus } = useUserStatus();
   const isSeller = userStatus?.user?.contactType?.includes('Seller') ?? false;
   const [tab, setTab] = useState<'buyer' | 'seller'>('buyer');
+  const [contactOpen, setContactOpen] = useState(false);
+  const { user } = useUser();
 
   // Auto-select seller tab if user is a seller
   useEffect(() => {
@@ -42,25 +46,44 @@ export default function Orders() {
 
   return (
     <Layout>
-      {/* Tab switcher for sellers */}
-      {isSeller && (
-        <div className="mb-6 flex gap-1 rounded-lg bg-brand-gray p-1 sm:w-fit">
-          <button
-            onClick={() => setTab('buyer')}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === 'buyer' ? 'surface shadow-sm text-brand-teal' : 'text-muted hover:text-secondary dark:hover:text-slate-200'}`}
-          >
-            My Bids
-          </button>
-          <button
-            onClick={() => setTab('seller')}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === 'seller' ? 'surface shadow-sm text-brand-teal' : 'text-muted hover:text-secondary dark:hover:text-slate-200'}`}
-          >
-            Incoming Bids
-          </button>
-        </div>
-      )}
+      {/* Tab switcher + need help */}
+      <div className="mb-6 flex items-center justify-between">
+        {isSeller ? (
+          <div className="flex gap-1 rounded-lg bg-brand-gray dark:bg-slate-900 p-1 sm:w-fit border border-transparent dark:border-slate-700">
+            <button
+              onClick={() => setTab('buyer')}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === 'buyer' ? 'bg-white dark:bg-slate-700 shadow-sm text-brand-teal dark:text-brand-yellow font-semibold' : 'text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+            >
+              My Bids
+            </button>
+            <button
+              onClick={() => setTab('seller')}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === 'seller' ? 'bg-white dark:bg-slate-700 shadow-sm text-brand-teal dark:text-brand-yellow font-semibold' : 'text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+            >
+              Incoming Bids
+            </button>
+          </div>
+        ) : (
+          <div />
+        )}
+        <button
+          onClick={() => setContactOpen(true)}
+          className="flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-teal/10 px-3 py-1 text-sm font-medium text-brand-teal transition hover:bg-brand-teal/20 dark:bg-brand-yellow/15 dark:text-brand-yellow dark:hover:bg-brand-yellow/25"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+          </svg>
+          Need help?
+        </button>
+      </div>
 
       {tab === 'buyer' ? <BuyerBidsView /> : <SellerBidsView />}
+      <ContactModal
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+        userName={user?.fullName || user?.firstName || ''}
+        userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+      />
     </Layout>
   );
 }
@@ -136,9 +159,9 @@ function BuyerBidsView() {
       )}
 
       {!loading && !error && bids.length === 0 && (
-        <div className="rounded-lg border border-brand-gray surface p-12 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10">
-            <svg className="h-8 w-8 text-brand-teal/50" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <div className="rounded-lg border border-brand-gray dark:border-slate-700 surface p-12 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-coral/10 dark:bg-brand-yellow/10">
+            <svg className="h-8 w-8 text-brand-coral/50 dark:text-brand-yellow/50" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" />
             </svg>
           </div>
@@ -260,7 +283,7 @@ function SellerBidsView() {
       )}
 
       {!loading && !error && bids.length === 0 && (
-        <div className="rounded-lg border border-default surface p-12 text-center">
+        <div className="rounded-lg border border-default dark:border-slate-700 surface p-12 text-center">
           <h3 className="mb-2 text-lg font-semibold text-secondary">No incoming bids</h3>
           <p className="text-sm text-muted">When buyers bid on your products, they'll appear here.</p>
         </div>

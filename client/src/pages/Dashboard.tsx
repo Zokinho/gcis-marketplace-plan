@@ -15,6 +15,17 @@ const CARDS = [
     ),
   },
   {
+    title: 'My Shortlist',
+    description: 'Products you\'ve saved for quick access and price alerts.',
+    href: '/shortlist',
+    accentColor: 'border-l-brand-yellow',
+    icon: (
+      <svg className="h-6 w-6 text-brand-yellow" viewBox="0 0 24 24" fill="currentColor">
+        <path fillRule="evenodd" d="M6.32 2.577a49.255 49.255 0 0 1 11.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 0 1-1.085.67L12 18.089l-7.165 3.583A.75.75 0 0 1 3.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93Z" clipRule="evenodd" />
+      </svg>
+    ),
+  },
+  {
     title: 'My Orders',
     description: 'View your bid history and order statuses.',
     href: '/orders',
@@ -33,6 +44,17 @@ const CARDS = [
     icon: (
       <svg className="h-6 w-6 text-brand-sage" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Platform Guide',
+    description: 'Learn how to browse products, place bids, and manage your account.',
+    href: '/guide',
+    accentColor: 'border-l-brand-coral',
+    icon: (
+      <svg className="h-6 w-6 text-brand-coral" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
       </svg>
     ),
   },
@@ -56,7 +78,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {CARDS.map((card) => (
           <DashboardCard key={card.href} {...card} />
         ))}

@@ -20,6 +20,46 @@ export function validate<T extends z.ZodTypeAny>(schema: T) {
   };
 }
 
+/**
+ * Express middleware factory: validates req.query against a Zod schema.
+ * Coerces query string values via Zod `.coerce` and applies defaults.
+ */
+export function validateQuery<T extends z.ZodTypeAny>(schema: T) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const errors = result.error.issues.map((i) => ({
+        field: i.path.join('.'),
+        message: i.message,
+      }));
+      return res.status(400).json({ error: 'Validation failed', details: errors });
+    }
+    (req as any).query = result.data;
+    next();
+  };
+}
+
+/**
+ * Express middleware factory: validates req.params against a Zod schema.
+ */
+export function validateParams<T extends z.ZodTypeAny>(schema: T) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.params);
+    if (!result.success) {
+      return res.status(400).json({ error: 'Invalid parameters' });
+    }
+    (req as any).params = result.data;
+    next();
+  };
+}
+
+// ─── Reusable building blocks ───
+
+export const paginationQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 // ─── Bid schemas ───
 
 export const createBidSchema = z.object({
@@ -37,6 +77,9 @@ export const updateListingSchema = z.object({
   upcomingQty: z.coerce.number().min(0).optional(),
   minQtyRequest: z.coerce.number().min(0).optional(),
   description: z.string().max(5000).optional(),
+  certification: z.string().max(200).optional(),
+  dominantTerpene: z.string().max(500).optional(),
+  totalTerpenePercent: z.coerce.number().min(0).max(100).optional(),
 }).superRefine((data, ctx) => {
   if (Object.values(data).every((v) => v === undefined)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'At least one field must be provided' });
@@ -93,4 +136,176 @@ export const createSellerShareSchema = z.object({
   label: z.string().max(200).optional(),
   productIds: z.array(z.string()).optional(),
   expiresInDays: z.coerce.number().int().positive().max(365).optional(),
+});
+
+// ─── Marketplace schemas ───
+
+export const marketplaceQuerySchema = paginationQuery.extend({
+  search: z.string().max(200).optional(),
+  category: z.string().max(100).optional(),
+  type: z.string().max(100).optional(),
+  certification: z.string().max(200).optional(),
+  terpene: z.string().max(200).optional(),
+  thcMin: z.coerce.number().min(0).max(100).optional(),
+  thcMax: z.coerce.number().min(0).max(100).optional(),
+  cbdMin: z.coerce.number().min(0).max(100).optional(),
+  cbdMax: z.coerce.number().min(0).max(100).optional(),
+  priceMin: z.coerce.number().min(0).optional(),
+  priceMax: z.coerce.number().min(0).optional(),
+  availability: z.enum(['in_stock', 'upcoming']).optional(),
+  cbdThcRatio: z.string().regex(/^\d+:\d+$/).optional(),
+  ratioTolerance: z.coerce.number().min(0).max(100).optional(),
+  sort: z.enum(['name', 'pricePerUnit', 'thcMax', 'cbdMax', 'gramsAvailable', 'createdAt', 'relevance']).default('name'),
+  order: z.enum(['asc', 'desc']).default('asc'),
+});
+
+// ─── Notification schemas ───
+
+export const notificationListSchema = paginationQuery.extend({
+  unreadOnly: z.enum(['true', 'false']).default('false'),
+});
+
+export const markReadSchema = z.union([
+  z.object({ ids: z.array(z.string().min(1)).min(1).max(100) }),
+  z.object({ all: z.literal(true) }),
+]);
+
+export const notificationPrefsSchema = z.record(
+  z.enum([
+    'BID_RECEIVED',
+    'BID_ACCEPTED',
+    'BID_REJECTED',
+    'BID_COUNTERED',
+    'BID_OUTCOME',
+    'PRODUCT_NEW',
+    'PRODUCT_PRICE',
+    'PRODUCT_STOCK',
+    'MATCH_SUGGESTION',
+    'COA_PROCESSED',
+    'PREDICTION_DUE',
+    'SHORTLIST_PRICE_DROP',
+    'SYSTEM_ANNOUNCEMENT',
+  ]),
+  z.boolean(),
+);
+
+export const broadcastSchema = z.object({
+  title: z.string().min(1).max(200),
+  body: z.string().min(1).max(2000),
+});
+
+// ─── CoA confirm schema ───
+
+export const coaConfirmBodySchema = z.object({
+  sellerId: z.string().min(1).optional(),
+  overrides: z.object({
+    name: z.string().max(300).optional(),
+    category: z.string().max(100).optional(),
+    type: z.string().max(100).optional(),
+    description: z.string().max(5000).optional(),
+    thcMin: z.coerce.number().min(0).max(100).optional(),
+    thcMax: z.coerce.number().min(0).max(100).optional(),
+    cbdMin: z.coerce.number().min(0).max(100).optional(),
+    cbdMax: z.coerce.number().min(0).max(100).optional(),
+    pricePerUnit: z.coerce.number().min(0).optional(),
+    gramsAvailable: z.coerce.number().min(0).optional(),
+  }).optional(),
+});
+
+// ─── Intelligence schemas ───
+
+export const intelMatchesQuerySchema = paginationQuery.extend({
+  minScore: z.coerce.number().min(0).max(100).default(0),
+  status: z.string().max(50).optional(),
+  category: z.string().max(100).optional(),
+});
+
+export const intelPredictionsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  type: z.enum(['upcoming', 'overdue']).optional(),
+});
+
+export const intelChurnQuerySchema = z.object({
+  minRiskLevel: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const intelTransactionsQuerySchema = paginationQuery.extend({
+  status: z.string().max(50).optional(),
+});
+
+export const generateMatchesBodySchema = z.object({
+  productId: z.string().min(1).optional(),
+});
+
+export const limitQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+});
+
+// ─── Bid list query schema ───
+
+export const bidListQuerySchema = paginationQuery.extend({
+  status: z.enum(['PENDING', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'COUNTERED', 'EXPIRED']).optional(),
+});
+
+// ─── Admin users query schema ───
+
+export const adminUsersQuerySchema = z.object({
+  filter: z.enum(['pending', 'approved', 'rejected', 'all']).default('all'),
+});
+
+// ─── Audit log query schema ───
+
+export const auditLogQuerySchema = paginationQuery.extend({
+  action: z.string().max(50).optional(),
+  actorId: z.string().max(50).optional(),
+  targetType: z.string().max(50).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+
+// ─── Shortlist schemas ───
+
+export const shortlistToggleSchema = z.object({
+  productId: z.string().min(1, 'productId is required'),
+});
+
+export const shortlistQuerySchema = paginationQuery.extend({
+  category: z.string().max(100).optional(),
+  sort: z.enum(['date', 'name', 'price']).default('date'),
+  order: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const shortlistCheckSchema = z.object({
+  productIds: z.string().min(1, 'productIds is required'),
+});
+
+// ─── Spot Sale schemas ───
+
+export const createSpotSaleSchema = z.object({
+  productId: z.string().min(1, 'productId is required'),
+  spotPrice: z.coerce.number().positive('spotPrice must be positive'),
+  quantity: z.coerce.number().positive('quantity must be positive').optional(),
+  expiresAt: z.string().datetime('expiresAt must be a valid ISO datetime'),
+});
+
+export const updateSpotSaleSchema = z.object({
+  active: z.boolean().optional(),
+  spotPrice: z.coerce.number().positive().optional(),
+  quantity: z.coerce.number().positive().nullable().optional(),
+  expiresAt: z.string().datetime().optional(),
+}).superRefine((data, ctx) => {
+  if (Object.values(data).every((v) => v === undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'At least one field must be provided' });
+  }
+});
+
+export const spotSaleAdminQuerySchema = paginationQuery.extend({
+  status: z.enum(['active', 'expired', 'deactivated', 'all']).default('all'),
+});
+
+export const recordSpotSaleSchema = z.object({
+  buyerId: z.string().min(1, 'buyerId is required'),
+  quantity: z.coerce.number().positive('quantity must be positive'),
 });

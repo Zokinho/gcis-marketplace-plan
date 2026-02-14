@@ -8,6 +8,15 @@ import {
   DEFAULT_NOTIFICATION_PREFS,
   createNotification,
 } from '../services/notificationService';
+import {
+  validate,
+  validateQuery,
+  notificationListSchema,
+  markReadSchema,
+  notificationPrefsSchema,
+  broadcastSchema,
+} from '../utils/validation';
+import { logAudit, getRequestIp } from '../services/auditService';
 
 const router = Router();
 
@@ -15,11 +24,10 @@ const router = Router();
  * GET /api/notifications
  * List notifications for the current user (paginated).
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', validateQuery(notificationListSchema), async (req: Request, res: Response) => {
   const user = req.user!;
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
-  const unreadOnly = req.query.unreadOnly === 'true';
+  const { page, limit, unreadOnly: unreadOnlyStr } = req.query as any;
+  const unreadOnly = unreadOnlyStr === 'true';
 
   const where: any = { userId: user.id };
   if (unreadOnly) where.read = false;
@@ -63,7 +71,7 @@ router.get('/unread-count', async (req: Request, res: Response) => {
  * PATCH /api/notifications/read
  * Mark notifications as read: { ids: [...] } or { all: true }
  */
-router.patch('/read', async (req: Request, res: Response) => {
+router.patch('/read', validate(markReadSchema), async (req: Request, res: Response) => {
   const user = req.user!;
   const { ids, all } = req.body as { ids?: string[]; all?: boolean };
 
@@ -73,7 +81,7 @@ router.patch('/read', async (req: Request, res: Response) => {
         where: { userId: user.id, read: false },
         data: { read: true, readAt: new Date() },
       });
-    } else if (ids && Array.isArray(ids) && ids.length > 0) {
+    } else if (ids && ids.length > 0) {
       await prisma.notification.updateMany({
         where: { id: { in: ids }, userId: user.id },
         data: { read: true, readAt: new Date() },
@@ -107,7 +115,7 @@ router.get('/preferences', async (req: Request, res: Response) => {
  * PATCH /api/notifications/preferences
  * Update notification preferences (partial merge).
  */
-router.patch('/preferences', async (req: Request, res: Response) => {
+router.patch('/preferences', validate(notificationPrefsSchema), async (req: Request, res: Response) => {
   const user = req.user!;
   const updates = req.body as Record<string, boolean>;
 
@@ -147,12 +155,8 @@ router.patch('/preferences', async (req: Request, res: Response) => {
  * POST /api/notifications/admin/broadcast
  * Send a SYSTEM_ANNOUNCEMENT to all approved users.
  */
-router.post('/admin/broadcast', requireAdmin, async (req: Request, res: Response) => {
-  const { title, body } = req.body as { title?: string; body?: string };
-
-  if (!title || !body) {
-    return res.status(400).json({ error: 'title and body are required' });
-  }
+router.post('/admin/broadcast', requireAdmin, validate(broadcastSchema), async (req: Request, res: Response) => {
+  const { title, body } = req.body as { title: string; body: string };
 
   try {
     const approvedUsers = await prisma.user.findMany({
@@ -169,6 +173,7 @@ router.post('/admin/broadcast', requireAdmin, async (req: Request, res: Response
       });
     }
 
+    logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'notification.broadcast', metadata: { title, recipientCount: approvedUsers.length }, ip: getRequestIp(req) });
     res.json({ sent: approvedUsers.length });
   } catch (err) {
     logger.error({ err }, '[NOTIFICATIONS] Broadcast failed');

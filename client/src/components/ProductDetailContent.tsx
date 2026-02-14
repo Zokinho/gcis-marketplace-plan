@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import BidForm from './BidForm';
 import CoaUpload from './CoaUpload';
 import TestResultsDisplay from './TestResultsDisplay';
+import ShortlistButton from './ShortlistButton';
 import { fetchProductById, type ProductDetail as ProductDetailType } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
@@ -27,6 +28,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
   const [selectedImage, setSelectedImage] = useState(0);
   const { data: userStatus } = useUserStatus();
   const isSeller = userStatus?.user?.contactType?.includes('Seller') ?? false;
+  const isAdmin = userStatus?.user?.isAdmin ?? false;
 
   useEffect(() => {
     setLoading(true);
@@ -116,13 +118,42 @@ export default function ProductDetailContent({ productId }: { productId: string 
             ))}
           </div>
 
-          <h1 className="mb-1 text-2xl font-bold text-primary">{product.name}</h1>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <h1 className="text-2xl font-bold text-primary">{product.name}</h1>
+            <ShortlistButton productId={product.id} size="sm" />
+          </div>
+          {/* Priced to Sell badge — hidden while Spot Sales is active */}
           {(product.seller as any)?.avgFulfillmentScore != null && (
             <p className="text-xs text-faint">
               <span className="inline-flex items-center gap-1 rounded-full bg-brand-sage/20 px-2 py-0.5 text-xs font-medium text-brand-blue">
                 Seller Score: {((product.seller as any).avgFulfillmentScore as number).toFixed(0)}/100
               </span>
             </p>
+          )}
+
+          {/* Admin-only view stats */}
+          {isAdmin && product.viewStats && (
+            <div className="mt-1 flex gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2 py-0.5 text-xs font-medium text-brand-blue">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.64 0 8.577 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.64 0-8.577-3.007-9.963-7.178Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+                {product.viewStats.totalViews} view{product.viewStats.totalViews !== 1 ? 's' : ''}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2 py-0.5 text-xs font-medium text-brand-blue">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                </svg>
+                {product.viewStats.uniqueViewers} unique viewer{product.viewStats.uniqueViewers !== 1 ? 's' : ''}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-yellow/20 px-2 py-0.5 text-xs font-medium text-brand-teal">
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path fillRule="evenodd" d="M6.32 2.577a49.255 49.255 0 0 1 11.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 0 1-1.085.67L12 18.089l-7.165 3.583A.75.75 0 0 1 3.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93Z" clipRule="evenodd" />
+                </svg>
+                {product.viewStats.shortlistCount} shortlist{product.viewStats.shortlistCount !== 1 ? 's' : ''}
+              </span>
+            </div>
           )}
 
           {product.description && (
