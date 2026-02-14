@@ -9,6 +9,7 @@ node_modules/
 # Build output
 dist/
 build/
+*.tsbuildinfo
 
 # Prisma
 server/prisma/*.db
@@ -37,3 +38,8 @@ uploads/
 
 # Design assets
 *.ai
+
+# Dev artifacts
+color-demo.html
+harvex-shortlist-feature-snippet.md
+security-audit-report.md
