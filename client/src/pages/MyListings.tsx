@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import SellerScoreCard from '../components/SellerScoreCard';
 import ShareModal from '../components/ShareModal';
 import ContactModal from '../components/ContactModal';
+import ProductImage from '../components/ProductImage';
 import {
   fetchMyListings,
   updateMyListing,
@@ -293,7 +294,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
         {/* Thumbnail */}
         <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-slate-700">
           {listing.imageUrls?.[0] ? (
-            <img src={listing.imageUrls[0]} alt={listing.name} className="h-full w-full object-cover" />
+            <ProductImage src={listing.imageUrls[0]} alt={listing.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
               <svg className="h-8 w-8 text-faint dark:text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">

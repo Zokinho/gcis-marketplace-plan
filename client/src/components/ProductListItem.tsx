@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { ProductCard } from '../lib/api';
 import ShortlistButton from './ShortlistButton';
+import ProductImage from './ProductImage';
 
 const TYPE_COLORS: Record<string, string> = {
   Sativa: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
@@ -27,7 +28,7 @@ export default function ProductListItem({ product, onClick }: { product: Product
       {/* Thumbnail */}
       <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-brand-gray/20 dark:bg-slate-700/40">
         {product.imageUrls?.[0] ? (
-          <img src={product.imageUrls[0]} alt={product.name} className="h-full w-full object-cover" />
+          <ProductImage src={product.imageUrls[0]} alt={product.name} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <svg className="h-6 w-6 text-brand-teal/20 dark:text-brand-sage/30" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">

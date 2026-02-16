@@ -62,7 +62,8 @@ app.use((req, res, next) => {
   return res.status(403).json({ error: 'Forbidden: origin not allowed' });
 });
 
-// ─── Static file serving for uploads ───
+// ─── Static file serving for uploads (legacy) ───
+// TODO: Remove after migrating existing /uploads/ paths to S3 keys in the database
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 // ─── Zoho file proxy cache ───

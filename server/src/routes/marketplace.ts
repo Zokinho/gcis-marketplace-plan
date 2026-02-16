@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../index';
 import { validateQuery, marketplaceQuerySchema } from '../utils/validation';
 import { get30DayAvgPricesBatch, scorePriceVsMarket } from '../services/marketContextService';
+import { getSignedFileUrl, isS3Configured } from '../utils/s3';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -397,6 +398,38 @@ router.get('/filters', async (_req: Request, res: Response) => {
     certifications: Array.from(certSet).sort(),
     terpenes: Array.from(terpeneSet).sort(),
   });
+});
+
+/**
+ * GET /api/marketplace/file-url?key=...
+ * Returns a time-limited presigned URL for an S3-stored file.
+ */
+router.get('/file-url', async (req: Request, res: Response) => {
+  const key = req.query.key as string | undefined;
+
+  if (!key || typeof key !== 'string') {
+    return res.status(400).json({ error: 'Missing key parameter' });
+  }
+
+  // Validate key prefix to prevent arbitrary S3 key access
+  if (!key.startsWith('products/') || key.includes('..')) {
+    return res.status(403).json({ error: 'Invalid file key' });
+  }
+
+  if (!isS3Configured) {
+    return res.status(404).json({ error: 'File storage not configured' });
+  }
+
+  try {
+    const url = await getSignedFileUrl(key);
+    if (!url) {
+      return res.status(500).json({ error: 'Failed to generate file URL' });
+    }
+    res.json({ url });
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) }, key }, '[MARKETPLACE] Presigned URL generation failed');
+    res.status(500).json({ error: 'Failed to generate file URL' });
+  }
 });
 
 export default router;

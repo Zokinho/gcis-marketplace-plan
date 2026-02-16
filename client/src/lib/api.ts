@@ -160,6 +160,13 @@ export async function fetchFilterOptions(): Promise<FilterOptions> {
   return res.data;
 }
 
+// ─── File URL API ───
+
+export async function getFileUrl(key: string): Promise<string> {
+  const res = await api.get<{ url: string }>('/marketplace/file-url', { params: { key } });
+  return res.data.url;
+}
+
 // ─── Bid API ───
 
 export type BidStatusType = 'PENDING' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'COUNTERED' | 'EXPIRED';

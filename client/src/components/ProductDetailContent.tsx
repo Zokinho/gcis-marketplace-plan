@@ -3,6 +3,7 @@ import BidForm from './BidForm';
 import CoaUpload from './CoaUpload';
 import TestResultsDisplay from './TestResultsDisplay';
 import ShortlistButton from './ShortlistButton';
+import ProductImage from './ProductImage';
 import { fetchProductById, type ProductDetail as ProductDetailType } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
@@ -76,7 +77,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
         {product.imageUrls && product.imageUrls.length > 0 && (
           <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4">
             <div className="mb-3 flex items-center justify-center overflow-hidden rounded-lg surface-muted" style={{ minHeight: '320px' }}>
-              <img
+              <ProductImage
                 src={product.imageUrls[selectedImage]}
                 alt={`${product.name} — image ${selectedImage + 1}`}
                 className="max-h-[480px] w-full object-contain"
@@ -92,7 +93,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
                       i === selectedImage ? 'border-brand-teal' : 'border-transparent hover:border-default'
                     }`}
                   >
-                    <img src={url} alt={`Thumbnail ${i + 1}`} className="h-full w-full object-cover" />
+                    <ProductImage src={url} alt={`Thumbnail ${i + 1}`} className="h-full w-full object-cover" />
                   </button>
                 ))}
               </div>

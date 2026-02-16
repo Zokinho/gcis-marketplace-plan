@@ -10,23 +10,12 @@ import { pushProductUpdate, createZohoProduct, createProductReviewTask, uploadPr
 import { zohoRequest } from '../services/zohoAuth';
 import { createNotificationBatch } from '../services/notificationService';
 import { writeLimiter } from '../utils/rateLimiters';
+import { isS3Configured, uploadFile as s3Upload } from '../utils/s3';
 
 const router = Router();
 
 // ─── Multer config for file uploads ───
-const uploadsDir = path.join(__dirname, '../../../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}-${file.originalname}`;
-    cb(null, unique);
-  },
-});
-
+// Use memory storage: buffers are uploaded to S3 (or saved to disk as fallback)
 const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
   const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
   const allowedPdf = ['application/pdf'];
@@ -37,7 +26,10 @@ const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
   }
 };
 
-const upload = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Local uploads directory — fallback when S3 is not configured
+const uploadsDir = path.join(__dirname, '../../../uploads');
 
 /**
  * POST /api/my-listings
@@ -67,24 +59,17 @@ router.post(
       return res.status(400).json({ error: 'Product name is required' });
     }
 
-    // Build image URLs: cover photo first, then additional images
-    const imageUrls: string[] = [];
-    if (files?.coverPhoto?.[0]) {
-      imageUrls.push(`/uploads/${files.coverPhoto[0].filename}`);
-    }
-    if (files?.images) {
-      for (const f of files.images) {
-        imageUrls.push(`/uploads/${f.filename}`);
-      }
-    }
+    // Collect all uploaded file buffers for processing after product creation
+    const imageFiles: Express.Multer.File[] = [];
+    if (files?.coverPhoto?.[0]) imageFiles.push(files.coverPhoto[0]);
+    if (files?.images) imageFiles.push(...files.images);
 
-    // Build CoA URLs
+    const coaFileList: Express.Multer.File[] = [];
+    if (files?.coaFiles) coaFileList.push(...files.coaFiles);
+
+    // Placeholder URLs — will be replaced with S3 keys or local paths after product creation
+    const imageUrls: string[] = [];
     const coaUrls: string[] = [];
-    if (files?.coaFiles) {
-      for (const f of files.coaFiles) {
-        coaUrls.push(`/uploads/${f.filename}`);
-      }
-    }
 
     const parseFloat_ = (v: string | undefined) => v ? parseFloat(v) : undefined;
     const thcVal = parseFloat_(thc);
@@ -168,6 +153,58 @@ router.post(
         },
       });
 
+      // Upload files to S3 (or local fallback) and update product with URLs
+      if (imageFiles.length > 0 || coaFileList.length > 0) {
+        try {
+          const ext = (mimetype: string) => {
+            const map: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+            return map[mimetype] || 'bin';
+          };
+
+          if (isS3Configured) {
+            // Upload to S3
+            for (const f of imageFiles) {
+              const key = `products/${product.id}/images/${crypto.randomUUID()}.${ext(f.mimetype)}`;
+              await s3Upload(key, f.buffer, f.mimetype);
+              imageUrls.push(key);
+            }
+            for (const f of coaFileList) {
+              const key = `products/${product.id}/coa/${crypto.randomUUID()}.pdf`;
+              await s3Upload(key, f.buffer, f.mimetype);
+              coaUrls.push(key);
+            }
+          } else {
+            // Fallback: save to local disk
+            if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+            // Sanitize originalname: strip path separators to prevent directory traversal
+            const safeName = (name: string) => name.replace(/[/\\]/g, '_');
+            for (const f of imageFiles) {
+              const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}-${safeName(f.originalname)}`;
+              fs.writeFileSync(path.join(uploadsDir, filename), f.buffer);
+              imageUrls.push(`/uploads/${filename}`);
+            }
+            for (const f of coaFileList) {
+              const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}-${safeName(f.originalname)}`;
+              fs.writeFileSync(path.join(uploadsDir, filename), f.buffer);
+              coaUrls.push(`/uploads/${filename}`);
+            }
+          }
+
+          // Update product with file URLs
+          if (imageUrls.length > 0 || coaUrls.length > 0) {
+            await prisma.product.update({
+              where: { id: product.id },
+              data: {
+                ...(imageUrls.length > 0 ? { imageUrls } : {}),
+                ...(coaUrls.length > 0 ? { coaUrls } : {}),
+              },
+            });
+          }
+        } catch (err) {
+          logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] File upload failed');
+        }
+      }
+
       // Create review task — fire-and-forget (non-critical)
       createProductReviewTask({
         zohoProductId,
@@ -182,22 +219,17 @@ router.post(
       });
 
       // Upload files to Zoho — fire-and-forget (non-critical)
-      const imageDiskPaths: string[] = [];
-      if (files?.coverPhoto?.[0]) imageDiskPaths.push(files.coverPhoto[0].path);
-      if (files?.images) {
-        for (const f of files.images) imageDiskPaths.push(f.path);
-      }
-      const coaDiskPaths: string[] = [];
-      if (files?.coaFiles) {
-        for (const f of files.coaFiles) coaDiskPaths.push(f.path);
-      }
-      if (imageDiskPaths.length > 0 || coaDiskPaths.length > 0) {
-        uploadProductFiles(zohoProductId, imageDiskPaths, coaDiskPaths).catch((err) => {
+      if (imageFiles.length > 0 || coaFileList.length > 0) {
+        const imageBuffers = imageFiles.map((f) => ({ buffer: f.buffer, originalname: f.originalname, mimetype: f.mimetype }));
+        const coaBuffers = coaFileList.map((f) => ({ buffer: f.buffer, originalname: f.originalname, mimetype: f.mimetype }));
+        uploadProductFiles(zohoProductId, imageBuffers, coaBuffers).catch((err) => {
           logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Zoho file upload failed (non-critical)');
         });
       }
 
-      res.status(201).json({ product });
+      // Re-fetch product to include updated file URLs
+      const finalProduct = await prisma.product.findUnique({ where: { id: product.id } });
+      res.status(201).json({ product: finalProduct });
     } catch (err: any) {
       logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Create failed');
       res.status(500).json({ error: 'Failed to create listing' });

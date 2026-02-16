@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { Readable } from 'stream';
 import FormData from 'form-data';
 import axios from 'axios';
 import { zohoRequest, getAccessToken, ZOHO_API_URL } from './zohoAuth';
@@ -427,13 +428,22 @@ export async function createProductReviewTask(params: {
 // ─── File Uploads to Zoho ───
 
 /**
- * Upload a local file to Zoho File System (ZFS).
+ * Upload a file to Zoho File System (ZFS).
+ * Accepts either a file path (string) or a buffer file object.
  * Returns the encrypted file ID for attaching to a record.
  */
-async function uploadToZFS(filePath: string): Promise<string> {
+async function uploadToZFS(file: string | { buffer: Buffer; originalname: string; mimetype: string }): Promise<string> {
   const token = await getAccessToken();
   const form = new FormData();
-  form.append('file', fs.createReadStream(filePath));
+
+  if (typeof file === 'string') {
+    // Legacy: file path on disk
+    form.append('file', fs.createReadStream(file));
+  } else {
+    // Buffer-based upload
+    const stream = Readable.from(file.buffer);
+    form.append('file', stream, { filename: file.originalname, contentType: file.mimetype });
+  }
 
   const response = await axios.post(`${ZOHO_API_URL}/files`, form, {
     headers: {
@@ -448,15 +458,18 @@ async function uploadToZFS(filePath: string): Promise<string> {
   return fileId;
 }
 
+type BufferFile = { buffer: Buffer; originalname: string; mimetype: string };
+
 /**
  * Upload images and CoA files to a Zoho Product record.
+ * Accepts buffer-based files (from memory storage) or file path strings (legacy).
  * Images go to Image_1 through Image_4, CoAs go to CoAs and CoAs_2.
  * Each file is uploaded to ZFS first, then attached to the record field.
  */
 export async function uploadProductFiles(
   zohoProductId: string,
-  imageFiles: string[],  // local file paths
-  coaFiles: string[],    // local file paths
+  imageFiles: (string | BufferFile)[],
+  coaFiles: (string | BufferFile)[],
 ): Promise<void> {
   const imageFieldNames = ['Image_1', 'Image_2', 'Image_3', 'Image_4'];
   const coaFieldNames = ['CoAs', 'CoAs_2', 'CoAs_3'];
@@ -504,10 +517,15 @@ export async function uploadProductFiles(
   ];
   if (overflowFiles.length > 0) {
     const token = await getAccessToken();
-    for (const filePath of overflowFiles) {
+    for (const file of overflowFiles) {
       try {
         const form = new FormData();
-        form.append('file', fs.createReadStream(filePath));
+        if (typeof file === 'string') {
+          form.append('file', fs.createReadStream(file));
+        } else {
+          const stream = Readable.from(file.buffer);
+          form.append('file', stream, { filename: file.originalname, contentType: file.mimetype });
+        }
         await axios.post(`${ZOHO_API_URL}/Products/${zohoProductId}/Attachments`, form, {
           headers: {
             Authorization: `Zoho-oauthtoken ${token}`,
@@ -516,7 +534,7 @@ export async function uploadProductFiles(
           maxContentLength: 20 * 1024 * 1024,
         });
       } catch (err: any) {
-        logger.error({ err, filePath }, '[ZOHO] Overflow attachment upload failed');
+        logger.error({ err }, '[ZOHO] Overflow attachment upload failed');
       }
     }
     logger.info({ count: overflowFiles.length, zohoProductId }, '[ZOHO] Uploaded overflow files as attachments');

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import TestResultsDisplay from '../components/TestResultsDisplay';
 import HarvexLogo from '../components/HarvexLogo';
+import ProductImage from '../components/ProductImage';
 import { fetchSharedProducts, getSharedProductPdfUrl, type SharedProduct } from '../lib/api';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -81,7 +82,7 @@ export default function SharedProductDetail() {
             {product.imageUrls && product.imageUrls.length > 0 && (
               <div className="rounded-lg border border-subtle surface p-4">
                 <div className="mb-3 flex items-center justify-center overflow-hidden rounded-lg surface-muted" style={{ minHeight: '320px' }}>
-                  <img
+                  <ProductImage
                     src={product.imageUrls[selectedImage]}
                     alt={`${product.name} — image ${selectedImage + 1}`}
                     className="max-h-[480px] w-full object-contain"
@@ -97,7 +98,7 @@ export default function SharedProductDetail() {
                           i === selectedImage ? 'border-brand-teal' : 'border-transparent hover:border-gray-300 dark:hover:border-slate-600'
                         }`}
                       >
-                        <img src={url} alt={`Thumbnail ${i + 1}`} className="h-full w-full object-cover" />
+                        <ProductImage src={url} alt={`Thumbnail ${i + 1}`} className="h-full w-full object-cover" />
                       </button>
                     ))}
                   </div>

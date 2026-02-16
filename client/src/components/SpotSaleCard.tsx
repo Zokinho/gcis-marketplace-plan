@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { SpotSaleRecord } from '../lib/api';
+import ProductImage from './ProductImage';
 
 const TYPE_COLORS: Record<string, string> = {
   Sativa: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
@@ -86,7 +87,7 @@ export default function SpotSaleCard({
       {/* Image */}
       <div className="flex h-40 items-center justify-center bg-brand-gray/20 dark:bg-slate-700/40 p-3">
         {product.imageUrls?.[0] ? (
-          <img src={product.imageUrls[0]} alt={product.name} className="h-full w-full rounded-md object-cover" />
+          <ProductImage src={product.imageUrls[0]} alt={product.name} className="h-full w-full rounded-md object-cover" />
         ) : (
           <svg className="h-12 w-12 text-brand-teal/20 dark:text-brand-sage/30" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
