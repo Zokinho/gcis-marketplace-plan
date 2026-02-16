@@ -13,7 +13,6 @@ build/
 
 # Prisma
 server/prisma/*.db
-server/prisma/migrations/
 
 # IDE
 .vscode/
