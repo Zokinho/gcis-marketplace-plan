@@ -506,14 +506,28 @@ Defined in `client/src/index.css` via Tailwind v4 `@theme` directive. Dark mode 
 # Local dev (database only)
 sudo docker compose up -d postgres
 
-# Full stack (production-like)
+# Full stack — dev (HTTP only)
 sudo docker compose up -d
+
+# Full stack — production (HTTPS via Let's Encrypt)
+sudo bash scripts/init-letsencrypt.sh   # First time only
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 - **Server Dockerfile**: `prisma migrate deploy` on startup (safe for production)
-- **Client Dockerfile**: Nginx serving Vite build output
+- **Client Dockerfile**: Dual-mode Nginx — dev (HTTP) or production (TLS termination via `SSL_DOMAIN` env)
 - **Docker Compose**: postgres (5434→5432), server (3001), client (80)
+- **Docker Compose Prod Override**: client (80+443), certbot (auto-renewal every 12h)
 - **GitHub Actions CI**: Build + test pipeline
+
+### HTTPS / SSL
+- **TLS termination** at Nginx (client container) — Express stays HTTP behind reverse proxy
+- **Let's Encrypt** certificates via Certbot webroot ACME challenge
+- **Auto-renewal**: certbot container runs `certbot renew` every 12 hours
+- **HSTS**: Strict-Transport-Security header (1 year, includeSubDomains, preload) — gated by `FORCE_HTTPS`
+- **HTTPS redirect**: Express middleware + Nginx 301 redirect — both gated by `FORCE_HTTPS`
+- **trust proxy**: `app.set('trust proxy', 1)` ensures `req.ip` and `req.protocol` are correct behind Nginx
+- **Dev mode**: No SSL, no HSTS, no redirect — works unchanged on HTTP
 
 ---
 
@@ -560,6 +574,7 @@ sudo docker compose up -d
 | 9 | 13 | Security hardening — Zod validation, $queryRaw, auth on file proxy, PDF validation |
 | 10 | 14 | Admin audit log — AuditLog model, fire-and-forget logging, filterable API |
 | 11 | 15 | Shortlist — product saving, intelligence integration, price-drop notifications |
+| 15 | 19 | HTTPS/SSL — Nginx TLS termination, Let's Encrypt, HSTS, HTTPS redirect |
 
 ### Production Hardening (cross-cutting)
 - Structured logging (pino) — replaced 130+ console.log/error calls
@@ -580,8 +595,8 @@ sudo docker compose up -d
 - [ ] **Rotate credentials** — .env has real keys in git history; revoke and regenerate
 
 ### P1 — High risk
-- [ ] **File uploads → S3/GCS** — Local filesystem won't survive scaled deployments
-- [ ] **HTTPS/SSL** — Need Let's Encrypt + HSTS + redirect
+- [x] **File uploads → S3/GCS** — DigitalOcean Spaces with presigned URLs (Phase 14)
+- [x] **HTTPS/SSL** — Nginx TLS termination + Let's Encrypt + HSTS + redirect (Phase 15)
 
 ### P2 — Medium risk
 - [ ] **Monitoring** — No Sentry/APM/log aggregation yet

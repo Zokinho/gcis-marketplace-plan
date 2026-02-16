@@ -39,6 +39,9 @@ uploads/
 # Design assets
 *.ai
 
+# SSL certificates (Let's Encrypt)
+certbot/
+
 # Dev artifacts
 color-demo.html
 harvex-shortlist-feature-snippet.md

@@ -15,7 +15,26 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
 // ─── Global middleware ───
-app.use(helmet());
+
+// Trust first proxy (Nginx) — makes req.ip and req.protocol correct behind reverse proxy
+app.set('trust proxy', 1);
+
+app.use(helmet({
+  hsts: process.env.FORCE_HTTPS === 'true'
+    ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+    : false,
+}));
+
+// HTTPS redirect (only in production with FORCE_HTTPS=true)
+if (process.env.FORCE_HTTPS === 'true') {
+  app.use((req, res, next) => {
+    if (req.protocol === 'http') {
+      return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    }
+    next();
+  });
+}
+
 app.use(cors({
   origin: (process.env.FRONTEND_URL || 'http://localhost:5173')
     .split(',')

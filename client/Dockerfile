@@ -27,9 +27,14 @@ FROM nginx:alpine
 # Copy built static files
 COPY --from=build /app/client/dist /usr/share/nginx/html
 
-# Copy nginx config
-COPY client/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy both nginx configs (dev + SSL template)
+COPY client/nginx-dev.conf /etc/nginx/nginx-dev.conf
+COPY client/nginx-ssl.conf.template /etc/nginx/nginx-ssl.conf.template
 
-EXPOSE 80
+# Create ACME challenge directory
+RUN mkdir -p /var/www/certbot
 
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 80 443
+
+# Dual-mode startup: if SSL_DOMAIN is set, use SSL template; otherwise use dev config
+CMD ["/bin/sh", "-c", "if [ -n \"$SSL_DOMAIN\" ]; then envsubst '${SSL_DOMAIN}' < /etc/nginx/nginx-ssl.conf.template > /etc/nginx/conf.d/default.conf; else cp /etc/nginx/nginx-dev.conf /etc/nginx/conf.d/default.conf; fi && nginx -g 'daemon off;'"]
