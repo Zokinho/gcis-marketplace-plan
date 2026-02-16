@@ -55,12 +55,23 @@ app.use(helmet({
       frameSrc: ["'self'", "https://*.clerk.accounts.dev"],
       workerSrc: ["'self'", "blob:"],
       objectSrc: ["'none'"],
+      mediaSrc: ["'none'"],
+      manifestSrc: ["'self'"],
+      scriptSrcAttr: ["'none'"],
+      styleSrcAttr: ["'unsafe-inline'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
       frameAncestors: ["'none'"],
+      upgradeInsecureRequests: [],
     },
   },
 }));
+
+// Permissions-Policy header — deny access to sensitive browser features
+app.use((_req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), autoplay=(), magnetometer=(), gyroscope=(), accelerometer=()');
+  next();
+});
 
 // HTTPS redirect (only in production with FORCE_HTTPS=true)
 if (process.env.FORCE_HTTPS === 'true') {
