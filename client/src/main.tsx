@@ -3,9 +3,12 @@ import ReactDOM from 'react-dom/client';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from './lib/useTheme';
+import { initSentry } from './lib/sentry';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
+
+initSentry();
 
 const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 

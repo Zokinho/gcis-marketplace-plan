@@ -100,3 +100,25 @@ vi.mock('../utils/logger', () => ({
     debug: vi.fn(),
   },
 }));
+
+// Mock metrics to avoid prom-client side effects in tests
+vi.mock('../utils/metrics', () => ({
+  cronJobDuration: { startTimer: vi.fn(() => vi.fn()) },
+  cronJobLastSuccess: { set: vi.fn() },
+  cronJobErrors: { inc: vi.fn() },
+  metricsMiddleware: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
+  registry: { metrics: vi.fn(), contentType: 'text/plain' },
+  isMetricsEnabled: false,
+}));
+
+// Mock Sentry to avoid SDK initialization in tests
+vi.mock('../utils/sentry', () => ({
+  initSentry: vi.fn(),
+  setUserContext: vi.fn(),
+  clearUserContext: vi.fn(),
+  Sentry: {
+    setupExpressErrorHandler: vi.fn(),
+    captureException: vi.fn(),
+    setUser: vi.fn(),
+  },
+}));

@@ -2,6 +2,9 @@ import { config } from 'dotenv';
 import path from 'path';
 config({ path: path.resolve(__dirname, '../../.env') });
 
+import { initSentry, Sentry } from './utils/sentry';
+initSentry();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -9,6 +12,7 @@ import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import logger from './utils/logger';
 import { withCronLock, LOCK_IDS } from './utils/cronLock';
+import { metricsMiddleware, registry, isMetricsEnabled } from './utils/metrics';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -81,6 +85,9 @@ app.use((req, res, next) => {
   return res.status(403).json({ error: 'Forbidden: origin not allowed' });
 });
 
+// ─── Prometheus metrics middleware ───
+app.use(metricsMiddleware);
+
 // ─── Static file serving for uploads (legacy) ───
 // TODO: Remove after migrating existing /uploads/ paths to S3 keys in the database
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
@@ -138,6 +145,18 @@ app.get('/api/health', async (req, res) => {
   const status = healthy ? 'ok' : 'degraded';
   res.status(healthy ? 200 : 503).json({ status, ...checks, timestamp: new Date().toISOString() });
 });
+
+// ─── Prometheus metrics endpoint (unauthenticated, for scraping) ───
+if (isMetricsEnabled) {
+  app.get('/metrics', async (_req, res) => {
+    try {
+      res.set('Content-Type', registry.contentType);
+      res.end(await registry.metrics());
+    } catch (err) {
+      res.status(500).end();
+    }
+  });
+}
 
 // ─── Rate limiters ───
 
@@ -364,6 +383,9 @@ function getMillisUntilHour(hour: number): number {
 
 // ─── Global error handler (must be after all routes) ───
 function mountErrorHandler() {
+  // Sentry error handler (must be before catch-all)
+  Sentry.setupExpressErrorHandler(app);
+
   // Catch-all for unhandled route errors
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status = err.status || err.statusCode || 500;

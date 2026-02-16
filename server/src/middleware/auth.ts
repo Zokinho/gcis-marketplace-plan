@@ -52,6 +52,13 @@ export async function marketplaceAuth(req: Request, res: Response, next: NextFun
   }
 
   req.user = user;
+
+  // Tag Sentry events with authenticated user
+  try {
+    const { setUserContext } = await import('../utils/sentry');
+    setUserContext(user.id, user.email);
+  } catch { /* Sentry not available — ignore */ }
+
   next();
 }
 

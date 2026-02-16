@@ -1,5 +1,6 @@
 import { prisma } from '../index';
 import logger from './logger';
+import { cronJobDuration, cronJobLastSuccess, cronJobErrors } from './metrics';
 
 /**
  * PostgreSQL advisory lock IDs for each cron job.
@@ -36,9 +37,16 @@ export async function withCronLock(
     return;
   }
 
+  const endTimer = cronJobDuration.startTimer({ job: jobName });
+
   try {
     await fn();
+    cronJobLastSuccess.set({ job: jobName }, Date.now() / 1000);
+  } catch (err) {
+    cronJobErrors.inc({ job: jobName });
+    throw err;
   } finally {
+    endTimer();
     // Always release the lock
     await prisma.$queryRaw`SELECT pg_advisory_unlock(${lockId})`.catch((err) => {
       logger.error({ err, job: jobName, lockId }, '[CRON-LOCK] Failed to release lock');
