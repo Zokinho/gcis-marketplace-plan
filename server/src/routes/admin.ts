@@ -327,6 +327,74 @@ router.post('/users/:userId/reject', async (req: Request<{ userId: string }>, re
   res.json({ message: 'User rejected and removed' });
 });
 
+// ─── Pending Product Approval ───
+
+/**
+ * GET /api/admin/pending-products
+ * List products with requestPending = true, for admin approval.
+ */
+router.get('/pending-products', async (_req: Request, res: Response) => {
+  const products = await prisma.product.findMany({
+    where: { requestPending: true },
+    include: {
+      seller: { select: { id: true, email: true, companyName: true, firstName: true, lastName: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.json({ products });
+});
+
+/**
+ * POST /api/admin/products/:productId/approve
+ * Approve a pending product — sets requestPending=false, isActive=true, marketplaceVisible=true.
+ * No Zoho writeback — marketplace-only approval.
+ */
+router.post('/products/:productId/approve', async (req: Request<{ productId: string }>, res: Response) => {
+  const { productId } = req.params;
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+  if (!product.requestPending) {
+    return res.status(400).json({ error: 'Product is not pending approval' });
+  }
+
+  const updated = await prisma.product.update({
+    where: { id: productId },
+    data: { requestPending: false, isActive: true, marketplaceVisible: true },
+  });
+
+  logger.info({ productId, productName: updated.name, approvedBy: req.user?.email }, '[ADMIN] Product approved');
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'product.approve', targetType: 'Product', targetId: productId, metadata: { productName: updated.name }, ip: getRequestIp(req) });
+
+  res.json({ message: 'Product approved', product: { id: updated.id, name: updated.name, requestPending: updated.requestPending, marketplaceVisible: updated.marketplaceVisible } });
+});
+
+/**
+ * POST /api/admin/products/:productId/reject
+ * Reject a pending product — deletes it.
+ */
+router.post('/products/:productId/reject', async (req: Request<{ productId: string }>, res: Response) => {
+  const { productId } = req.params;
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+  if (!product.requestPending) {
+    return res.status(400).json({ error: 'Product is not pending approval' });
+  }
+
+  await prisma.product.delete({ where: { id: productId } });
+
+  logger.info({ productId, productName: product.name, rejectedBy: req.user?.email }, '[ADMIN] Product rejected (deleted)');
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'product.reject', targetType: 'Product', targetId: productId, metadata: { productName: product.name }, ip: getRequestIp(req) });
+
+  res.json({ message: 'Product rejected and removed' });
+});
+
 // ─── Audit Log ───
 
 /**

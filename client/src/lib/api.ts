@@ -481,6 +481,34 @@ export async function rejectUser(userId: string): Promise<void> {
   await api.post(`/admin/users/${userId}/reject`);
 }
 
+// ─── Pending Product Approval ───
+
+export interface PendingProduct {
+  id: string;
+  name: string;
+  category: string | null;
+  pricePerUnit: number | null;
+  gramsAvailable: number | null;
+  thcMax: number | null;
+  cbdMax: number | null;
+  source: string;
+  createdAt: string;
+  seller: { id: string; email: string; companyName: string | null; firstName: string | null; lastName: string | null };
+}
+
+export async function fetchPendingProducts(): Promise<PendingProduct[]> {
+  const res = await api.get<{ products: PendingProduct[] }>('/admin/pending-products');
+  return res.data.products;
+}
+
+export async function approveProduct(productId: string): Promise<void> {
+  await api.post(`/admin/products/${productId}/approve`);
+}
+
+export async function rejectProduct(productId: string): Promise<void> {
+  await api.post(`/admin/products/${productId}/reject`);
+}
+
 // ─── Curated Shares Types ───
 
 export interface CuratedShareData {

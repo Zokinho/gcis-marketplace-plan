@@ -37,6 +37,7 @@ function GuideNavLink({ onClick }: { onClick?: () => void }) {
 }
 
 const ADMIN_LINKS = [
+  { to: '/pending-products', label: 'Pending Products' },
   { to: '/intelligence', label: 'Intelligence' },
   { to: '/spot-sales/admin', label: 'Manage Deals' },
   { to: '/coa-inbox', label: 'CoA Inbox' },

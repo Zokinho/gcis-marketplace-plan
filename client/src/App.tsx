@@ -26,6 +26,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import ShortlistPage from './pages/ShortlistPage';
 import SpotSales from './pages/SpotSales';
 import SpotSalesAdmin from './pages/SpotSalesAdmin';
+import PendingProducts from './pages/PendingProducts';
 import Guide from './pages/Guide';
 import { ShortlistProvider } from './lib/useShortlist';
 
@@ -189,6 +190,9 @@ export default function App() {
         } />
         <Route path="/shares" element={
           <RequireAuth><MarketplaceGuard><CuratedShares /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/pending-products" element={
+          <RequireAuth><MarketplaceGuard><PendingProducts /></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/users" element={
           <RequireAuth><MarketplaceGuard><UserManagement /></MarketplaceGuard></RequireAuth>
