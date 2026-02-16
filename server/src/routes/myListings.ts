@@ -4,7 +4,7 @@ import fs from 'fs';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import logger from '../utils/logger';
-import { validate, updateListingSchema, createSellerShareSchema } from '../utils/validation';
+import { validate, updateListingSchema, createSellerShareSchema, createListingSchema } from '../utils/validation';
 import { prisma } from '../index';
 import { pushProductUpdate, createZohoProduct, createProductReviewTask, uploadProductFiles } from '../services/zohoApi';
 import { zohoRequest } from '../services/zohoAuth';
@@ -47,17 +47,23 @@ router.post(
     const sellerId = req.user!.id;
     const files = req.files as Record<string, Express.Multer.File[]> | undefined;
 
+    // Validate form body (runs after multer has parsed the multipart form)
+    const parsed = createListingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => ({
+        field: i.path.join('.'),
+        message: i.message,
+      }));
+      return res.status(400).json({ error: 'Validation failed', details: errors });
+    }
+
     const {
       name, description, category, type,
       licensedProducer, lineage, growthMedium, harvestDate, certification,
       thc, cbd, dominantTerpene, totalTerpenePercent,
       gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
       budSizePopcorn, budSizeSmall, budSizeMedium, budSizeLarge, budSizeXLarge,
-    } = req.body as Record<string, string>;
-
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'Product name is required' });
-    }
+    } = parsed.data as Record<string, string>;
 
     // Collect all uploaded file buffers for processing after product creation
     const imageFiles: Express.Multer.File[] = [];

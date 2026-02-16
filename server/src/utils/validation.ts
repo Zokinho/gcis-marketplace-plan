@@ -309,3 +309,30 @@ export const recordSpotSaleSchema = z.object({
   buyerId: z.string().min(1, 'buyerId is required'),
   quantity: z.coerce.number().positive('quantity must be positive'),
 });
+
+// ─── Create listing schema (multipart form — all values are strings) ───
+
+export const createListingSchema = z.object({
+  name: z.string().min(1, 'Product name is required').max(300),
+  description: z.string().max(5000).optional(),
+  category: z.string().max(100).optional(),
+  type: z.string().max(100).optional(),
+  licensedProducer: z.string().max(200).optional(),
+  lineage: z.string().max(500).optional(),
+  growthMedium: z.string().max(100).optional(),
+  harvestDate: z.string().optional(),
+  certification: z.string().max(200).optional(),
+  thc: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'thc must be a number'),
+  cbd: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'cbd must be a number'),
+  dominantTerpene: z.string().max(500).optional(),
+  totalTerpenePercent: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'totalTerpenePercent must be a number'),
+  gramsAvailable: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'gramsAvailable must be a number'),
+  upcomingQty: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'upcomingQty must be a number'),
+  minQtyRequest: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'minQtyRequest must be a number'),
+  pricePerUnit: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'pricePerUnit must be a number'),
+  budSizePopcorn: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizePopcorn must be a number'),
+  budSizeSmall: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeSmall must be a number'),
+  budSizeMedium: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeMedium must be a number'),
+  budSizeLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeLarge must be a number'),
+  budSizeXLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeXLarge must be a number'),
+}).passthrough(); // Allow extra form fields (multer adds _fieldname etc.)

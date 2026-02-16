@@ -174,6 +174,18 @@ async function handleUserCreated(data: ClerkWebhookEvent['data']) {
  * Handles Zoho CRM workflow notifications for Products, Contacts, and Tasks.
  */
 router.post('/zoho', async (req: Request, res: Response) => {
+  // Verify shared secret — reject unauthenticated requests
+  const webhookSecret = process.env.ZOHO_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    const headerSecret = req.headers['x-zoho-webhook-secret'] as string | undefined;
+    if (headerSecret !== webhookSecret) {
+      logger.warn('[ZOHO WEBHOOK] Invalid or missing webhook secret');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  } else {
+    logger.warn('[ZOHO WEBHOOK] ZOHO_WEBHOOK_SECRET not configured — webhook is unprotected');
+  }
+
   const { module, record_id, action } = req.body;
 
   if (!module || !record_id) {
