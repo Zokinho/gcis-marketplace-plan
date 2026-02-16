@@ -23,10 +23,43 @@ const PORT = process.env.PORT || 3001;
 // Trust first proxy (Nginx) — makes req.ip and req.protocol correct behind reverse proxy
 app.set('trust proxy', 1);
 
+// Build CSP directives — allow Clerk, Google Fonts, Sentry, and S3/Spaces
+const cspExtraConnectSrc = (process.env.CSP_EXTRA_CONNECT_SRC || '').split(',').map((s) => s.trim()).filter(Boolean);
+const s3Host = process.env.S3_ENDPOINT ? new URL(process.env.S3_ENDPOINT).host : null;
+
 app.use(helmet({
   hsts: process.env.FORCE_HTTPS === 'true'
     ? { maxAge: 31536000, includeSubDomains: true, preload: true }
     : false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://*.clerk.accounts.dev"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://img.clerk.com",
+        ...(s3Host ? [`https://${s3Host}`] : []),
+      ],
+      connectSrc: [
+        "'self'",
+        "https://*.clerk.accounts.dev",
+        "https://*.clerk.dev",
+        "https://*.ingest.sentry.io",
+        ...(s3Host ? [`https://${s3Host}`] : []),
+        ...cspExtraConnectSrc,
+      ],
+      frameSrc: ["'self'", "https://*.clerk.accounts.dev"],
+      workerSrc: ["'self'", "blob:"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
 }));
 
 // HTTPS redirect (only in production with FORCE_HTTPS=true)
