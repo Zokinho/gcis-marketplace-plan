@@ -20,10 +20,10 @@ GREEN='\033[0;32m'
 GRAY='\033[0;90m'
 NC='\033[0m'
 
-log_pass()  { echo -e "${GREEN}[PASS]${NC} $1"; ((PASS++)); echo "- ✅ **PASS**: $1" >> "$REPORT_FILE"; }
-log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; ((WARN++)); echo "- ⚠️ **WARN**: $1" >> "$REPORT_FILE"; }
-log_fail()  { echo -e "${RED}[FAIL]${NC} $1"; ((FAIL++)); echo "- ❌ **FAIL**: $1" >> "$REPORT_FILE"; }
-log_skip()  { echo -e "${GRAY}[SKIP]${NC} $1"; ((SKIP++)); echo "- ⏭️ **SKIP**: $1" >> "$REPORT_FILE"; }
+log_pass()  { echo -e "${GREEN}[PASS]${NC} $1"; ((PASS++)) || true; echo "- ✅ **PASS**: $1" >> "$REPORT_FILE"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; ((WARN++)) || true; echo "- ⚠️ **WARN**: $1" >> "$REPORT_FILE"; }
+log_fail()  { echo -e "${RED}[FAIL]${NC} $1"; ((FAIL++)) || true; echo "- ❌ **FAIL**: $1" >> "$REPORT_FILE"; }
+log_skip()  { echo -e "${GRAY}[SKIP]${NC} $1"; ((SKIP++)) || true; echo "- ⏭️ **SKIP**: $1" >> "$REPORT_FILE"; }
 
 cd "$PROJECT_DIR"
 
@@ -50,9 +50,12 @@ echo "── 1. Dependency Vulnerabilities ──"
 
 if [ -f "package.json" ]; then
     AUDIT_OUTPUT=$(npm audit --json 2>/dev/null || true)
-    CRITICAL=$(echo "$AUDIT_OUTPUT" | grep -o '"critical":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
-    HIGH=$(echo "$AUDIT_OUTPUT" | grep -o '"high":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
-    MODERATE=$(echo "$AUDIT_OUTPUT" | grep -o '"moderate":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+    CRITICAL=$(echo "$AUDIT_OUTPUT" | grep -o '"critical":[0-9]*' | head -1 | grep -o '[0-9]*' || true)
+    HIGH=$(echo "$AUDIT_OUTPUT" | grep -o '"high":[0-9]*' | head -1 | grep -o '[0-9]*' || true)
+    MODERATE=$(echo "$AUDIT_OUTPUT" | grep -o '"moderate":[0-9]*' | head -1 | grep -o '[0-9]*' || true)
+    CRITICAL=${CRITICAL:-0}
+    HIGH=${HIGH:-0}
+    MODERATE=${MODERATE:-0}
 
     if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
         log_fail "npm audit: $CRITICAL critical, $HIGH high, $MODERATE moderate vulnerabilities"
