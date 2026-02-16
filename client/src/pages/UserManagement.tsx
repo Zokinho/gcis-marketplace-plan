@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { fetchAdminUsers, approveUser, rejectUser, type AdminUser } from '../lib/api';
+import { fetchAdminUsers, approveUser, rejectUser, promoteUser, demoteUser, type AdminUser } from '../lib/api';
 
 type FilterTab = 'pending' | 'approved' | 'all';
 
@@ -45,6 +45,32 @@ export default function UserManagement() {
       await load();
     } catch (err) {
       console.error('Failed to reject user:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handlePromote(userId: string, userName: string) {
+    if (!confirm(`Grant admin access to ${userName}? They will be able to manage users, products, and all admin features.`)) return;
+    setActionLoading(userId);
+    try {
+      await promoteUser(userId);
+      await load();
+    } catch (err) {
+      console.error('Failed to promote user:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDemote(userId: string, userName: string) {
+    if (!confirm(`Remove admin access from ${userName}?`)) return;
+    setActionLoading(userId);
+    try {
+      await demoteUser(userId);
+      await load();
+    } catch (err) {
+      console.error('Failed to demote user:', err);
     } finally {
       setActionLoading(null);
     }
@@ -143,7 +169,16 @@ export default function UserManagement() {
                       <span className="text-muted">No</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">{getStatusBadge(user)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      {getStatusBadge(user)}
+                      {user.isAdmin && (
+                        <span className="inline-block rounded-full bg-brand-blue/15 px-2.5 py-0.5 text-xs font-medium text-brand-blue dark:bg-brand-blue/25">
+                          Admin
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-secondary">
                     {new Date(user.createdAt).toLocaleDateString()}
                   </td>
@@ -157,6 +192,25 @@ export default function UserManagement() {
                         >
                           {actionLoading === user.id ? '...' : 'Approve'}
                         </button>
+                      )}
+                      {user.approved && (
+                        user.isAdmin ? (
+                          <button
+                            onClick={() => handleDemote(user.id, user.firstName || user.email)}
+                            disabled={actionLoading === user.id}
+                            className="rounded bg-brand-blue/10 px-3 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/20 disabled:opacity-50 transition"
+                          >
+                            {actionLoading === user.id ? '...' : 'Remove Admin'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handlePromote(user.id, user.firstName || user.email)}
+                            disabled={actionLoading === user.id}
+                            className="rounded bg-brand-teal/10 px-3 py-1 text-xs font-medium text-brand-teal hover:bg-brand-teal/20 disabled:opacity-50 transition"
+                          >
+                            {actionLoading === user.id ? '...' : 'Make Admin'}
+                          </button>
+                        )
                       )}
                       {confirmReject === user.id ? (
                         <div className="flex gap-1">

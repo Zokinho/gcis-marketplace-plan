@@ -16,6 +16,7 @@ declare global {
         companyName: string | null;
         contactType: string | null;
         approved: boolean;
+        isAdmin: boolean;
         eulaAcceptedAt: Date | null;
         docUploaded: boolean;
       };
@@ -79,17 +80,23 @@ const ADMIN_EMAILS_SET = new Set(
 
 /**
  * Admin route guard.
- * Only allows users whose email is in the ADMIN_EMAILS list.
+ * Allows users whose email is in ADMIN_EMAILS env var OR who have isAdmin=true in DB.
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!isAdmin(req.user?.email)) {
+  if (!req.user?.isAdmin && !isAdminByEmail(req.user?.email)) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
 }
 
-/** Check if an email is in the admin list. */
-export function isAdmin(email: string | null | undefined): boolean {
+/** Check if a user is an admin (DB flag or env var). */
+export function isAdmin(email: string | null | undefined, isAdminFlag?: boolean): boolean {
+  if (isAdminFlag) return true;
+  return isAdminByEmail(email);
+}
+
+/** Check if an email is in the ADMIN_EMAILS env var. */
+function isAdminByEmail(email: string | null | undefined): boolean {
   return email ? ADMIN_EMAILS_SET.has(email.toLowerCase()) : false;
 }
 

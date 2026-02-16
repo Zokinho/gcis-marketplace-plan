@@ -20,6 +20,7 @@ model User {
   title          String?
   contactType    String? // From Zoho Contact_Type multi-select ("Buyer; Seller")
   approved       Boolean   @default(false) // From Zoho Account_Confirmed
+  isAdmin        Boolean   @default(false)
   eulaAcceptedAt DateTime?
   docUploaded    Boolean   @default(false)
   mailingCountry String?

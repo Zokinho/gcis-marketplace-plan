@@ -268,6 +268,7 @@ router.get('/users', validateQuery(adminUsersQuerySchema), async (req: Request, 
       eulaAcceptedAt: true,
       docUploaded: true,
       approved: true,
+      isAdmin: true,
       createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
@@ -325,6 +326,54 @@ router.post('/users/:userId/reject', async (req: Request<{ userId: string }>, re
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.reject', targetType: 'User', targetId: userId, metadata: { userEmail: user.email }, ip: getRequestIp(req) });
 
   res.json({ message: 'User rejected and removed' });
+});
+
+/**
+ * POST /api/admin/users/:userId/promote
+ * Promote a user to admin.
+ */
+router.post('/users/:userId/promote', async (req: Request<{ userId: string }>, res: Response) => {
+  const { userId } = req.params;
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  if (user.isAdmin) {
+    return res.status(400).json({ error: 'User is already an admin' });
+  }
+
+  await prisma.user.update({ where: { id: userId }, data: { isAdmin: true } });
+  logger.info({ userId, userEmail: user.email, promotedBy: req.user?.email }, '[ADMIN] User promoted to admin');
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.promote', targetType: 'User', targetId: userId, metadata: { userEmail: user.email }, ip: getRequestIp(req) });
+
+  res.json({ message: 'User promoted to admin' });
+});
+
+/**
+ * POST /api/admin/users/:userId/demote
+ * Remove admin role from a user.
+ */
+router.post('/users/:userId/demote', async (req: Request<{ userId: string }>, res: Response) => {
+  const { userId } = req.params;
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  if (!user.isAdmin) {
+    return res.status(400).json({ error: 'User is not an admin' });
+  }
+  // Prevent self-demotion
+  if (userId === req.user?.id) {
+    return res.status(400).json({ error: 'Cannot remove your own admin role' });
+  }
+
+  await prisma.user.update({ where: { id: userId }, data: { isAdmin: false } });
+  logger.info({ userId, userEmail: user.email, demotedBy: req.user?.email }, '[ADMIN] User demoted from admin');
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.demote', targetType: 'User', targetId: userId, metadata: { userEmail: user.email }, ip: getRequestIp(req) });
+
+  res.json({ message: 'Admin role removed' });
 });
 
 // ─── Pending Product Approval ───

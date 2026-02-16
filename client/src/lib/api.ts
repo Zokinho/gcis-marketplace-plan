@@ -463,6 +463,7 @@ export interface AdminUser {
   eulaAcceptedAt: string | null;
   docUploaded: boolean;
   approved: boolean;
+  isAdmin: boolean;
   createdAt: string;
 }
 
@@ -479,6 +480,14 @@ export async function approveUser(userId: string, contactType?: string): Promise
 
 export async function rejectUser(userId: string): Promise<void> {
   await api.post(`/admin/users/${userId}/reject`);
+}
+
+export async function promoteUser(userId: string): Promise<void> {
+  await api.post(`/admin/users/${userId}/promote`);
+}
+
+export async function demoteUser(userId: string): Promise<void> {
+  await api.post(`/admin/users/${userId}/demote`);
 }
 
 // ─── Pending Product Approval ───
