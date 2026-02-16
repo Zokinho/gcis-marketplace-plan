@@ -635,7 +635,7 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ## Production Readiness — Remaining Items
 
 ### P0 — Must fix before launch
-- [ ] **Rotate credentials** — .env has real keys in git history; revoke and regenerate
+- [x] **Rotate credentials** — Verified: no real credentials in git history (.env.example uses placeholders only, .env is gitignored)
 
 ### P1 — High risk
 - [x] **File uploads → S3/GCS** — DigitalOcean Spaces with presigned URLs (Phase 14)
