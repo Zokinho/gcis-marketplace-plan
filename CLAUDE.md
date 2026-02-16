@@ -18,7 +18,8 @@ B2B cannabis marketplace connecting licensed producers (sellers) with buyers. Pr
 | **CoA** | Proxy to CoA microservice (Python/FastAPI at localhost:8000) |
 | **Database** | PostgreSQL 16 via Docker on **port 5434** |
 | **Testing** | Vitest + Supertest (289 tests across 14 files) |
-| **Logging** | Pino (structured JSON) |
+| **Logging** | Pino (structured JSON) + pino-sentry-transport |
+| **Monitoring** | Sentry (backend + frontend) + Prometheus metrics |
 
 ---
 
@@ -57,6 +58,10 @@ See `.env.example`. Key vars:
 | `COA_API_KEY` | Optional API key for CoA service |
 | `ADMIN_EMAILS` | Comma-separated admin email addresses |
 | `ZOHO_DEALS_ENABLED` | `true`/`false` — gates Zoho Deal creation on bid accept |
+| `SENTRY_DSN` | Backend Sentry DSN (optional — disables Sentry if unset) |
+| `VITE_SENTRY_DSN` | Frontend Sentry DSN (build-time, optional) |
+| `SENTRY_TRACES_SAMPLE_RATE` | Sentry trace sampling rate (default `0.1`) |
+| `ENABLE_METRICS` | `true`/`false` — enables Prometheus `/metrics` endpoint |
 
 ---
 
@@ -110,12 +115,14 @@ gcis-marketplace-plan/
 │       │   └── zohoSync.ts         # Full + delta product/contact sync (15-min cron)
 │       ├── utils/
 │       │   ├── coaMapper.ts        # Map CoA extraction → Product fields
-│       │   ├── cronLock.ts         # PostgreSQL advisory locks for cron jobs
-│       │   ├── logger.ts           # Pino structured logger
+│       │   ├── cronLock.ts         # PostgreSQL advisory locks for cron jobs (instrumented with metrics)
+│       │   ├── logger.ts           # Pino structured logger + pino-sentry-transport
+│       │   ├── metrics.ts          # Prometheus registry, HTTP + cron metrics, metricsMiddleware
 │       │   ├── proximity.ts        # Bid proximity score calculator
+│       │   ├── sentry.ts           # Sentry SDK init, user context helpers
 │       │   └── validation.ts       # Zod schemas + validate/validateQuery/validateParams
 │       └── __tests__/
-│           ├── setup.ts            # Global Prisma + logger mocks
+│           ├── setup.ts            # Global Prisma + logger + metrics + sentry mocks
 │           ├── admin.test.ts       # 18 tests
 │           ├── auth.test.ts        # 17 tests
 │           ├── bids.test.ts        # 22 tests
@@ -140,6 +147,7 @@ gcis-marketplace-plan/
 │       ├── index.css               # Tailwind v4 @theme (brand colors, dark mode)
 │       ├── lib/
 │       │   ├── api.ts              # Axios client + Clerk token injection + all API functions
+│       │   ├── sentry.ts           # Frontend Sentry init (env-gated)
 │       │   ├── useNotifications.ts # Polling hook (30s interval)
 │       │   └── useShortlist.tsx   # Context provider + optimistic toggle hook
 │       ├── components/
@@ -238,6 +246,7 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/health` | Health check (`?detailed=true` for full) |
+| GET | `/metrics` | Prometheus metrics (gated by `ENABLE_METRICS`) |
 | POST | `/api/webhooks` | Clerk webhook (Svix signature) |
 | GET | `/api/shares/public/:token` | Public share catalog |
 | GET | `/api/shares/public/:token/:productId` | Public product detail |
@@ -425,6 +434,7 @@ All routes use **Zod schemas** via middleware:
 
 ### Public Routes (no auth required)
 - `/api/health` — Health check
+- `/metrics` — Prometheus metrics (gated by `ENABLE_METRICS`)
 - `/uploads/*` — Static file serving
 - `/api/webhooks` — Clerk webhook (Svix signature verification)
 - `/api/shares/public/*` — Token-based share access
@@ -446,6 +456,36 @@ Actions logged: `user.approve`, `user.reject`, `sync.trigger`, `coa.confirm`, `c
 - Fire-and-forget `createNotification()` respects per-user preferences
 - `SYSTEM_ANNOUNCEMENT` always delivered (cannot be disabled)
 - Frontend: 30-second polling via `useNotifications` hook + `NotificationBell` dropdown
+
+---
+
+## Monitoring
+
+All monitoring is **env-gated** — without `SENTRY_DSN` / `ENABLE_METRICS`, behavior is unchanged.
+
+### Sentry (Error Tracking)
+- **Backend**: `server/src/utils/sentry.ts` — `initSentry()` called at Express startup, `setUserContext()` tags events with authenticated user
+- **Frontend**: `client/src/lib/sentry.ts` — `initSentry()` called before React render, browser tracing integration
+- **Pino transport**: `pino-sentry-transport` automatically forwards all `error`/`fatal` log messages to Sentry (zero code changes to existing 115+ logger calls)
+- **Error boundary**: `ErrorBoundary.tsx` calls `Sentry.captureException()` for uncaught React errors
+- **Express error handler**: `Sentry.setupExpressErrorHandler(app)` captures unhandled route errors
+- **Vite plugin**: `@sentry/vite-plugin` uploads sourcemaps when `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` are set (CI/CD only)
+
+### Prometheus Metrics
+- **Endpoint**: `GET /metrics` (unauthenticated, for Prometheus scraping, gated by `ENABLE_METRICS=true`)
+- **HTTP metrics**: `http_requests_total` (counter), `http_request_duration_seconds` (histogram), `http_requests_in_flight` (gauge)
+- **Cron metrics**: `cron_job_duration_seconds` (histogram), `cron_job_last_success_timestamp` (gauge), `cron_job_errors_total` (counter)
+- **Process metrics**: Default Node.js process metrics (CPU, memory, event loop, GC) via `collectDefaultMetrics()`
+- **Route normalization**: UUIDs and numeric IDs replaced with `:id` to prevent label cardinality explosion
+- All 6 cron jobs automatically instrumented via `withCronLock()` in `cronLock.ts`
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `server/src/utils/sentry.ts` | Sentry SDK init + user context helpers |
+| `server/src/utils/metrics.ts` | Prometheus registry, metrics, middleware |
+| `server/src/utils/logger.ts` | Pino multi-target transport (stdout + Sentry) |
+| `client/src/lib/sentry.ts` | Frontend Sentry init |
 
 ---
 
@@ -476,7 +516,7 @@ npm run test:coverage # With coverage report
 | matchingEngine.test.ts | 9 | Unit — 10-factor scoring algorithm |
 
 ### Test Patterns
-- Global mock setup in `__tests__/setup.ts` (Prisma + logger)
+- Global mock setup in `__tests__/setup.ts` (Prisma + logger + metrics + sentry)
 - `createTestApp()` factory injects `req.user` for auth simulation
 - `vi.mock()` for service isolation, `vi.mocked()` for type-safe access
 - `vi.clearAllMocks()` in every `beforeEach`
@@ -575,6 +615,7 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 | 10 | 14 | Admin audit log — AuditLog model, fire-and-forget logging, filterable API |
 | 11 | 15 | Shortlist — product saving, intelligence integration, price-drop notifications |
 | 15 | 19 | HTTPS/SSL — Nginx TLS termination, Let's Encrypt, HSTS, HTTPS redirect |
+| 16 | 20 | Monitoring — Sentry error tracking, Prometheus metrics, pino-sentry transport |
 
 ### Production Hardening (cross-cutting)
 - Structured logging (pino) — replaced 130+ console.log/error calls
@@ -586,6 +627,8 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 - Rate limiting (4 tiers)
 - 289 tests across 14 files
 - Dark mode support across all pages
+- Sentry error tracking (backend + frontend) with pino log transport
+- Prometheus metrics (HTTP + cron) with `/metrics` endpoint
 
 ---
 
@@ -599,7 +642,7 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 - [x] **HTTPS/SSL** — Nginx TLS termination + Let's Encrypt + HSTS + redirect (Phase 15)
 
 ### P2 — Medium risk
-- [ ] **Monitoring** — No Sentry/APM/log aggregation yet
+- [x] **Monitoring** — Sentry + Prometheus metrics + pino-sentry transport (Phase 16)
 
 ### P3 — Nice to have
 - [x] **CSRF protection** — Origin/Referer validation on mutating requests
