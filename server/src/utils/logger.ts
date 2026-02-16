@@ -3,7 +3,7 @@ import pino from 'pino';
 function buildTransport(): pino.TransportMultiOptions | undefined {
   const targets: pino.TransportTargetOptions[] = [];
 
-  // Always log to stdout
+  // Always log to stdout in dev (transport mode)
   if (process.env.NODE_ENV !== 'production') {
     targets.push({ target: 'pino/file', options: { destination: 1 }, level: 'debug' });
   }
@@ -20,12 +20,18 @@ function buildTransport(): pino.TransportMultiOptions | undefined {
   return targets.length > 0 ? { targets } : undefined;
 }
 
+const transport = buildTransport();
+
+// Pino does not allow custom formatters with transport.targets —
+// only apply formatters when no multi-target transport is active
 const logger = pino({
   level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-  transport: buildTransport(),
-  formatters: {
-    level: (label) => ({ level: label }),
-  },
+  transport,
+  ...(!transport && {
+    formatters: {
+      level: (label) => ({ level: label }),
+    },
+  }),
   timestamp: pino.stdTimeFunctions.isoTime,
 });
 
