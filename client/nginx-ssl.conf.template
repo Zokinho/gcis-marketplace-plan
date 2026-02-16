@@ -39,9 +39,30 @@ server {
     # Security headers
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
 
+    # Basic auth (optional — enabled when /etc/nginx/.htpasswd exists)
+    auth_basic "Restricted";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
     # Static files
     root /usr/share/nginx/html;
     index index.html;
+
+    # Webhook endpoint — no basic auth (Clerk needs access)
+    location /api/webhooks {
+        auth_basic off;
+        proxy_pass http://server:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # Health check — no basic auth
+    location /api/health {
+        auth_basic off;
+        proxy_pass http://server:3001;
+        proxy_set_header Host $host;
+    }
 
     # API proxy -> server container
     location /api/ {

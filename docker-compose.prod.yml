@@ -10,10 +10,11 @@ services:
     ports:
       - "443:443"
     environment:
-      SSL_DOMAIN: ${SSL_DOMAIN:-marketplace.harvex.ca}
+      SSL_DOMAIN: ${SSL_DOMAIN:-testing.harvex.ca}
     volumes:
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
+      - ./.htpasswd:/etc/nginx/.htpasswd:ro
 
   certbot:
     image: certbot/certbot

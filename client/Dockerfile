@@ -39,4 +39,5 @@ RUN mkdir -p /var/www/certbot
 EXPOSE 80 443
 
 # Dual-mode startup: if SSL_DOMAIN is set, use SSL template; otherwise use dev config
-CMD ["/bin/sh", "-c", "if [ -n \"$SSL_DOMAIN\" ]; then envsubst '${SSL_DOMAIN}' < /etc/nginx/nginx-ssl.conf.template > /etc/nginx/conf.d/default.conf; else cp /etc/nginx/nginx-dev.conf /etc/nginx/conf.d/default.conf; fi && nginx -g 'daemon off;'"]
+# If no .htpasswd file exists, strip basic auth directives to avoid Nginx errors
+CMD ["/bin/sh", "-c", "if [ -n \"$SSL_DOMAIN\" ]; then envsubst '${SSL_DOMAIN}' < /etc/nginx/nginx-ssl.conf.template > /etc/nginx/conf.d/default.conf; else cp /etc/nginx/nginx-dev.conf /etc/nginx/conf.d/default.conf; fi && if [ ! -f /etc/nginx/.htpasswd ] || [ ! -s /etc/nginx/.htpasswd ]; then sed -i '/auth_basic/d' /etc/nginx/conf.d/default.conf; fi && nginx -g 'daemon off;'"]
