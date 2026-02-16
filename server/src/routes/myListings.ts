@@ -11,6 +11,7 @@ import { zohoRequest } from '../services/zohoAuth';
 import { createNotificationBatch } from '../services/notificationService';
 import { writeLimiter } from '../utils/rateLimiters';
 import { isS3Configured, uploadFile as s3Upload } from '../utils/s3';
+import { isCoupledMode, marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 
 const router = Router();
 
@@ -154,6 +155,7 @@ router.post(
           coaUrls,
           source: 'manual',
           isActive: false,
+          marketplaceVisible: false,
           requestPending: true,
           sellerId,
         },
@@ -266,6 +268,7 @@ router.get('/', async (req: Request, res: Response) => {
       certification: true,
       harvestDate: true,
       isActive: true,
+      marketplaceVisible: true,
       requestPending: true,
       pricePerUnit: true,
       gramsAvailable: true,
@@ -381,7 +384,7 @@ router.patch('/:id/toggle-active', writeLimiter, async (req: Request<{ id: strin
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { id: true, sellerId: true, zohoProductId: true, isActive: true, requestPending: true },
+    select: { id: true, sellerId: true, zohoProductId: true, isActive: true, marketplaceVisible: true, requestPending: true },
   });
 
   if (!product || product.sellerId !== sellerId) {
@@ -392,25 +395,36 @@ router.patch('/:id/toggle-active', writeLimiter, async (req: Request<{ id: strin
     return res.status(400).json({ error: 'Cannot toggle a listing that is pending approval' });
   }
 
-  const newActive = !product.isActive;
+  if (isCoupledMode()) {
+    // Coupled mode: toggle both isActive + marketplaceVisible, write to Zoho
+    const newActive = !product.isActive;
 
-  // Update local DB
-  await prisma.product.update({
-    where: { id: productId },
-    data: { isActive: newActive },
-  });
-
-  // Sync to Zoho
-  try {
-    await zohoRequest('PUT', `/Products/${product.zohoProductId}`, {
-      data: { data: [{ Product_Active: newActive }], trigger: [] },
+    await prisma.product.update({
+      where: { id: productId },
+      data: { isActive: newActive, marketplaceVisible: newActive },
     });
-  } catch (err: any) {
-    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Zoho toggle sync failed');
-    // Don't fail the request — local state is updated
-  }
 
-  res.json({ message: newActive ? 'Product activated' : 'Product paused', isActive: newActive });
+    // Sync to Zoho
+    try {
+      await zohoRequest('PUT', `/Products/${product.zohoProductId}`, {
+        data: { data: [{ Product_Active: newActive }], trigger: [] },
+      });
+    } catch (err: any) {
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Zoho toggle sync failed');
+    }
+
+    res.json({ message: newActive ? 'Product activated' : 'Product paused', isActive: newActive, marketplaceVisible: newActive });
+  } else {
+    // Decoupled mode: toggle only marketplaceVisible, leave isActive and Zoho untouched
+    const newVisible = !product.marketplaceVisible;
+
+    await prisma.product.update({
+      where: { id: productId },
+      data: { marketplaceVisible: newVisible },
+    });
+
+    res.json({ message: newVisible ? 'Product visible on marketplace' : 'Product hidden from marketplace', isActive: product.isActive, marketplaceVisible: newVisible });
+  }
 });
 
 // ─── Seller Share Links ───
@@ -437,7 +451,7 @@ router.post('/share', writeLimiter, validate(createSellerShareSchema), async (re
     idsToShare = productIds;
   } else {
     const active = await prisma.product.findMany({
-      where: { sellerId, isActive: true },
+      where: { sellerId, ...marketplaceVisibleWhere() },
       select: { id: true },
     });
     if (active.length === 0) {

@@ -4,6 +4,7 @@ import { prisma } from '../index';
 import { validateQuery, marketplaceQuerySchema } from '../utils/validation';
 import { get30DayAvgPricesBatch, scorePriceVsMarket } from '../services/marketContextService';
 import { getSignedFileUrl, isS3Configured } from '../utils/s3';
+import { marketplaceVisibleWhere, isProductMarketplaceVisible, isCoupledMode } from '../utils/marketplaceVisibility';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -39,7 +40,7 @@ router.get('/products', validateQuery(marketplaceQuerySchema), async (req: Reque
 
   // Build where clause
   const where: Prisma.ProductWhereInput = {
-    isActive: true,
+    ...marketplaceVisibleWhere(),
   };
 
   if (category) where.category = category;
@@ -107,8 +108,9 @@ router.get('/products', validateQuery(marketplaceQuerySchema), async (req: Reque
 
       // We need raw filtering since Prisma can't do cross-column math.
       // We'll get IDs from a raw query and add them as an IN filter.
+      const visibleColumn = isCoupledMode() ? Prisma.raw('"isActive"') : Prisma.raw('"marketplaceVisible"');
       const ratioProductIds: { id: string }[] = await prisma.$queryRaw`
-        SELECT id FROM "Product" WHERE "isActive" = true AND "thcMax" > 0 AND "cbdMax" > 0 AND ("cbdMax" / "thcMax") BETWEEN ${lowerRatio} AND ${upperRatio}
+        SELECT id FROM "Product" WHERE ${visibleColumn} = true AND "thcMax" > 0 AND "cbdMax" > 0 AND ("cbdMax" / "thcMax") BETWEEN ${lowerRatio} AND ${upperRatio}
       `;
       const ids = ratioProductIds.map((r) => r.id);
       if (ids.length === 0) {
@@ -179,6 +181,7 @@ router.get('/products', validateQuery(marketplaceQuerySchema), async (req: Reque
         upcomingQty: true,
         imageUrls: true,
         isActive: true,
+        marketplaceVisible: true,
         matchCount: true,
       },
     }),
@@ -240,6 +243,7 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
       lineage: true,
       harvestDate: true,
       isActive: true,
+      marketplaceVisible: true,
       requestPending: true,
       pricePerUnit: true,
       minQtyRequest: true,
@@ -280,7 +284,7 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
     },
   });
 
-  if (!product || !product.isActive) {
+  if (!product || !isProductMarketplaceVisible(product)) {
     return res.status(404).json({ error: 'Product not found' });
   }
 
@@ -349,23 +353,24 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
  * Returns available filter options (distinct values from active products).
  */
 router.get('/filters', async (_req: Request, res: Response) => {
+  const visibleWhere = marketplaceVisibleWhere();
   const [categories, types, certifications, terpeneProducts] = await Promise.all([
     prisma.product.findMany({
-      where: { isActive: true, category: { not: null } },
+      where: { ...visibleWhere, category: { not: null } },
       distinct: ['category'],
       select: { category: true },
     }),
     prisma.product.findMany({
-      where: { isActive: true, type: { not: null } },
+      where: { ...visibleWhere, type: { not: null } },
       distinct: ['type'],
       select: { type: true },
     }),
     prisma.product.findMany({
-      where: { isActive: true, certification: { not: null } },
+      where: { ...visibleWhere, certification: { not: null } },
       select: { certification: true },
     }),
     prisma.product.findMany({
-      where: { isActive: true, dominantTerpene: { not: null } },
+      where: { ...visibleWhere, dominantTerpene: { not: null } },
       select: { dominantTerpene: true },
     }),
   ]);

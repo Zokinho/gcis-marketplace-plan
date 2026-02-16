@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { prisma } from '../index';
 import { zohoRequest } from '../services/zohoAuth';
 import { BidStatus } from '@prisma/client';
+import { isCoupledMode } from '../utils/marketplaceVisibility';
 
 const router = Router();
 
@@ -237,6 +238,8 @@ async function syncSingleProduct(zohoProductId: string) {
       return;
     }
 
+    const coupledMarketplaceVisible = isCoupledMode() ? { marketplaceVisible: record.Product_Active ?? false } : {};
+
     await prisma.product.upsert({
       where: { zohoProductId },
       create: {
@@ -248,6 +251,7 @@ async function syncSingleProduct(zohoProductId: string) {
         category: record.Product_Category || null,
         type: record.Type || null,
         isActive: record.Product_Active ?? false,
+        ...coupledMarketplaceVisible,
         requestPending: record.Request_pending ?? false,
         pricePerUnit: record.Unit_Price ?? null,
         minQtyRequest: record.Min_QTY_Request ?? null,
@@ -279,6 +283,7 @@ async function syncSingleProduct(zohoProductId: string) {
         category: record.Product_Category || null,
         type: record.Type || null,
         isActive: record.Product_Active ?? false,
+        ...coupledMarketplaceVisible,
         requestPending: record.Request_pending ?? false,
         pricePerUnit: record.Unit_Price ?? null,
         minQtyRequest: record.Min_QTY_Request ?? null,

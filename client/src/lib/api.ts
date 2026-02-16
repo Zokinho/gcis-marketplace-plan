@@ -232,6 +232,7 @@ export interface SellerListing {
   certification: string | null;
   harvestDate: string | null;
   isActive: boolean;
+  marketplaceVisible?: boolean;
   requestPending: boolean;
   pricePerUnit: number | null;
   gramsAvailable: number | null;

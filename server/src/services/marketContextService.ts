@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../index';
+import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 
 interface PriceComparison {
   listingPrice: number;
@@ -180,7 +181,7 @@ export async function getSupplyDemandForCategory(categoryName: string): Promise<
   });
 
   const activeListings = await prisma.product.count({
-    where: { category: categoryName, isActive: true },
+    where: { category: categoryName, ...marketplaceVisibleWhere() },
   });
 
   const ratio = activeListings > 0

@@ -10,6 +10,7 @@ import {
   fetchDeletedProductIds,
 } from './zohoApi';
 import { createNotification, createNotificationBatch } from './notificationService';
+import { isCoupledMode, isProductMarketplaceVisible } from '../utils/marketplaceVisibility';
 
 // ─── Seller resolution cache ───
 
@@ -55,13 +56,18 @@ function mapProductFields(p: any) {
   const certArray = Array.isArray(p.Certification) ? p.Certification : [];
   const certValue = certArray.length > 0 ? certArray.join(', ') : null;
 
+  const isActive = p.Product_Active ?? false;
+
   return {
     name: p.Product_Name || 'Unnamed Product',
     productCode: p.Product_Code || null,
     description: p.Description || null,
     category: p.Product_Category || null,
     type: typeValue,
-    isActive: p.Product_Active ?? false,
+    isActive,
+    // In coupled mode, marketplaceVisible mirrors isActive from Zoho.
+    // In decoupled mode, don't touch marketplaceVisible during sync.
+    ...(isCoupledMode() ? { marketplaceVisible: isActive } : {}),
     requestPending: p.Request_pending ?? false,
     pricePerUnit: p.Min_Request_G_Including_5_markup != null ? Number(p.Min_Request_G_Including_5_markup) : null,
     minQtyRequest: p.Min_QTY_Request != null ? Number(p.Min_QTY_Request) : null,
@@ -147,7 +153,11 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
           zohoProductId: { notIn: activeZohoIds },
           isActive: true,
         },
-        data: { isActive: false, lastSyncedAt: new Date() },
+        data: {
+          isActive: false,
+          ...(isCoupledMode() ? { marketplaceVisible: false } : {}),
+          lastSyncedAt: new Date(),
+        },
       });
     }
 
@@ -253,7 +263,8 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
         });
 
         // Notification: PRODUCT_NEW — notify previous buyers of this seller
-        if (!existing && fields.isActive) {
+        // Gate on marketplace visibility (not just Zoho active) so we don't notify in decoupled mode
+        if (!existing && isProductMarketplaceVisible({ isActive: fields.isActive, marketplaceVisible: (fields as any).marketplaceVisible ?? false })) {
           try {
             const previousBuyers = await prisma.transaction.findMany({
               where: { sellerId },
@@ -349,7 +360,11 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
         if (productIdsWithBids.size > 0) {
           await prisma.product.updateMany({
             where: { id: { in: [...productIdsWithBids] } },
-            data: { isActive: false, lastSyncedAt: new Date() },
+            data: {
+              isActive: false,
+              ...(isCoupledMode() ? { marketplaceVisible: false } : {}),
+              lastSyncedAt: new Date(),
+            },
           });
         }
 

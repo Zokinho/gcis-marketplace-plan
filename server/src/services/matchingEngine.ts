@@ -10,6 +10,7 @@ import * as marketContextService from './marketContextService';
 import * as propensityService from './propensityService';
 import logger from '../utils/logger';
 import { createNotification } from './notificationService';
+import { isProductMarketplaceVisible, marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 
 interface ScoreBreakdown {
   category: number;
@@ -517,10 +518,10 @@ export async function scoreMatch(buyerId: string, productId: string): Promise<Ma
 export async function generateMatchesForProduct(productId: string): Promise<number> {
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { id: true, sellerId: true, isActive: true, name: true },
+    select: { id: true, sellerId: true, isActive: true, marketplaceVisible: true, name: true },
   });
 
-  if (!product || !product.isActive) return 0;
+  if (!product || !isProductMarketplaceVisible(product)) return 0;
 
   // Get all active buyers (excluding the seller)
   const buyers = await prisma.user.findMany({
@@ -583,7 +584,7 @@ export async function generateMatchesForProduct(productId: string): Promise<numb
 
 export async function regenerateAllMatches(): Promise<{ products: number; matches: number }> {
   const activeProducts = await prisma.product.findMany({
-    where: { isActive: true },
+    where: { ...marketplaceVisibleWhere() },
     select: { id: true },
   });
 

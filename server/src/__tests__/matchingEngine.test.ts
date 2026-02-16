@@ -46,6 +46,7 @@ const mockProduct = {
   gramsAvailable: 1000,
   sellerId: 's1',
   isActive: true,
+  marketplaceVisible: true,
   seller: { id: 's1', mailingCountry: 'Canada' },
 };
 
@@ -179,6 +180,7 @@ describe('generateMatchesForProduct', () => {
       id: 'p1',
       sellerId: 's1',
       isActive: false,
+      marketplaceVisible: false,
     } as any);
 
     const count = await generateMatchesForProduct('p1');
@@ -190,7 +192,7 @@ describe('generateMatchesForProduct', () => {
     // First call: generateMatchesForProduct looks up the product (select: id, sellerId, isActive)
     // Subsequent calls: scoreMatch looks up the product (include: seller)
     vi.mocked(prisma.product.findUnique)
-      .mockResolvedValueOnce({ id: 'p1', sellerId: 's1', isActive: true } as any) // generateMatchesForProduct lookup
+      .mockResolvedValueOnce({ id: 'p1', sellerId: 's1', isActive: true, marketplaceVisible: true, name: 'Test Flower' } as any) // generateMatchesForProduct lookup
       .mockResolvedValue(mockProduct as any); // scoreMatch lookups
 
     // Two approved buyers (excluding the seller)
@@ -225,7 +227,7 @@ describe('generateMatchesForProduct', () => {
 
   it('handles errors in individual buyer scoring gracefully', async () => {
     vi.mocked(prisma.product.findUnique)
-      .mockResolvedValueOnce({ id: 'p1', sellerId: 's1', isActive: true } as any)
+      .mockResolvedValueOnce({ id: 'p1', sellerId: 's1', isActive: true, marketplaceVisible: true, name: 'Test Flower' } as any)
       .mockRejectedValue(new Error('DB error')); // scoreMatch will fail for each buyer
 
     vi.mocked(prisma.user.findMany).mockResolvedValue([

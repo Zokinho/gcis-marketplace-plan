@@ -3,6 +3,7 @@ import logger from '../utils/logger';
 import { prisma } from '../index';
 import { calculateProximity } from '../utils/proximity';
 import { validate, validateQuery, createBidSchema, bidOutcomeSchema, bidListQuerySchema } from '../utils/validation';
+import { isProductMarketplaceVisible } from '../utils/marketplaceVisibility';
 import {
   createBidTask,
   updateBidTaskStatus,
@@ -32,12 +33,13 @@ router.post('/', writeLimiter, validate(createBidSchema), async (req: Request, r
   const product = await prisma.product.findUnique({
     where: { id: productId },
     include: { seller: true },
+    // Note: include returns all scalar fields including marketplaceVisible
   });
 
   if (!product) {
     return res.status(404).json({ error: 'Product not found' });
   }
-  if (!product.isActive) {
+  if (!isProductMarketplaceVisible(product)) {
     return res.status(400).json({ error: 'This product is not currently active' });
   }
 

@@ -68,6 +68,7 @@ function makeProduct(overrides: Record<string, any> = {}) {
     lineage: 'Blueberry x Haze',
     harvestDate: now,
     isActive: true,
+    marketplaceVisible: true,
     requestPending: false,
     pricePerUnit: 5.0,
     minQtyRequest: 100,
@@ -122,6 +123,7 @@ function makeListProduct(overrides: Record<string, any> = {}) {
     upcomingQty: 0,
     imageUrls: ['https://example.com/img1.jpg'],
     isActive: true,
+    marketplaceVisible: true,
     matchCount: 5,
     ...overrides,
   };

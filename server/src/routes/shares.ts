@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { prisma } from '../index';
 import { getCoaClient } from '../services/coaClient';
 import { validate, createShareSchema, updateShareSchema } from '../utils/validation';
+import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 
 const router = Router();
 
@@ -163,7 +164,7 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
   const products = await prisma.product.findMany({
     where: {
       id: { in: share.productIds },
-      isActive: true,
+      ...marketplaceVisibleWhere(),
     },
     select: {
       id: true,

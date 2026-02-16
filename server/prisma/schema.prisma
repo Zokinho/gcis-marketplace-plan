@@ -72,8 +72,9 @@ model Product {
   harvestDate      DateTime?
 
   // Status (from Zoho checkboxes)
-  isActive       Boolean @default(false) // Product_Active
-  requestPending Boolean @default(false) // Request_pending
+  isActive             Boolean @default(false) // Product_Active
+  marketplaceVisible   Boolean @default(false) // Independent marketplace visibility
+  requestPending       Boolean @default(false) // Request_pending
 
   // Seller link
   sellerId String
@@ -139,6 +140,7 @@ model Product {
   @@index([sellerId])
   @@index([category])
   @@index([isActive])
+  @@index([marketplaceVisible])
 }
 
 // ─── Bids ───

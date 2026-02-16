@@ -67,6 +67,7 @@ const mockProduct = {
   zohoProductId: 'zoho-prod-1',
   sellerId: 'seller-1',
   isActive: true,
+  marketplaceVisible: true,
   pricePerUnit: 5.0,
   minQtyRequest: 100,
   gramsAvailable: 5000,

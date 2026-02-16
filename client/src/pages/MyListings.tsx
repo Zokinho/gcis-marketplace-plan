@@ -264,11 +264,14 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     }
   }
 
+  const isMarketplaceVisible = listing.marketplaceVisible ?? listing.isActive;
   const statusBadge = listing.requestPending
     ? { label: 'Pending', class: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
-    : listing.isActive
+    : isMarketplaceVisible
       ? { label: 'Active', class: 'bg-brand-sage/20 text-brand-teal' }
       : { label: 'Paused', class: 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400' };
+  // Show sub-badge when Zoho active state differs from marketplace visibility
+  const showZohoBadge = listing.marketplaceVisible != null && listing.isActive !== listing.marketplaceVisible;
 
   const sourceBadge = SOURCE_BADGES[listing.source] || { label: listing.source, class: 'bg-gray-50 text-gray-500 dark:bg-slate-700 dark:text-slate-400' };
 
@@ -287,7 +290,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
   return (
     <div className={`rounded-lg border border-brand-blue/15 border-l-4 bg-brand-blue/5 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
       listing.requestPending ? 'border-l-amber-400' :
-      listing.isActive ? 'border-l-brand-teal' :
+      isMarketplaceVisible ? 'border-l-brand-teal' :
       'border-l-gray-300 dark:border-l-slate-600'
     }`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -312,6 +315,11 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.class}`}>
               {statusBadge.label}
             </span>
+            {showZohoBadge && (
+              <span className="rounded-full border border-dashed border-gray-300 dark:border-slate-600 px-2 py-0.5 text-[10px] font-medium text-faint">
+                Zoho: {listing.isActive ? 'Active' : 'Paused'}
+              </span>
+            )}
             {listing.type && (
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[listing.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                 {listing.type}
@@ -462,12 +470,12 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 onClick={handleToggle}
                 disabled={toggling}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-                  listing.isActive
+                  isMarketplaceVisible
                     ? 'border border-amber-300 text-amber-700 hover:bg-amber-50'
                     : 'border border-brand-sage text-brand-teal hover:bg-brand-sage/10'
                 }`}
               >
-                {toggling ? '...' : listing.isActive ? 'Pause' : 'Activate'}
+                {toggling ? '...' : isMarketplaceVisible ? 'Pause' : 'Activate'}
               </button>
             )}
           </div>

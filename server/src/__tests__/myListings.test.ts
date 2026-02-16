@@ -44,6 +44,7 @@ const mockProduct = {
   certification: 'Organic',
   harvestDate: null,
   isActive: true,
+  marketplaceVisible: true,
   requestPending: false,
   pricePerUnit: 5.0,
   gramsAvailable: 5000,
@@ -264,15 +265,16 @@ describe('PATCH /:id/toggle-active', () => {
     (prisma.bid as any).groupBy = vi.fn();
   });
 
-  it('activates an inactive product', async () => {
+  it('activates an inactive product (coupled mode — default)', async () => {
     vi.mocked(prisma.product.findUnique).mockResolvedValue({
       id: 'product-1',
       sellerId: 'seller-1',
       zohoProductId: 'zoho-prod-1',
       isActive: false,
+      marketplaceVisible: false,
       requestPending: false,
     } as any);
-    vi.mocked(prisma.product.update).mockResolvedValue({ ...mockProduct, isActive: true } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({ ...mockProduct, isActive: true, marketplaceVisible: true } as any);
 
     const app = createTestApp(myListingsRouter);
     const res = await request(app).patch('/product-1/toggle-active');
@@ -280,9 +282,10 @@ describe('PATCH /:id/toggle-active', () => {
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('Product activated');
     expect(res.body.isActive).toBe(true);
+    expect(res.body.marketplaceVisible).toBe(true);
     expect(prisma.product.update).toHaveBeenCalledWith({
       where: { id: 'product-1' },
-      data: { isActive: true },
+      data: { isActive: true, marketplaceVisible: true },
     });
     const { zohoRequest } = await import('../services/zohoAuth');
     expect(zohoRequest).toHaveBeenCalledWith('PUT', '/Products/zoho-prod-1', {
@@ -290,15 +293,16 @@ describe('PATCH /:id/toggle-active', () => {
     });
   });
 
-  it('deactivates an active product', async () => {
+  it('deactivates an active product (coupled mode — default)', async () => {
     vi.mocked(prisma.product.findUnique).mockResolvedValue({
       id: 'product-1',
       sellerId: 'seller-1',
       zohoProductId: 'zoho-prod-1',
       isActive: true,
+      marketplaceVisible: true,
       requestPending: false,
     } as any);
-    vi.mocked(prisma.product.update).mockResolvedValue({ ...mockProduct, isActive: false } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({ ...mockProduct, isActive: false, marketplaceVisible: false } as any);
 
     const app = createTestApp(myListingsRouter);
     const res = await request(app).patch('/product-1/toggle-active');
@@ -306,10 +310,44 @@ describe('PATCH /:id/toggle-active', () => {
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('Product paused');
     expect(res.body.isActive).toBe(false);
+    expect(res.body.marketplaceVisible).toBe(false);
     expect(prisma.product.update).toHaveBeenCalledWith({
       where: { id: 'product-1' },
-      data: { isActive: false },
+      data: { isActive: false, marketplaceVisible: false },
     });
+  });
+
+  it('decoupled mode: toggle only updates marketplaceVisible, no Zoho call', async () => {
+    const originalEnv = process.env.MARKETPLACE_COUPLED;
+    process.env.MARKETPLACE_COUPLED = 'false';
+
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      sellerId: 'seller-1',
+      zohoProductId: 'zoho-prod-1',
+      isActive: true,
+      marketplaceVisible: true,
+      requestPending: false,
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({ ...mockProduct, isActive: true, marketplaceVisible: false } as any);
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app).patch('/product-1/toggle-active');
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Product hidden from marketplace');
+    expect(res.body.isActive).toBe(true); // Zoho state unchanged
+    expect(res.body.marketplaceVisible).toBe(false);
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: { marketplaceVisible: false },
+    });
+    const { zohoRequest } = await import('../services/zohoAuth');
+    expect(zohoRequest).not.toHaveBeenCalled();
+
+    // Restore env
+    if (originalEnv === undefined) delete process.env.MARKETPLACE_COUPLED;
+    else process.env.MARKETPLACE_COUPLED = originalEnv;
   });
 
   it('returns 404 when product not found', async () => {
@@ -328,6 +366,7 @@ describe('PATCH /:id/toggle-active', () => {
       sellerId: 'seller-1',
       zohoProductId: 'zoho-prod-1',
       isActive: false,
+      marketplaceVisible: false,
       requestPending: true,
     } as any);
 

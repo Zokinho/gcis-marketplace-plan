@@ -9,6 +9,7 @@ import { mapCoaToProductFields } from '../utils/coaMapper';
 import { detectSeller } from '../services/sellerDetection';
 import { pollEmailIngestions } from '../services/coaEmailSync';
 import { logAudit, getRequestIp } from '../services/auditService';
+import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 
 const router = Router();
 
@@ -32,12 +33,16 @@ router.get('/sync-status', async (_req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  const productCount = await prisma.product.count({ where: { isActive: true } });
-  const userCount = await prisma.user.count();
+  const [zohoActiveCount, marketplaceVisibleCount, userCount] = await Promise.all([
+    prisma.product.count({ where: { isActive: true } }),
+    prisma.product.count({ where: { ...marketplaceVisibleWhere() } }),
+    prisma.user.count(),
+  ]);
 
   res.json({
     summary: {
-      activeProducts: productCount,
+      activeProducts: zohoActiveCount,
+      marketplaceVisibleProducts: marketplaceVisibleCount,
       totalUsers: userCount,
       lastProductSync: lastProductSync?.createdAt || null,
       lastContactSync: lastContactSync?.createdAt || null,
@@ -158,6 +163,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         source: 'coa_email',
         sellerId,
         isActive: true,
+        marketplaceVisible: true,
         zohoProductId: `coa_email_${syncRecord.coaJobId}`,
       },
     });

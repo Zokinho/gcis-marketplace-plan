@@ -326,6 +326,7 @@ describe('Public: GET /:token/products - Get share products', () => {
         name: 'Product A',
         category: 'Dried Flower',
         isActive: true,
+        marketplaceVisible: true,
         pricePerUnit: 5.0,
       },
       {
@@ -333,6 +334,7 @@ describe('Public: GET /:token/products - Get share products', () => {
         name: 'Product B',
         category: 'Pre-rolls',
         isActive: true,
+        marketplaceVisible: true,
         pricePerUnit: 8.0,
       },
     ];

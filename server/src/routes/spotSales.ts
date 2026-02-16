@@ -22,6 +22,7 @@ import * as churnDetectionService from '../services/churnDetectionService';
 import * as marketContextService from '../services/marketContextService';
 import { createNotification } from '../services/notificationService';
 import { z } from 'zod';
+import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 
 // ─── Admin router ───
 
@@ -448,7 +449,7 @@ buyerRouter.get('/', async (_req: Request, res: Response) => {
       where: {
         active: true,
         expiresAt: { gt: now },
-        product: { isActive: true },
+        product: { ...marketplaceVisibleWhere() },
       },
       include: {
         product: { select: productSelect },

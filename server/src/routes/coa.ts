@@ -237,6 +237,7 @@ router.post('/jobs/:jobId/confirm', validate(coaConfirmBodySchema), async (req: 
       source: 'coa_upload' as const,
       sellerId: finalSellerId,
       isActive: true,
+      marketplaceVisible: true,
       zohoProductId: `coa_${jobId}`, // Unique identifier for CoA-created products
     };
 
