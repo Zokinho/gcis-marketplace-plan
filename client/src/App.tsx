@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import { SignIn, SignUp, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, RedirectToSignIn, RedirectToSignUp } from '@clerk/clerk-react';
 import { useUserStatus } from './lib/useUserStatus';
 import Landing from './pages/Landing';
 import Marketplace from './pages/Marketplace';
@@ -118,8 +118,8 @@ export default function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Landing />} />
-        <Route path="/sign-in/*" element={<div className="flex min-h-screen items-center justify-center"><SignIn routing="path" path="/sign-in" /></div>} />
-        <Route path="/sign-up/*" element={<div className="flex min-h-screen items-center justify-center"><SignUp routing="path" path="/sign-up" /></div>} />
+        <Route path="/sign-in/*" element={<RedirectToSignIn />} />
+        <Route path="/sign-up/*" element={<RedirectToSignUp />} />
 
         {/* Authenticated but pre-approval routes */}
         <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />

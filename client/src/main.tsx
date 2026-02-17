@@ -19,7 +19,7 @@ if (!CLERK_KEY) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
-      <ClerkProvider publishableKey={CLERK_KEY}>
+      <ClerkProvider publishableKey={CLERK_KEY} signInFallbackRedirectUrl="/marketplace" afterSignOutUrl="/">
         <BrowserRouter>
           <ErrorBoundary>
             <App />
