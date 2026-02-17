@@ -13,6 +13,8 @@ function CustomSignIn({ onSwitch }: { onSwitch: () => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needsSecondFactor, setNeedsSecondFactor] = useState(false);
+  const [code, setCode] = useState('');
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -27,6 +29,9 @@ function CustomSignIn({ onSwitch }: { onSwitch: () => void }) {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         navigate('/marketplace');
+      } else if (result.status === 'needs_second_factor') {
+        await signIn.prepareSecondFactor({ strategy: 'email_code' });
+        setNeedsSecondFactor(true);
       }
     } catch (err: any) {
       const msg = err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || 'Sign in failed. Please try again.';
@@ -34,6 +39,64 @@ function CustomSignIn({ onSwitch }: { onSwitch: () => void }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSecondFactor(e: FormEvent) {
+    e.preventDefault();
+    if (!isLoaded) return;
+    setError('');
+    setLoading(true);
+    try {
+      const result = await signIn.attemptSecondFactor({ strategy: 'email_code', code });
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        navigate('/marketplace');
+      }
+    } catch (err: any) {
+      const msg = err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || 'Verification failed. Please try again.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (needsSecondFactor) {
+    return (
+      <div className="rounded-xl border border-white/25 bg-white/20 p-6 backdrop-blur-md shadow-2xl">
+        <h3 className="mb-1 text-lg font-semibold text-white">Check your email</h3>
+        <p className="mb-5 text-sm text-white/50">
+          We sent a verification code to <span className="text-white/80">{email}</span>
+        </p>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-400/30 bg-red-500/15 px-3 py-2 text-sm text-red-200">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSecondFactor} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-white/70">Verification code</label>
+            <input
+              type="text"
+              required
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Enter 6-digit code"
+              className={inputClass}
+              autoComplete="one-time-code"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full cursor-pointer rounded-lg bg-white py-2.5 text-sm font-semibold text-brand-teal transition hover:bg-white/90 disabled:opacity-50"
+          >
+            {loading ? 'Verifying...' : 'Verify'}
+          </button>
+        </form>
+      </div>
+    );
   }
 
   return (
