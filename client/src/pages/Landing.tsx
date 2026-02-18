@@ -100,7 +100,6 @@ interface SignUpData {
   address: string;
   city: string;
   postalCode: string;
-  mailingCountry: string;
   eulaAccepted: boolean;
 }
 
@@ -116,7 +115,6 @@ const INITIAL_DATA: SignUpData = {
   address: '',
   city: '',
   postalCode: '',
-  mailingCountry: 'Canada',
   eulaAccepted: false,
 };
 
@@ -179,7 +177,7 @@ function SignUpWizard({ onSwitch }: { onSwitch: () => void }) {
         address: data.address || undefined,
         city: data.city || undefined,
         postalCode: data.postalCode || undefined,
-        mailingCountry: data.mailingCountry || undefined,
+        mailingCountry: 'Canada',
       });
       navigate('/onboarding');
     } catch (err: any) {
@@ -278,13 +276,6 @@ function SignUpWizard({ onSwitch }: { onSwitch: () => void }) {
               <label className="mb-1 block text-xs font-medium text-white/70">Postal code</label>
               <input type="text" value={data.postalCode} onChange={(e) => update('postalCode', e.target.value)} placeholder="A1B 2C3" className={inputClass} autoComplete="postal-code" />
             </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-white/70">Country</label>
-            <select value={data.mailingCountry} onChange={(e) => update('mailingCountry', e.target.value)} className={selectClass}>
-              <option value="Canada">Canada</option>
-              <option value="United States">United States</option>
-            </select>
           </div>
           <div className="flex gap-3">
             <button type="button" onClick={prevStep} className="w-1/3 cursor-pointer rounded-lg border border-white/30 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
