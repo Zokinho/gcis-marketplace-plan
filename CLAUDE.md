@@ -13,11 +13,11 @@ B2B cannabis marketplace connecting licensed producers (sellers) with buyers. Pr
 | **Monorepo** | npm workspaces (`server/`, `client/`) |
 | **Backend** | Express 4 + TypeScript + Prisma 6 (PostgreSQL) |
 | **Frontend** | React 19 + Vite 6 + Tailwind CSS v4 + React Router v7 |
-| **Auth** | Clerk (sign-up/sign-in, JWT middleware, webhook sync) |
+| **Auth** | Self-hosted bcrypt + JWT (access token 15min + refresh token 7d httpOnly cookie) |
 | **CRM** | Zoho CRM API v7 (Canada region — zohocloud.ca) |
 | **CoA** | Proxy to CoA microservice (Python/FastAPI at localhost:8000) |
 | **Database** | PostgreSQL 16 via Docker on **port 5434** |
-| **Testing** | Vitest + Supertest (289 tests across 14 files) |
+| **Testing** | Vitest + Supertest (382 tests across 22 files) |
 | **Logging** | Pino (structured JSON) + pino-sentry-transport |
 | **Monitoring** | Sentry (backend + frontend) + Prometheus metrics |
 
@@ -49,8 +49,8 @@ See `.env.example`. Key vars:
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection (port 5434 locally) |
-| `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` | Clerk auth |
-| `CLERK_WEBHOOK_SECRET` | Svix signature verification |
+| `JWT_SECRET` | Secret for signing access tokens (required) |
+| `JWT_REFRESH_SECRET` | Secret for signing refresh tokens (required) |
 | `ZOHO_CLIENT_ID` / `ZOHO_CLIENT_SECRET` / `ZOHO_REFRESH_TOKEN` | Zoho CRM OAuth |
 | `ZOHO_ACCOUNTS_URL` | `https://accounts.zohocloud.ca` (Canada) |
 | `ZOHO_API_URL` | `https://www.zohoapis.ca/crm/v7` (Canada) |
@@ -87,6 +87,7 @@ gcis-marketplace-plan/
 │       │   └── auth.ts             # requireAuth, marketplaceAuth, requireSeller, requireAdmin
 │       ├── routes/
 │       │   ├── admin.ts            # User management, sync triggers, CoA queue, audit log
+│       │   ├── auth.ts             # Register, login, refresh, logout, upload-agreement
 │       │   ├── bids.ts             # Create bid, buyer/seller history, accept/reject/outcome
 │       │   ├── coa.ts              # Upload CoA, status, preview, confirm/dismiss
 │       │   ├── intelligence.ts     # Admin dashboard, matches, predictions, churn, market, scores
@@ -97,7 +98,7 @@ gcis-marketplace-plan/
 │       │   ├── shares.ts           # Admin CRUD + public share viewer (token-based)
 │       │   ├── shortlist.ts       # Toggle, list, check, count (buyer shortlist)
 │       │   ├── user.ts             # User status/profile
-│       │   └── webhooks.ts         # Clerk webhook (user.created/updated/deleted)
+│       │   └── webhooks.ts         # Zoho webhook (product/contact updates)
 │       ├── services/
 │       │   ├── auditService.ts     # logAudit (fire-and-forget), getRequestIp
 │       │   ├── churnDetectionService.ts  # At-risk buyer detection
@@ -114,6 +115,7 @@ gcis-marketplace-plan/
 │       │   ├── zohoAuth.ts         # OAuth token management
 │       │   └── zohoSync.ts         # Full + delta product/contact sync (15-min cron)
 │       ├── utils/
+│       │   ├── auth.ts             # JWT sign/verify, bcrypt hash/compare, refresh token helpers
 │       │   ├── coaMapper.ts        # Map CoA extraction → Product fields
 │       │   ├── cronLock.ts         # PostgreSQL advisory locks for cron jobs (instrumented with metrics)
 │       │   ├── logger.ts           # Pino structured logger + pino-sentry-transport
@@ -124,17 +126,20 @@ gcis-marketplace-plan/
 │       └── __tests__/
 │           ├── setup.ts            # Global Prisma + logger + metrics + sentry mocks
 │           ├── admin.test.ts       # 18 tests
-│           ├── auth.test.ts        # 17 tests
+│           ├── auth.test.ts        # 20 tests
+│           ├── authRoutes.test.ts  # 19 tests
+│           ├── authUtils.test.ts   # 13 tests
 │           ├── bids.test.ts        # 22 tests
 │           ├── coaMapper.test.ts   # 22 tests
 │           ├── cronLock.test.ts    # 11 tests
 │           ├── marketplace.test.ts # 32 tests
 │           ├── matchingEngine.test.ts # 9 tests
-│           ├── myListings.test.ts  # 19 tests
+│           ├── myListings.test.ts  # 20 tests
 │           ├── notifications.test.ts  # 18 tests
 │           ├── proximity.test.ts   # 21 tests
 │           ├── sellerDetection.test.ts # 16 tests
 │           ├── shares.test.ts      # 19 tests
+│           ├── shortlist.test.ts   # 16 tests
 │           └── validation.test.ts  # 49 tests
 │
 ├── client/
@@ -143,10 +148,11 @@ gcis-marketplace-plan/
 │   ├── tsconfig.json
 │   ├── vite.config.ts
 │   └── src/
-│       ├── App.tsx                 # Router + Clerk provider
+│       ├── App.tsx                 # Router + AuthProvider
 │       ├── index.css               # Tailwind v4 @theme (brand colors, dark mode)
 │       ├── lib/
-│       │   ├── api.ts              # Axios client + Clerk token injection + all API functions
+│       │   ├── api.ts              # Axios client + all API functions
+│       │   ├── AuthContext.tsx     # Auth context (login, register, logout, auto-refresh, 401 retry)
 │       │   ├── sentry.ts           # Frontend Sentry init (env-gated)
 │       │   ├── useNotifications.ts # Polling hook (30s interval)
 │       │   └── useShortlist.tsx   # Context provider + optimistic toggle hook
@@ -210,7 +216,7 @@ gcis-marketplace-plan/
 
 | Model | Purpose |
 |-------|---------|
-| **User** | Clerk ↔ Zoho linked user (buyer/seller/admin) |
+| **User** | Marketplace user (buyer/seller/admin), optionally linked to Zoho Contact |
 | **Product** | Cannabis product (synced from Zoho, enriched with CoA) |
 | **Bid** | Buyer bid on a product (PENDING → ACCEPTED/REJECTED) |
 | **Transaction** | Created when bid accepted (tracks delivery outcome) |
@@ -247,11 +253,15 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 |--------|------|---------|
 | GET | `/api/health` | Health check (`?detailed=true` for full) |
 | GET | `/metrics` | Prometheus metrics (gated by `ENABLE_METRICS`) |
-| POST | `/api/webhooks` | Clerk webhook (Svix signature) |
+| POST | `/api/auth/register` | Create new user account |
+| POST | `/api/auth/login` | Sign in with email + password |
+| POST | `/api/auth/refresh` | Rotate refresh token, get new access token |
+| POST | `/api/auth/logout` | Clear refresh token cookie |
+| POST | `/api/webhooks/zoho` | Zoho webhook (secret header verification) |
 | GET | `/api/shares/public/:token` | Public share catalog |
 | GET | `/api/shares/public/:token/:productId` | Public product detail |
 
-### Authenticated (Clerk + marketplace approval)
+### Authenticated (JWT + marketplace approval)
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/user/status` | Current user status |
@@ -328,11 +338,18 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 
 ## Auth Model
 
-1. **Clerk** handles sign-up/sign-in and issues JWTs
-2. **`requireAuth()`** — Clerk middleware validates JWT
-3. **`marketplaceAuth`** — Checks user exists in DB with `approved: true`
+1. **Self-hosted auth** — bcrypt passwords + JWT access/refresh tokens
+2. **`requireAuth()`** — Extracts Bearer token, verifies JWT, sets `authUserId`
+3. **`marketplaceAuth`** — Looks up user by ID, checks `approved: true`, EULA, doc upload
 4. **`requireSeller`** — Checks `contactType` includes "Seller"
 5. **`requireAdmin`** — Checks email is in `ADMIN_EMAILS` env var
+
+### Token Strategy
+- **Access token**: 15min expiry, signed with `JWT_SECRET`, sent as Bearer header, stored in memory
+- **Refresh token**: 7 days, signed with `JWT_REFRESH_SECRET`, httpOnly cookie (`sameSite: strict`, `path: /api/auth`)
+- **Token rotation**: Each refresh issues a new refresh token and invalidates the old one
+- **Reuse detection**: If a used refresh token is presented again, all sessions for that user are revoked
+- **DB storage**: SHA-256 hash of refresh token (not the raw token)
 
 ### Middleware Chain
 ```
@@ -420,13 +437,12 @@ All routes use **Zod schemas** via middleware:
 - `validateQuery(schema)` — query parameters (with coercion)
 - `validateParams(schema)` — URL parameters
 
-15 schemas in `server/src/utils/validation.ts` covering marketplace, notifications, intelligence, bids, CoA, and admin routes.
+17 schemas in `server/src/utils/validation.ts` covering auth, marketplace, notifications, intelligence, bids, CoA, and admin routes.
 
 ### Other Measures
 - **Helmet** + **CORS** (configurable origin)
 - **Rate limiting**: 200/min general (reads), 30/min writes (route-level on POST/PATCH/DELETE for bids + listings), 30/min auth, 60/min public
-- **Clerk JWT** verification on all protected routes
-- **Svix signature** verification on webhooks
+- **JWT** verification on all protected routes (self-hosted, `jsonwebtoken`)
 - **Zoho file proxy** requires auth + validates product exists in DB
 - **PDF magic byte** validation (`%PDF-`) on CoA upload
 - **`$queryRaw` tagged templates** (not `$queryRawUnsafe`) for SQL
@@ -436,7 +452,8 @@ All routes use **Zod schemas** via middleware:
 - `/api/health` — Health check
 - `/metrics` — Prometheus metrics (gated by `ENABLE_METRICS`)
 - `/uploads/*` — Static file serving
-- `/api/webhooks` — Clerk webhook (Svix signature verification)
+- `/api/auth/*` — Register, login, refresh, logout
+- `/api/webhooks/zoho` — Zoho webhook (secret header verification)
 - `/api/shares/public/*` — Token-based share access
 
 ---
@@ -493,7 +510,7 @@ All monitoring is **env-gated** — without `SENTRY_DSN` / `ENABLE_METRICS`, beh
 
 ```bash
 cd server
-npm test              # Run all 273 tests
+npm test              # Run all 382 tests
 npm run test:watch    # Watch mode
 npm run test:coverage # With coverage report
 ```
@@ -505,15 +522,19 @@ npm run test:coverage # With coverage report
 | coaMapper.test.ts | 22 | Unit — CoA → Product field mapping |
 | bids.test.ts | 22 | Integration — bid CRUD + accept/reject/outcome |
 | proximity.test.ts | 21 | Unit — proximity score calculation |
-| myListings.test.ts | 19 | Integration — seller listings/shares |
+| auth.test.ts | 20 | Unit — auth middleware chain |
+| myListings.test.ts | 20 | Integration — seller listings/shares |
+| authRoutes.test.ts | 19 | Integration — register/login/refresh/logout |
 | shares.test.ts | 19 | Integration — curated share CRUD |
 | notifications.test.ts | 18 | Integration + Unit — routes + service logic |
 | admin.test.ts | 18 | Integration — user management + sync + queue |
-| auth.test.ts | 17 | Unit — auth middleware chain |
 | sellerDetection.test.ts | 16 | Unit — email/company/producer matching |
-| cronLock.test.ts | 11 | Unit — PostgreSQL advisory lock behavior |
 | shortlist.test.ts | 16 | Integration — toggle, list, check, count |
+| authUtils.test.ts | 13 | Unit — JWT/bcrypt round-trip tests |
+| marketplaceVisibility.test.ts | 11 | Unit — visibility mode switching |
+| cronLock.test.ts | 11 | Unit — PostgreSQL advisory lock behavior |
 | matchingEngine.test.ts | 9 | Unit — 10-factor scoring algorithm |
+| e2e/*.test.ts | 46 | E2E — signup, bidding, admin ops, shortlist |
 
 ### Test Patterns
 - Global mock setup in `__tests__/setup.ts` (Prisma + logger + metrics + sentry)
@@ -600,7 +621,7 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 | Phase | Prompt | What was built |
 |-------|--------|---------------|
 | 1 | 1 | Project init — monorepo, Docker, Prisma schema, Express skeleton |
-| 1 | 2 | Auth flow — Clerk integration, webhook sync, middleware chain |
+| 1 | 2 | Auth flow — middleware chain, webhook sync (originally Clerk, replaced in Phase 17) |
 | 2 | 3 | Zoho sync engine — OAuth, product/contact sync, cron job |
 | 3 | 4 | Marketplace UI — product listing, filters, FTS, product detail |
 | 4 | 5 | Seller features — my listings, update, toggle active, share links |
@@ -616,6 +637,7 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 | 11 | 15 | Shortlist — product saving, intelligence integration, price-drop notifications |
 | 15 | 19 | HTTPS/SSL — Nginx TLS termination, Let's Encrypt, HSTS, HTTPS redirect |
 | 16 | 20 | Monitoring — Sentry error tracking, Prometheus metrics, pino-sentry transport |
+| 17 | 22 | Self-hosted auth — Replace Clerk with bcrypt + JWT, multi-step sign-up wizard |
 
 ### Production Hardening (cross-cutting)
 - Structured logging (pino) — replaced 130+ console.log/error calls
@@ -623,9 +645,9 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 - Database indexes on all foreign keys
 - PostgreSQL advisory lock cron locking (6 jobs)
 - Docker startup with `prisma migrate deploy`
-- Health check with detailed mode (DB, Zoho, Clerk, CoA)
+- Health check with detailed mode (DB, Zoho, CoA)
 - Rate limiting (4 tiers)
-- 289 tests across 14 files
+- 382 tests across 22 files
 - Dark mode support across all pages
 - Sentry error tracking (backend + frontend) with pino log transport
 - Prometheus metrics (HTTP + cron) with `/metrics` endpoint
