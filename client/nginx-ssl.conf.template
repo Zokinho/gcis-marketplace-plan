@@ -2,6 +2,7 @@
 server {
     listen 80;
     server_name ${SSL_DOMAIN};
+    server_tokens off;
 
     # Let's Encrypt ACME challenge
     location /.well-known/acme-challenge/ {
@@ -19,6 +20,7 @@ server {
     listen 443 ssl;
     http2 on;
     server_name ${SSL_DOMAIN};
+    server_tokens off;
 
     # SSL certificates (managed by Certbot)
     ssl_certificate /etc/letsencrypt/live/${SSL_DOMAIN}/fullchain.pem;
@@ -38,6 +40,13 @@ server {
 
     # Security headers
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; frame-src 'none'; object-src 'none'; manifest-src 'self'; worker-src 'self' blob:;" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Embedder-Policy "credentialless" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
 
     # Basic auth (optional — enabled when /etc/nginx/.htpasswd exists)
     auth_basic "Restricted";
@@ -47,7 +56,7 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Webhook endpoint — no basic auth (Clerk needs access)
+    # Webhook endpoint — no basic auth
     location /api/webhooks {
         auth_basic off;
         proxy_pass http://server:3001;
