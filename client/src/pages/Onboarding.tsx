@@ -27,6 +27,7 @@ export default function Onboarding() {
   // Determine which step to show
   const needsEula = data?.status === 'EULA_REQUIRED';
   const needsDoc = data?.status === 'DOC_REQUIRED';
+  const isSeller = data?.user?.contactType?.includes('Seller') ?? false;
 
   if (!needsEula && !needsDoc) {
     // Onboarding complete — redirect to pending approval
@@ -46,9 +47,13 @@ export default function Onboarding() {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         {/* Progress indicator */}
         <div className="mb-8 flex items-center justify-center gap-4">
-          <StepIndicator step={1} label="Accept EULA" active={needsEula} completed={!needsEula} />
-          <div className="h-px w-12 bg-gray-300 dark:bg-slate-600" />
-          <StepIndicator step={2} label="Upload Document" active={needsDoc} completed={false} />
+          <StepIndicator step={1} label="Accept Terms" active={needsEula} completed={!needsEula} />
+          {isSeller && (
+            <>
+              <div className="h-px w-12 bg-gray-300 dark:bg-slate-600" />
+              <StepIndicator step={2} label="Upload Agreement" active={needsDoc} completed={false} />
+            </>
+          )}
         </div>
 
         {needsEula && <EulaStep onComplete={refetch} />}

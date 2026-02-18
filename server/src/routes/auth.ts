@@ -75,7 +75,6 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
       postalCode: postalCode || null,
       mailingCountry: mailingCountry || null,
       zohoContactId,
-      eulaAcceptedAt: new Date(),
       docUploaded: false,
       approved: false,
     },

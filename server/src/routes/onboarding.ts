@@ -34,9 +34,16 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
     return res.json({ message: 'EULA already accepted', eulaAcceptedAt: user.eulaAcceptedAt });
   }
 
+  // Determine if user is a buyer-only (no doc upload required)
+  const isBuyerOnly = !user.contactType || !user.contactType.includes('Seller');
+
   const updated = await prisma.user.update({
     where: { id: user.id },
-    data: { eulaAcceptedAt: new Date() },
+    data: {
+      eulaAcceptedAt: new Date(),
+      // Buyers skip doc upload — mark as done so they go straight to PENDING_APPROVAL
+      ...(isBuyerOnly ? { docUploaded: true } : {}),
+    },
   });
 
   // Zoho writeback — push EULA_Accepted date to Contact
@@ -44,6 +51,62 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
     try {
       await pushOnboardingMilestone(user.zohoContactId, 'eula_accepted');
     } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[ONBOARDING] Zoho EULA writeback failed'); }
+  }
+
+  // For buyers: create Zoho Contact now (sellers create it on doc upload)
+  if (isBuyerOnly && !user.zohoContactId) {
+    try {
+      const contactData: Record<string, any> = {
+        First_Name: user.firstName || '',
+        Last_Name: user.lastName || user.email,
+        Email: user.email,
+        Company: user.companyName || '',
+        Account_Name: user.companyName || '',
+        Contact_Type: (user.contactType || 'Buyer').split(';').map((s: string) => s.trim()).filter(Boolean),
+        User_UID: user.id,
+        EULA_Accepted: new Date().toISOString().split('T')[0],
+      };
+      if (user.phone) contactData.Phone = user.phone;
+      if (user.mailingCountry) contactData.Mailing_Country = user.mailingCountry;
+
+      const result = await zohoRequest('POST', '/Contacts', {
+        data: { data: [contactData], trigger: [] },
+      });
+      const newZohoContactId = result?.data?.[0]?.details?.id;
+      if (newZohoContactId) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { zohoContactId: newZohoContactId },
+        });
+
+        // Create registration Task on the new Contact
+        await zohoRequest('POST', '/Tasks', {
+          data: {
+            data: [{
+              Subject: `Marketplace Registration — ${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
+              Status: 'Not Started',
+              Priority: 'Normal',
+              Who_Id: newZohoContactId,
+              Description: [
+                'User registered on Harvex Marketplace',
+                `Name: ${user.firstName || ''} ${user.lastName || ''}`.trim(),
+                `Company: ${user.companyName || 'N/A'}`,
+                `Type: ${user.contactType || 'N/A'}`,
+                `Date: ${user.createdAt.toISOString()}`,
+              ].join('\n'),
+            }],
+            trigger: [],
+          },
+        });
+
+        logger.info({ userId: user.id, newZohoContactId }, '[ONBOARDING] Zoho Contact created for buyer on terms acceptance');
+      }
+    } catch (e) {
+      logger.error(
+        { err: e instanceof Error ? e : { message: String(e) }, userId: user.id },
+        '[ONBOARDING] Zoho Contact creation for buyer failed',
+      );
+    }
   }
 
   res.json({

@@ -100,7 +100,6 @@ interface SignUpData {
   address: string;
   city: string;
   postalCode: string;
-  eulaAccepted: boolean;
 }
 
 const INITIAL_DATA: SignUpData = {
@@ -115,10 +114,9 @@ const INITIAL_DATA: SignUpData = {
   address: '',
   city: '',
   postalCode: '',
-  eulaAccepted: false,
 };
 
-const STEPS = ['Account', 'Company', 'Agreement'];
+const STEPS = ['Account', 'Company'];
 
 function SignUpWizard({ onSwitch }: { onSwitch: () => void }) {
   const { register } = useAuth();
@@ -158,11 +156,6 @@ function SignUpWizard({ onSwitch }: { onSwitch: () => void }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
-
-    if (!data.eulaAccepted) {
-      setError('You must accept the EULA to continue');
-      return;
-    }
 
     setLoading(true);
     try {
@@ -249,9 +242,9 @@ function SignUpWizard({ onSwitch }: { onSwitch: () => void }) {
         </form>
       )}
 
-      {/* Step 1: Company */}
+      {/* Step 1: Company + Submit */}
       {step === 1 && (
-        <form onSubmit={nextStep} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-white/70">Company name</label>
             <input type="text" required value={data.companyName} onChange={(e) => update('companyName', e.target.value)} placeholder="Your company" className={inputClass} autoComplete="organization" />
@@ -281,43 +274,9 @@ function SignUpWizard({ onSwitch }: { onSwitch: () => void }) {
             <button type="button" onClick={prevStep} className="w-1/3 cursor-pointer rounded-lg border border-white/30 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
               Back
             </button>
-            <button type="submit" className="flex-1 cursor-pointer rounded-lg bg-white py-2.5 text-sm font-semibold text-brand-teal transition hover:bg-white/90">
-              Next
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Step 2: EULA Agreement */}
-      {step === 2 && (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="max-h-48 overflow-y-auto rounded-lg border border-white/20 bg-white/5 p-4 text-xs text-white/70 leading-relaxed">
-            <p className="mb-2 font-semibold text-white/90">End-User License Agreement (EULA)</p>
-            <p className="mb-2">By creating an account on Harvex Marketplace, you agree to the following terms:</p>
-            <p className="mb-2">1. You represent that you are a licensed entity authorized to buy and/or sell cannabis products in Canada under applicable federal and provincial regulations.</p>
-            <p className="mb-2">2. All product listings, bids, and transactions conducted through this platform are subject to Health Canada's Cannabis Act and associated regulations.</p>
-            <p className="mb-2">3. You agree to maintain accurate and up-to-date information in your account profile, including your company details and licensing information.</p>
-            <p className="mb-2">4. Harvex acts solely as a marketplace facilitator. All transactions are between buyers and sellers directly. Harvex does not take title to any products.</p>
-            <p className="mb-2">5. You agree to comply with all applicable laws regarding the transportation, storage, and sale of cannabis products.</p>
-            <p className="mb-2">6. Harvex reserves the right to suspend or terminate accounts that violate these terms or applicable regulations.</p>
-            <p>7. This agreement is governed by the laws of the Province of Ontario, Canada.</p>
-          </div>
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={data.eulaAccepted}
-              onChange={(e) => update('eulaAccepted', e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-white/30 accent-brand-yellow"
-            />
-            <span className="text-sm text-white/70">I accept the End-User License Agreement and agree to the terms above</span>
-          </label>
-          <div className="flex gap-3">
-            <button type="button" onClick={prevStep} className="w-1/3 cursor-pointer rounded-lg border border-white/30 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
-              Back
-            </button>
             <button
               type="submit"
-              disabled={loading || !data.eulaAccepted}
+              disabled={loading}
               className="flex-1 cursor-pointer rounded-lg bg-white py-2.5 text-sm font-semibold text-brand-teal transition hover:bg-white/90 disabled:opacity-50"
             >
               {loading ? 'Creating account...' : 'Create Account'}
