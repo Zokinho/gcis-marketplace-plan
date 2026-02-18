@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 3001;
 // Trust first proxy (Nginx) — makes req.ip and req.protocol correct behind reverse proxy
 app.set('trust proxy', 1);
 
-// Build CSP directives — allow Clerk, Google Fonts, Sentry, and S3/Spaces
+// Build CSP directives — allow Google Fonts, Sentry, and S3/Spaces
 const cspExtraConnectSrc = (process.env.CSP_EXTRA_CONNECT_SRC || '').split(',').map((s) => s.trim()).filter(Boolean);
 const s3Host = process.env.S3_ENDPOINT ? new URL(process.env.S3_ENDPOINT).host : null;
 
@@ -304,28 +304,28 @@ async function mountRoutes() {
   // Webhooks — Zoho webhook (shared secret verification)
   app.use('/api/webhooks', webhookRoutes);
 
-  // User status — requires Clerk auth only (no marketplace approval check)
+  // User status — requires JWT auth only (no marketplace approval check)
   app.use('/api/user', authLimiter, requireAuth(), userRoutes);
 
-  // Onboarding — requires Clerk auth only (user may not be fully approved yet)
+  // Onboarding — requires JWT auth only (user may not be fully approved yet)
   app.use('/api/onboarding', authLimiter, requireAuth(), onboardingRoutes);
 
-  // Admin — requires Clerk auth + marketplace auth + admin check
+  // Admin — requires JWT auth + marketplace auth + admin check
   app.use('/api/admin', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, adminRoutes);
 
-  // CoA upload — requires Clerk auth + marketplace auth
+  // CoA upload — requires JWT auth + marketplace auth
   app.use('/api/coa', writeLimiter, requireAuth(), marketplaceAuth, coaRoutes);
 
-  // Shares admin — requires Clerk auth + marketplace auth + admin check
+  // Shares admin — requires JWT auth + marketplace auth + admin check
   app.use('/api/shares', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, shareRoutes);
 
   // Public share endpoints — NO auth (token-based access)
   app.use('/api/shares/public', publicLimiter, publicShareRouter);
 
-  // Notifications — requires Clerk auth + marketplace auth
+  // Notifications — requires JWT auth + marketplace auth
   app.use('/api/notifications', apiLimiter, requireAuth(), marketplaceAuth, notificationRoutes);
 
-  // Shortlist — requires Clerk auth + marketplace auth
+  // Shortlist — requires JWT auth + marketplace auth
   const shortlistRoutes = (await import('./routes/shortlist')).default;
   app.use('/api/shortlist', apiLimiter, requireAuth(), marketplaceAuth, shortlistRoutes);
 

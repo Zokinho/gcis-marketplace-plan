@@ -418,14 +418,14 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
 
     for (const c of contacts) {
       try {
-        const clerkUserId = c.User_UID;
-        if (!clerkUserId) continue;
+        const userUid = c.User_UID;
+        if (!userUid) continue;
 
-        // Find the local user by Clerk ID or Zoho Contact ID
+        // Find the local user by legacy UID or Zoho Contact ID
         const existingUser = await prisma.user.findFirst({
           where: {
             OR: [
-              { clerkUserId },
+              { clerkUserId: userUid },
               { zohoContactId: c.id },
             ],
           },

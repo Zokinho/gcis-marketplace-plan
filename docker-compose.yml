@@ -39,8 +39,7 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
-      args:
-        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+      args: {}
     container_name: gcis-client
     restart: unless-stopped
     depends_on:

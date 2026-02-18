@@ -80,7 +80,7 @@ export async function fetchMarketplaceContacts(): Promise<any[]> {
       });
 
       const contacts = response?.data || [];
-      // Only include contacts that have a Clerk User_UID
+      // Only include contacts that have a User_UID (links to marketplace user)
       for (const c of contacts) {
         if (c.User_UID) allContacts.push(c);
       }

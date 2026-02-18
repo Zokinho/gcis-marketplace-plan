@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshingRef = useRef<Promise<string | null> | null>(null);
+  const tokenRef = useRef<string | null>(null);
 
   // Attempt to refresh session on mount (httpOnly cookie)
   useEffect(() => {
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const res = await authApi.post('/refresh');
         const { accessToken: newToken, user: newUser } = res.data;
+        tokenRef.current = newToken;
         setAccessToken(newToken);
         setUser(newUser);
         return newToken as string;
@@ -83,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.post('/login', { email, password });
     const { accessToken: newToken, user: newUser } = res.data;
+    tokenRef.current = newToken;
     setAccessToken(newToken);
     setUser(newUser);
   }, []);
@@ -90,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (data: RegisterData) => {
     const res = await authApi.post('/register', data);
     const { accessToken: newToken, user: newUser } = res.data;
+    tokenRef.current = newToken;
     setAccessToken(newToken);
     setUser(newUser);
   }, []);
@@ -98,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.post('/logout');
     } catch { /* ignore */ }
+    tokenRef.current = null;
     setAccessToken(null);
     setUser(null);
   }, []);
@@ -115,12 +120,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await tryRefresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Set up axios interceptor for the main api client
+  // Keep tokenRef in sync so the interceptor always reads the latest token
+  useEffect(() => {
+    tokenRef.current = accessToken;
+  }, [accessToken]);
+
+  // Set up axios interceptor once on mount (reads token from ref, not closure)
   useEffect(() => {
     // Request interceptor: attach access token
     const reqInterceptor = api.interceptors.request.use(async (config: any) => {
-      // Get latest token
-      let token = accessToken;
+      const token = tokenRef.current;
       if (token) {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
@@ -149,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       api.interceptors.request.eject(reqInterceptor);
       api.interceptors.response.eject(resInterceptor);
     };
-  }, [accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AuthContext.Provider
