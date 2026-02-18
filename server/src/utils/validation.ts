@@ -310,6 +310,27 @@ export const recordSpotSaleSchema = z.object({
   quantity: z.coerce.number().positive('quantity must be positive'),
 });
 
+// ─── Auth schemas ───
+
+export const registerSchema = z.object({
+  email: z.string().email('Valid email is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
+  firstName: z.string().min(1, 'First name is required').max(100),
+  lastName: z.string().min(1, 'Last name is required').max(100),
+  companyName: z.string().min(1, 'Company name is required').max(200),
+  phone: z.string().max(30).optional(),
+  contactType: z.enum(['Buyer', 'Buyer; Seller']),
+  address: z.string().max(300).optional(),
+  city: z.string().max(100).optional(),
+  postalCode: z.string().max(20).optional(),
+  mailingCountry: z.string().max(100).optional(),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email('Valid email is required'),
+  password: z.string().min(1, 'Password is required'),
+});
+
 // ─── Create listing schema (multipart form — all values are strings) ───
 
 export const createListingSchema = z.object({

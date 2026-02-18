@@ -5,20 +5,25 @@ vi.hoisted(() => {
   process.env.ADMIN_EMAILS = 'admin@example.com,superadmin@test.com';
 });
 
-// Mock @clerk/express BEFORE importing the module under test
-vi.mock('@clerk/express', () => ({
-  requireAuth: vi.fn(() => (_req: any, _res: any, next: any) => next()),
-  getAuth: vi.fn(),
+// Mock the auth utility (verifyAccessToken)
+vi.mock('../utils/auth', () => ({
+  verifyAccessToken: vi.fn(),
+  signAccessToken: vi.fn(() => 'mock-access-token'),
+  signRefreshToken: vi.fn(() => 'mock-refresh-token'),
+  hashPassword: vi.fn(() => Promise.resolve('mock-hash')),
+  comparePassword: vi.fn(() => Promise.resolve(true)),
+  hashRefreshToken: vi.fn(() => 'mock-hash'),
+  refreshTokenExpiresAt: vi.fn(() => new Date()),
 }));
 
-import { getAuth } from '@clerk/express';
-import { marketplaceAuth, requireSeller, requireAdmin } from '../middleware/auth';
+import { verifyAccessToken } from '../utils/auth';
+import { marketplaceAuth, requireSeller, requireAdmin, requireAuth } from '../middleware/auth';
 import { prisma } from '../index';
 
 // ─── Helpers ───
 
 function mockReq(overrides: any = {}): any {
-  return { user: null, ...overrides };
+  return { user: null, headers: {}, ...overrides };
 }
 
 function mockRes(): any {
@@ -35,7 +40,7 @@ function createMockNext(): any {
 // A fully-approved user fixture
 const approvedUser = {
   id: 'u1',
-  clerkUserId: 'clerk_123',
+  clerkUserId: null,
   zohoContactId: 'zoho_c1',
   email: 'seller@example.com',
   firstName: 'Test',
@@ -45,7 +50,54 @@ const approvedUser = {
   approved: true,
   eulaAcceptedAt: new Date('2025-01-01'),
   docUploaded: true,
+  isAdmin: false,
 };
+
+// ─── requireAuth ───
+
+describe('requireAuth', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 401 when no Authorization header', () => {
+    const middleware = requireAuth();
+    const req = mockReq({ headers: {} });
+    const res = mockRes();
+    const next = createMockNext();
+
+    middleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when token is invalid', () => {
+    vi.mocked(verifyAccessToken).mockImplementation(() => { throw new Error('Invalid'); });
+    const middleware = requireAuth();
+    const req = mockReq({ headers: { authorization: 'Bearer invalid' } });
+    const res = mockRes();
+    const next = createMockNext();
+
+    middleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('calls next() and sets authUserId when token is valid', () => {
+    vi.mocked(verifyAccessToken).mockReturnValue({ userId: 'u1', email: 'test@test.com' });
+    const middleware = requireAuth();
+    const req = mockReq({ headers: { authorization: 'Bearer valid-token' } });
+    const res = mockRes();
+    const next = createMockNext();
+
+    middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.authUserId).toBe('u1');
+  });
+});
 
 // ─── marketplaceAuth ───
 
@@ -54,9 +106,7 @@ describe('marketplaceAuth', () => {
     vi.clearAllMocks();
   });
 
-  it('returns 401 when no clerkUserId is present', async () => {
-    vi.mocked(getAuth).mockReturnValue({ userId: null } as any);
-
+  it('returns 401 when no authUserId is present', async () => {
     const req = mockReq();
     const res = mockRes();
     const next = createMockNext();
@@ -71,10 +121,9 @@ describe('marketplaceAuth', () => {
   });
 
   it('returns 403 NOT_FOUND when user not found in DB', async () => {
-    vi.mocked(getAuth).mockReturnValue({ userId: 'clerk_unknown' } as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
 
-    const req = mockReq();
+    const req = mockReq({ authUserId: 'unknown-id' });
     const res = mockRes();
     const next = createMockNext();
 
@@ -88,13 +137,12 @@ describe('marketplaceAuth', () => {
   });
 
   it('returns 403 PENDING_APPROVAL when user is not approved', async () => {
-    vi.mocked(getAuth).mockReturnValue({ userId: 'clerk_123' } as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       ...approvedUser,
       approved: false,
     } as any);
 
-    const req = mockReq();
+    const req = mockReq({ authUserId: 'u1' });
     const res = mockRes();
     const next = createMockNext();
 
@@ -108,13 +156,12 @@ describe('marketplaceAuth', () => {
   });
 
   it('returns 403 EULA_REQUIRED when user has not accepted EULA', async () => {
-    vi.mocked(getAuth).mockReturnValue({ userId: 'clerk_123' } as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       ...approvedUser,
       eulaAcceptedAt: null,
     } as any);
 
-    const req = mockReq();
+    const req = mockReq({ authUserId: 'u1' });
     const res = mockRes();
     const next = createMockNext();
 
@@ -128,13 +175,12 @@ describe('marketplaceAuth', () => {
   });
 
   it('returns 403 DOC_REQUIRED when user has not uploaded document', async () => {
-    vi.mocked(getAuth).mockReturnValue({ userId: 'clerk_123' } as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       ...approvedUser,
       docUploaded: false,
     } as any);
 
-    const req = mockReq();
+    const req = mockReq({ authUserId: 'u1' });
     const res = mockRes();
     const next = createMockNext();
 
@@ -148,10 +194,9 @@ describe('marketplaceAuth', () => {
   });
 
   it('calls next() and sets req.user for a fully approved user', async () => {
-    vi.mocked(getAuth).mockReturnValue({ userId: 'clerk_123' } as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue(approvedUser as any);
 
-    const req = mockReq();
+    const req = mockReq({ authUserId: 'u1' });
     const res = mockRes();
     const next = createMockNext();
 

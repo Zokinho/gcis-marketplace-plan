@@ -1,11 +1,20 @@
-import { UserButton } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/AuthContext';
 import HarvexLogo from '../components/HarvexLogo';
 
 export default function PendingApproval() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center surface-base px-4">
       <div className="absolute right-6 top-6">
-        <UserButton />
+        <button
+          onClick={() => logout().then(() => navigate('/'))}
+          className="cursor-pointer rounded-lg border border-gray-300 dark:border-slate-600 px-3 py-1.5 text-sm text-muted transition hover:bg-gray-100 dark:hover:bg-slate-700"
+        >
+          Sign out
+        </button>
       </div>
 
       <div className="w-full max-w-md overflow-hidden rounded-lg surface text-center shadow-lg">

@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { getAuth } from '@clerk/express';
 import logger from '../utils/logger';
 import { prisma } from '../index';
 import { pushOnboardingMilestone } from '../services/zohoApi';
@@ -11,14 +10,14 @@ const router = Router();
  * Records that the user accepted the EULA.
  */
 router.post('/accept-eula', async (req: Request, res: Response) => {
-  const { userId: clerkUserId } = getAuth(req);
+  const userId = (req as any).authUserId;
 
-  if (!clerkUserId) {
+  if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const user = await prisma.user.findUnique({
-    where: { clerkUserId },
+    where: { id: userId },
   });
 
   if (!user) {
@@ -50,18 +49,16 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
 /**
  * POST /api/onboarding/upload-doc
  * Records that the user uploaded their agreement document.
- * In a full implementation, the file would be uploaded to Zoho Contact attachments.
- * For now, we just mark the flag — file upload integration comes in Phase 4.
  */
 router.post('/upload-doc', async (req: Request, res: Response) => {
-  const { userId: clerkUserId } = getAuth(req);
+  const userId = (req as any).authUserId;
 
-  if (!clerkUserId) {
+  if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const user = await prisma.user.findUnique({
-    where: { clerkUserId },
+    where: { id: userId },
   });
 
   if (!user) {

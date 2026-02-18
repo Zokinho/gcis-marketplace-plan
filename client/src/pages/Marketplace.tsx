@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
 import ProductCard from '../components/ProductCard';
 import ProductListItem from '../components/ProductListItem';
@@ -18,7 +18,7 @@ export default function Marketplace() {
   const [view, setView] = useState<'grid' | 'grid-lg' | 'list'>('grid-lg');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
-  const { user } = useUser();
+  const { user } = useAuth();
   const { preload } = useShortlist();
 
   const loadProducts = useCallback(async (f: ProductFilters) => {
@@ -245,8 +245,8 @@ export default function Marketplace() {
       <ContactModal
         open={contactOpen}
         onClose={() => setContactOpen(false)}
-        userName={user?.fullName || user?.firstName || ''}
-        userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''}
+        userEmail={user?.email || ''}
       />
     </Layout>
   );

@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { getAuth } from '@clerk/express';
 import { prisma } from '../index';
 import { isAdmin } from '../middleware/auth';
 
@@ -23,25 +22,23 @@ function getUserStatusCode(user: {
 /**
  * GET /api/user/status
  * Returns the current user's account and onboarding status.
- * Requires Clerk authentication (userId injected by requireAuth).
+ * Requires JWT auth (userId injected by requireAuth).
  */
 router.get('/status', async (req: Request, res: Response) => {
-  const { userId: clerkUserId } = getAuth(req);
+  const userId = (req as any).authUserId;
 
-  if (!clerkUserId) {
+  if (!userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const user = await prisma.user.findUnique({
-    where: { clerkUserId },
+    where: { id: userId },
   });
 
   if (!user) {
-    // User signed up via Clerk but webhook hasn't fired yet,
-    // or webhook failed — return a status so the frontend can handle it
     return res.json({
       status: 'NOT_FOUND',
-      message: 'Account is being set up. Please wait a moment and refresh.',
+      message: 'Account not found.',
     });
   }
 
@@ -59,7 +56,7 @@ router.get('/status', async (req: Request, res: Response) => {
       approved: user.approved,
       eulaAcceptedAt: user.eulaAcceptedAt,
       docUploaded: user.docUploaded,
-      isAdmin: isAdmin(user.email),
+      isAdmin: isAdmin(user.email, user.isAdmin),
     },
   });
 });

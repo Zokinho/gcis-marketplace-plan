@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
 import SpotSaleCard from '../components/SpotSaleCard';
 import { fetchSpotSales, type SpotSaleRecord } from '../lib/api';
 import HelpModal from '../components/ContactModal';
 
 export default function SpotSales() {
-  const { user } = useUser();
+  const { user } = useAuth();
   const [spotSales, setSpotSales] = useState<SpotSaleRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [contactTarget, setContactTarget] = useState<SpotSaleRecord | null>(null);
@@ -26,7 +26,7 @@ export default function SpotSales() {
   const handleSendContact = (message: string) => {
     if (!contactTarget) return;
     const subject = `Spot Sale Inquiry: ${contactTarget.product.name}`;
-    const body = `${message}\n\n---\nProduct: ${contactTarget.product.name}\nSpot Price: $${contactTarget.spotPrice.toFixed(2)}/g (${Math.round(contactTarget.discountPercent)}% off)\nFrom: ${user?.fullName || ''}\nEmail: ${user?.primaryEmailAddress?.emailAddress || ''}`;
+    const body = `${message}\n\n---\nProduct: ${contactTarget.product.name}\nSpot Price: $${contactTarget.spotPrice.toFixed(2)}/g (${Math.round(contactTarget.discountPercent)}% off)\nFrom: ${`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}\nEmail: ${user?.email || ''}`;
     window.location.href = `mailto:team@gciscan.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setContactTarget(null);
   };
@@ -118,8 +118,8 @@ export default function SpotSales() {
       <HelpModal
         open={helpOpen}
         onClose={() => setHelpOpen(false)}
-        userName={user?.fullName || user?.firstName || ''}
-        userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''}
+        userEmail={user?.email || ''}
       />
     </Layout>
   );

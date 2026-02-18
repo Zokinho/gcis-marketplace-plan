@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
 import SellerScoreCard from '../components/SellerScoreCard';
 import ShareModal from '../components/ShareModal';
@@ -29,7 +29,7 @@ export default function MyListings() {
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-  const { user } = useUser();
+  const { user } = useAuth();
   const location = useLocation();
   const [successMsg, setSuccessMsg] = useState<string | null>(
     (location.state as any)?.created
@@ -171,8 +171,8 @@ export default function MyListings() {
       <ContactModal
         open={contactOpen}
         onClose={() => setContactOpen(false)}
-        userName={user?.fullName || user?.firstName || ''}
-        userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''}
+        userEmail={user?.email || ''}
       />
     </Layout>
   );

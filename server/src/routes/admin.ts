@@ -306,6 +306,38 @@ router.post('/users/:userId/approve', validate(approveUserSchema), async (req: R
   logger.info({ userEmail: updated.email, approvedBy: req.user?.email }, '[ADMIN] User approved');
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.approve', targetType: 'User', targetId: userId, metadata: { userEmail: updated.email, contactType }, ip: getRequestIp(req) });
 
+  // Create Zoho Contact if not already linked (fire-and-forget)
+  if (!updated.zohoContactId) {
+    (async () => {
+      try {
+        const { zohoRequest } = await import('../services/zohoAuth');
+        const contactData: Record<string, any> = {
+          First_Name: updated.firstName || '',
+          Last_Name: updated.lastName || updated.email,
+          Email: updated.email,
+          Company: updated.companyName || '',
+          Phone: updated.phone || '',
+          Contact_Type: updated.contactType || 'Buyer',
+          Account_Confirmed: true,
+          Mailing_Country: updated.mailingCountry || '',
+          Mailing_Street: (updated as any).address || '',
+          Mailing_City: (updated as any).city || '',
+          Mailing_Zip: (updated as any).postalCode || '',
+        };
+        const result = await zohoRequest('POST', '/Contacts', {
+          data: { data: [contactData], trigger: [] },
+        });
+        const zohoContactId = result?.data?.[0]?.details?.id;
+        if (zohoContactId) {
+          await prisma.user.update({ where: { id: userId }, data: { zohoContactId } });
+          logger.info({ userId, zohoContactId }, '[ADMIN] Zoho Contact created on approval');
+        }
+      } catch (err) {
+        logger.error({ err: err instanceof Error ? err : { message: String(err) }, userId }, '[ADMIN] Zoho Contact creation failed');
+      }
+    })();
+  }
+
   res.json({ message: 'User approved', user: { id: updated.id, email: updated.email, approved: updated.approved } });
 });
 

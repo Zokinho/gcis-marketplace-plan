@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.21.0",
     "@sentry/react": "^10.39.0",
     "axios": "^1.7.9",
     "react": "^19.0.0",

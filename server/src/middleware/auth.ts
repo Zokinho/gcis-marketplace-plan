@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { requireAuth, getAuth } from '@clerk/express';
+import { verifyAccessToken } from '../utils/auth';
 import { prisma } from '../index';
 
 // Extend Express Request to include user
@@ -8,7 +8,7 @@ declare global {
     interface Request {
       user?: {
         id: string;
-        clerkUserId: string;
+        clerkUserId: string | null;
         zohoContactId: string | null;
         email: string;
         firstName: string | null;
@@ -25,18 +25,39 @@ declare global {
 }
 
 /**
+ * JWT auth middleware.
+ * Extracts Bearer token, verifies it, and sets req.authUserId.
+ */
+export function requireAuth() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    try {
+      const payload = verifyAccessToken(authHeader.slice(7));
+      (req as any).authUserId = payload.userId;
+      next();
+    } catch {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+  };
+}
+
+/**
  * Marketplace auth middleware.
- * Checks: Clerk JWT → local user → Zoho link → approved → EULA → doc uploaded
+ * Checks: JWT userId → local user → approved → EULA → doc uploaded
  */
 export async function marketplaceAuth(req: Request, res: Response, next: NextFunction) {
-  const { userId: clerkUserId } = getAuth(req);
+  const userId = (req as any).authUserId;
 
-  if (!clerkUserId) {
+  if (!userId) {
     return res.status(401).json({ error: 'Not authenticated', code: 'NOT_AUTHENTICATED' });
   }
 
   const user = await prisma.user.findUnique({
-    where: { clerkUserId },
+    where: { id: userId },
   });
 
   if (!user) {
@@ -99,5 +120,3 @@ export function isAdmin(email: string | null | undefined, isAdminFlag?: boolean)
 function isAdminByEmail(email: string | null | undefined): boolean {
   return email ? ADMIN_EMAILS_SET.has(email.toLowerCase()) : false;
 }
-
-export { requireAuth };

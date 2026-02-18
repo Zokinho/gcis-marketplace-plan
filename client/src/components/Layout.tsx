@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { UserButton } from '@clerk/clerk-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/AuthContext';
 import { useUserStatus } from '../lib/useUserStatus';
 import { useTheme } from '../lib/useTheme';
 import HarvexLogo from './HarvexLogo';
@@ -127,6 +127,52 @@ function AdminMobileSection({ onClose }: { onClose: () => void }) {
   );
 }
 
+function UserDropdown() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || '?';
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-brand-yellow text-sm font-bold text-brand-teal transition hover:ring-2 hover:ring-white/30"
+        title={user?.email || 'Account'}
+      >
+        {initials}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-lg border border-white/10 bg-brand-blue dark:bg-[#255564] shadow-xl">
+          <div className="border-b border-white/10 px-4 py-3">
+            <p className="text-sm font-medium text-white">{user?.firstName} {user?.lastName}</p>
+            <p className="text-xs text-white/50 truncate">{user?.email}</p>
+          </div>
+          <button
+            onClick={() => {
+              setOpen(false);
+              logout().then(() => navigate('/'));
+            }}
+            className="w-full cursor-pointer px-4 py-2.5 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { data } = useUserStatus();
   const { resolved } = useTheme();
@@ -163,7 +209,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-3">
                 <ThemeToggle />
                 <NotificationBell />
-                <UserButton />
+                <UserDropdown />
               </div>
               {/* Hamburger button — mobile only */}
               <button

@@ -9,7 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { clerkMiddleware } from '@clerk/express';
+import cookieParser from 'cookie-parser';
 import { PrismaClient } from '@prisma/client';
 import logger from './utils/logger';
 import { withCronLock, LOCK_IDS } from './utils/cronLock';
@@ -35,25 +35,22 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://*.clerk.accounts.dev"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: [
         "'self'",
         "data:",
         "blob:",
-        "https://img.clerk.com",
         ...(s3Host ? [`https://${s3Host}`] : []),
       ],
       connectSrc: [
         "'self'",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.dev",
         "https://*.ingest.sentry.io",
         ...(s3Host ? [`https://${s3Host}`] : []),
         ...cspExtraConnectSrc,
       ],
-      frameSrc: ["'self'", "https://*.clerk.accounts.dev"],
+      frameSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
       objectSrc: ["'none'"],
       mediaSrc: ["'none'"],
@@ -91,9 +88,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
-
-// ─── Clerk global middleware (initializes Clerk for all routes) ───
-app.use(clerkMiddleware());
+app.use(cookieParser());
 
 // ─── CSRF protection (Origin validation on mutating requests) ───
 const ALLOWED_ORIGINS = new Set(
@@ -106,8 +101,11 @@ app.use((req, res, next) => {
   // Only check mutating methods
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
 
-  // Skip webhook routes (Svix signature verification is their CSRF equivalent)
+  // Skip webhook routes (Zoho shared secret is their CSRF equivalent)
   if (req.path.startsWith('/api/webhooks')) return next();
+
+  // Skip auth routes (public registration/login)
+  if (req.path.startsWith('/api/auth')) return next();
 
   const origin = req.headers['origin'];
   const referer = req.headers['referer'];
@@ -159,9 +157,6 @@ app.get('/api/health', async (req, res) => {
   }
 
   if (detailed) {
-    // Clerk
-    checks.clerk = process.env.CLERK_SECRET_KEY ? 'configured' : 'not_configured';
-
     // Zoho
     if (process.env.ZOHO_CLIENT_ID && process.env.ZOHO_REFRESH_TOKEN) {
       try {
@@ -240,7 +235,8 @@ const publicLimiter = rateLimit({
 
 // ─── Import routes (lazy to avoid circular deps with prisma export) ───
 async function mountRoutes() {
-  const { requireAuth } = await import('@clerk/express');
+  const { requireAuth } = await import('./middleware/auth');
+  const authRoutes = (await import('./routes/auth')).default;
   const webhookRoutes = (await import('./routes/webhooks')).default;
   const userRoutes = (await import('./routes/user')).default;
   const onboardingRoutes = (await import('./routes/onboarding')).default;
@@ -302,7 +298,10 @@ async function mountRoutes() {
     }
   });
 
-  // Webhooks — no auth required (Svix signature verification instead)
+  // Auth routes — public (register, login, refresh, logout)
+  app.use('/api/auth', authLimiter, authRoutes);
+
+  // Webhooks — Zoho webhook (shared secret verification)
   app.use('/api/webhooks', webhookRoutes);
 
   // User status — requires Clerk auth only (no marketplace approval check)

@@ -2,21 +2,10 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
+  withCredentials: true,
 });
 
-/**
- * Attach Clerk session token to every request.
- * Called once from App after Clerk loads.
- */
-export function setAuthTokenGetter(getToken: () => Promise<string | null>) {
-  api.interceptors.request.use(async (config) => {
-    const token = await getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  });
-}
+// Token interceptor is set up dynamically by AuthContext — no static setup needed here
 
 // ─── User types ───
 

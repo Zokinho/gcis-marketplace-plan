@@ -1,4 +1,4 @@
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../lib/AuthContext';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 
@@ -61,7 +61,7 @@ const CARDS = [
 ];
 
 export default function Dashboard() {
-  const { user } = useUser();
+  const { user } = useAuth();
 
   return (
     <Layout>

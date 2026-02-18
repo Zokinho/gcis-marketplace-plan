@@ -7,24 +7,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Users (links Clerk ↔ Zoho) ───
+// ─── Users ───
 
 model User {
   id             String    @id @default(cuid())
-  clerkUserId    String    @unique
+  clerkUserId    String?   @unique // Deprecated — kept for migration compatibility
   zohoContactId  String?   @unique
   email          String    @unique
+  passwordHash   String?
+  refreshToken   String?   // SHA-256 of current refresh token
+  refreshTokenExpiresAt DateTime?
   firstName      String?
   lastName       String?
   companyName    String?
   title          String?
-  contactType    String? // From Zoho Contact_Type multi-select ("Buyer; Seller")
-  approved       Boolean   @default(false) // From Zoho Account_Confirmed
+  contactType    String? // "Buyer" | "Buyer; Seller"
+  approved       Boolean   @default(false)
   isAdmin        Boolean   @default(false)
   eulaAcceptedAt DateTime?
   docUploaded    Boolean   @default(false)
   mailingCountry String?
   phone          String?
+  address        String?
+  city           String?
+  postalCode     String?
   lastSyncedAt   DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt

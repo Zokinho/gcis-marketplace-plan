@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import { SignedIn, SignedOut, RedirectToSignIn, RedirectToSignUp } from '@clerk/clerk-react';
+import { useAuth } from './lib/AuthContext';
 import { useUserStatus } from './lib/useUserStatus';
 import Landing from './pages/Landing';
 import Marketplace from './pages/Marketplace';
@@ -31,15 +31,24 @@ import Guide from './pages/Guide';
 import { ShortlistProvider } from './lib/useShortlist';
 
 /**
- * Requires Clerk sign-in. Redirects unauthenticated users to /sign-in.
+ * Requires sign-in. Redirects unauthenticated users to landing page.
  */
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <SignedIn>{children}</SignedIn>
-      <SignedOut><RedirectToSignIn /></SignedOut>
-    </>
-  );
+  const { isSignedIn, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 /**
@@ -118,8 +127,6 @@ export default function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Landing />} />
-        <Route path="/sign-in/*" element={<RedirectToSignIn />} />
-        <Route path="/sign-up/*" element={<RedirectToSignUp />} />
 
         {/* Authenticated but pre-approval routes */}
         <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />

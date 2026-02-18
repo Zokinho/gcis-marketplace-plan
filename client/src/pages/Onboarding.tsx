@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { UserButton } from '@clerk/clerk-react';
+import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useUserStatus } from '../lib/useUserStatus';
 import { acceptEula, uploadDoc } from '../lib/api';
@@ -7,6 +7,7 @@ import HarvexLogo from '../components/HarvexLogo';
 
 export default function Onboarding() {
   const { data, loading, refetch } = useUserStatus();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   if (loading) {
@@ -38,7 +39,7 @@ export default function Onboarding() {
       <header className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-4 shadow-sm">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
           <HarvexLogo size="sm" color="white" />
-          <UserButton />
+          <button onClick={() => logout().then(() => navigate('/'))} className="cursor-pointer text-sm text-white/60 hover:text-white">Sign out</button>
         </div>
       </header>
 

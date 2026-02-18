@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
 import MatchCard from '../components/MatchCard';
 import ContactModal from '../components/ContactModal';
@@ -12,7 +12,7 @@ export default function BuyerMatchesPage() {
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [infoDismissed, setInfoDismissed] = useState(() => localStorage.getItem('matches-info-dismissed') === '1');
-  const { user } = useUser();
+  const { user } = useAuth();
 
   function handleDismissInfo() {
     setInfoDismissed(true);
@@ -135,8 +135,8 @@ export default function BuyerMatchesPage() {
       <ContactModal
         open={contactOpen}
         onClose={() => setContactOpen(false)}
-        userName={user?.fullName || user?.firstName || ''}
-        userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''}
+        userEmail={user?.email || ''}
       />
     </Layout>
   );

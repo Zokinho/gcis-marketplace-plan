@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
 import OutcomeForm from '../components/OutcomeForm';
 import ContactModal from '../components/ContactModal';
@@ -37,7 +37,7 @@ export default function Orders() {
   const isSeller = userStatus?.user?.contactType?.includes('Seller') ?? false;
   const [tab, setTab] = useState<'buyer' | 'seller'>('buyer');
   const [contactOpen, setContactOpen] = useState(false);
-  const { user } = useUser();
+  const { user } = useAuth();
 
   // Auto-select seller tab if user is a seller
   useEffect(() => {
@@ -81,8 +81,8 @@ export default function Orders() {
       <ContactModal
         open={contactOpen}
         onClose={() => setContactOpen(false)}
-        userName={user?.fullName || user?.firstName || ''}
-        userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''}
+        userEmail={user?.email || ''}
       />
     </Layout>
   );
