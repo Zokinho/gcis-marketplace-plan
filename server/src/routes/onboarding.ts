@@ -1,10 +1,15 @@
 import { Router, Request, Response } from 'express';
+import { Readable } from 'stream';
+import multer from 'multer';
+import axios from 'axios';
+import FormData from 'form-data';
 import logger from '../utils/logger';
 import { prisma } from '../index';
 import { pushOnboardingMilestone } from '../services/zohoApi';
-import { zohoRequest } from '../services/zohoAuth';
+import { zohoRequest, getAccessToken, ZOHO_API_URL } from '../services/zohoAuth';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 /**
  * POST /api/onboarding/accept-eula
@@ -51,7 +56,7 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
  * POST /api/onboarding/upload-doc
  * Records that the user uploaded their agreement document.
  */
-router.post('/upload-doc', async (req: Request, res: Response) => {
+router.post('/upload-doc', upload.single('file'), async (req: Request, res: Response) => {
   const userId = (req as any).authUserId;
 
   if (!userId) {
@@ -79,11 +84,30 @@ router.post('/upload-doc', async (req: Request, res: Response) => {
     data: { docUploaded: true },
   });
 
+  // Helper: upload file as attachment to a Zoho Contact
+  const uploadFileToZohoContact = async (zohoContactId: string) => {
+    if (!req.file) return;
+    try {
+      const token = await getAccessToken();
+      const form = new FormData();
+      const stream = Readable.from(req.file.buffer);
+      form.append('file', stream, { filename: req.file.originalname, contentType: req.file.mimetype });
+      await axios.post(`${ZOHO_API_URL.replace('/crm/v7', '/crm/v7')}/Contacts/${zohoContactId}/Attachments`, form, {
+        headers: { Authorization: `Zoho-oauthtoken ${token}`, ...form.getHeaders() },
+        maxContentLength: 20 * 1024 * 1024,
+      });
+      logger.info({ userId: user.id, zohoContactId }, '[ONBOARDING] Agreement file uploaded to Zoho Contact');
+    } catch (e) {
+      logger.error({ err: e instanceof Error ? e : { message: String(e) }, userId: user.id }, '[ONBOARDING] Zoho file attachment failed');
+    }
+  };
+
   // Zoho writeback — push Agreement_Uploaded to Contact, or create Contact if not in Zoho
   if (user.zohoContactId) {
     try {
       await pushOnboardingMilestone(user.zohoContactId, 'agreement_uploaded');
     } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[ONBOARDING] Zoho doc upload writeback failed'); }
+    await uploadFileToZohoContact(user.zohoContactId);
   } else {
     // Create Zoho Contact for users not already in CRM
     try {
@@ -92,6 +116,7 @@ router.post('/upload-doc', async (req: Request, res: Response) => {
         Last_Name: user.lastName || user.email,
         Email: user.email,
         Company: user.companyName || '',
+        Account_Name: user.companyName || '',
         Contact_Type: (user.contactType || 'Buyer').split(';').map((s: string) => s.trim()).filter(Boolean),
         User_UID: user.id,
         EULA_Accepted: user.eulaAcceptedAt
@@ -116,8 +141,8 @@ router.post('/upload-doc', async (req: Request, res: Response) => {
         await zohoRequest('POST', '/Tasks', {
           data: {
             data: [{
-              Subject: `Marketplace Registration — ${user.companyName || 'Unknown'}`,
-              Status: 'Completed',
+              Subject: `Marketplace Registration — ${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
+              Status: 'Not Started',
               Priority: 'Normal',
               Who_Id: newZohoContactId,
               Description: [
@@ -133,6 +158,9 @@ router.post('/upload-doc', async (req: Request, res: Response) => {
         });
 
         logger.info({ userId: user.id, newZohoContactId }, '[ONBOARDING] Zoho Contact created on agreement upload');
+
+        // Upload agreement file to new Contact
+        await uploadFileToZohoContact(newZohoContactId);
       }
     } catch (e) {
       logger.error(

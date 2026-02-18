@@ -340,6 +340,7 @@ export async function pushRegistrationToZoho(
     First_Name: user.firstName,
     Last_Name: user.lastName,
     Company: user.companyName,
+    Account_Name: user.companyName,
     Contact_Type: user.contactType.split(';').map((s) => s.trim()).filter(Boolean),
     EULA_Accepted: new Date().toISOString().split('T')[0],
   };
@@ -354,8 +355,8 @@ export async function pushRegistrationToZoho(
   await zohoRequest('POST', '/Tasks', {
     data: {
       data: [{
-        Subject: `Marketplace Registration — ${user.companyName}`,
-        Status: 'Completed',
+        Subject: `Marketplace Registration — ${user.firstName} ${user.lastName}`,
+        Status: 'Not Started',
         Priority: 'Normal',
         Who_Id: zohoContactId,
         Description: [

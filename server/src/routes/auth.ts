@@ -335,6 +335,7 @@ router.post('/upload-agreement', async (req: Request, res: Response) => {
         Last_Name: user.lastName || user.email,
         Email: user.email,
         Company: user.companyName || '',
+        Account_Name: user.companyName || '',
         Contact_Type: (user.contactType || 'Buyer').split(';').map((s: string) => s.trim()).filter(Boolean),
         User_UID: user.id,
         EULA_Accepted: user.eulaAcceptedAt
@@ -359,8 +360,8 @@ router.post('/upload-agreement', async (req: Request, res: Response) => {
         await zohoRequest('POST', '/Tasks', {
           data: {
             data: [{
-              Subject: `Marketplace Registration — ${user.companyName || 'Unknown'}`,
-              Status: 'Completed',
+              Subject: `Marketplace Registration — ${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
+              Status: 'Not Started',
               Priority: 'Normal',
               Who_Id: newZohoContactId,
               Description: [

@@ -222,9 +222,7 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
     setSubmitting(true);
     setError(null);
     try {
-      // TODO: In Phase 4, actually upload the file to Zoho Contact attachments.
-      // For now, just mark the flag.
-      await uploadDoc();
+      await uploadDoc(file);
       onComplete();
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to upload document');
