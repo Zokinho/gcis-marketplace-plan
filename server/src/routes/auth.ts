@@ -335,7 +335,7 @@ router.post('/upload-agreement', async (req: Request, res: Response) => {
         Last_Name: user.lastName || user.email,
         Email: user.email,
         Company: user.companyName || '',
-        Contact_Type: user.contactType || 'Buyer',
+        Contact_Type: (user.contactType || 'Buyer').split(';').map((s: string) => s.trim()).filter(Boolean),
         User_UID: user.id,
         EULA_Accepted: user.eulaAcceptedAt
           ? user.eulaAcceptedAt.toISOString().split('T')[0]

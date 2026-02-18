@@ -340,7 +340,7 @@ export async function pushRegistrationToZoho(
     First_Name: user.firstName,
     Last_Name: user.lastName,
     Company: user.companyName,
-    Contact_Type: user.contactType,
+    Contact_Type: user.contactType.split(';').map((s) => s.trim()).filter(Boolean),
     EULA_Accepted: new Date().toISOString().split('T')[0],
   };
   if (user.phone) contactFields.Phone = user.phone;
