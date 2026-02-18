@@ -158,6 +158,13 @@ function UserDropdown() {
             <p className="text-sm font-medium text-white">{user?.firstName} {user?.lastName}</p>
             <p className="text-xs text-white/50 truncate">{user?.email}</p>
           </div>
+          <Link
+            to="/settings"
+            onClick={() => setOpen(false)}
+            className="block w-full px-4 py-2.5 text-left text-sm text-white/80 transition hover:bg-white/5 hover:text-white"
+          >
+            Settings
+          </Link>
           <button
             onClick={() => {
               setOpen(false);

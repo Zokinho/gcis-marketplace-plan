@@ -170,24 +170,21 @@ export const markReadSchema = z.union([
   z.object({ all: z.literal(true) }),
 ]);
 
-export const notificationPrefsSchema = z.record(
-  z.enum([
-    'BID_RECEIVED',
-    'BID_ACCEPTED',
-    'BID_REJECTED',
-    'BID_COUNTERED',
-    'BID_OUTCOME',
-    'PRODUCT_NEW',
-    'PRODUCT_PRICE',
-    'PRODUCT_STOCK',
-    'MATCH_SUGGESTION',
-    'COA_PROCESSED',
-    'PREDICTION_DUE',
-    'SHORTLIST_PRICE_DROP',
-    'SYSTEM_ANNOUNCEMENT',
-  ]),
-  z.boolean(),
-);
+export const notificationPrefsSchema = z.object({
+  BID_RECEIVED: z.boolean().optional(),
+  BID_ACCEPTED: z.boolean().optional(),
+  BID_REJECTED: z.boolean().optional(),
+  BID_COUNTERED: z.boolean().optional(),
+  BID_OUTCOME: z.boolean().optional(),
+  PRODUCT_NEW: z.boolean().optional(),
+  PRODUCT_PRICE: z.boolean().optional(),
+  PRODUCT_STOCK: z.boolean().optional(),
+  MATCH_SUGGESTION: z.boolean().optional(),
+  COA_PROCESSED: z.boolean().optional(),
+  PREDICTION_DUE: z.boolean().optional(),
+  SHORTLIST_PRICE_DROP: z.boolean().optional(),
+  SYSTEM_ANNOUNCEMENT: z.boolean().optional(),
+}).strict();
 
 export const broadcastSchema = z.object({
   title: z.string().min(1).max(200),
@@ -308,6 +305,13 @@ export const spotSaleAdminQuerySchema = paginationQuery.extend({
 export const recordSpotSaleSchema = z.object({
   buyerId: z.string().min(1, 'buyerId is required'),
   quantity: z.coerce.number().positive('quantity must be positive'),
+});
+
+// ─── Password change schema ───
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(128),
 });
 
 // ─── Auth schemas ───

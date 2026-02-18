@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { fetchAdminUsers, approveUser, rejectUser, promoteUser, demoteUser, type AdminUser } from '../lib/api';
+import { fetchAdminUsers, approveUser, rejectUser, promoteUser, demoteUser, adminResetPassword, type AdminUser } from '../lib/api';
 
 type FilterTab = 'pending' | 'approved' | 'all';
 
@@ -71,6 +71,23 @@ export default function UserManagement() {
       await load();
     } catch (err) {
       console.error('Failed to demote user:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleResetPassword(userId: string, userName: string) {
+    if (!confirm(`Reset password for ${userName}? A temporary password will be generated.`)) return;
+    setActionLoading(userId);
+    try {
+      const result = await adminResetPassword(userId);
+      window.prompt(
+        'Temporary password (copy it now — it will not be shown again):',
+        result.temporaryPassword,
+      );
+    } catch (err) {
+      console.error('Failed to reset password:', err);
+      alert('Failed to reset password. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -211,6 +228,15 @@ export default function UserManagement() {
                             {actionLoading === user.id ? '...' : 'Make Admin'}
                           </button>
                         )
+                      )}
+                      {user.approved && (
+                        <button
+                          onClick={() => handleResetPassword(user.id, user.firstName || user.email)}
+                          disabled={actionLoading === user.id}
+                          className="rounded bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 disabled:opacity-50 transition"
+                        >
+                          {actionLoading === user.id ? '...' : 'Reset PW'}
+                        </button>
                       )}
                       {confirmReject === user.id ? (
                         <div className="flex gap-1">

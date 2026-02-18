@@ -28,6 +28,7 @@ import SpotSales from './pages/SpotSales';
 import SpotSalesAdmin from './pages/SpotSalesAdmin';
 import PendingProducts from './pages/PendingProducts';
 import Guide from './pages/Guide';
+import AccountSettings from './pages/AccountSettings';
 import { ShortlistProvider } from './lib/useShortlist';
 
 /**
@@ -166,6 +167,9 @@ export default function App() {
         } />
         <Route path="/guide" element={
           <RequireAuth><MarketplaceGuard><Guide /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/settings" element={
+          <RequireAuth><MarketplaceGuard><AccountSettings /></MarketplaceGuard></RequireAuth>
         } />
 
         {/* Intelligence routes (admin) */}

@@ -479,6 +479,11 @@ export async function demoteUser(userId: string): Promise<void> {
   await api.post(`/admin/users/${userId}/demote`);
 }
 
+export async function adminResetPassword(userId: string): Promise<{ message: string; temporaryPassword: string }> {
+  const res = await api.post(`/admin/users/${userId}/reset-password`);
+  return res.data;
+}
+
 // ─── Pending Product Approval ───
 
 export interface PendingProduct {
@@ -956,6 +961,13 @@ export async function checkShortlist(productIds: string[]): Promise<Record<strin
     params: { productIds: productIds.join(',') },
   });
   return res.data.shortlisted;
+}
+
+// ─── Password Change API ───
+
+export async function changePassword(data: { currentPassword: string; newPassword: string }): Promise<{ message: string }> {
+  const res = await api.post('/user/change-password', data);
+  return res.data;
 }
 
 export async function fetchShortlistCount(): Promise<number> {

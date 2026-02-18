@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
 import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema } from '../utils/validation';
@@ -10,6 +11,7 @@ import { detectSeller } from '../services/sellerDetection';
 import { pollEmailIngestions } from '../services/coaEmailSync';
 import { logAudit, getRequestIp } from '../services/auditService';
 import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
+import { hashPassword } from '../utils/auth';
 
 const router = Router();
 
@@ -406,6 +408,37 @@ router.post('/users/:userId/demote', async (req: Request<{ userId: string }>, re
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.demote', targetType: 'User', targetId: userId, metadata: { userEmail: user.email }, ip: getRequestIp(req) });
 
   res.json({ message: 'Admin role removed' });
+});
+
+/**
+ * POST /api/admin/users/:userId/reset-password
+ * Admin-initiated password reset — generates a 12-char temporary password.
+ * Clears refresh tokens to force re-login.
+ */
+router.post('/users/:userId/reset-password', async (req: Request<{ userId: string }>, res: Response) => {
+  const { userId } = req.params;
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const tempPassword = crypto.randomBytes(9).toString('base64url');
+  const hashed = await hashPassword(tempPassword);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash: hashed,
+      refreshToken: null,
+      refreshTokenExpiresAt: null,
+    },
+  });
+
+  logger.info({ userId, userEmail: user.email, resetBy: req.user?.email }, '[ADMIN] Password reset');
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.password_reset', targetType: 'User', targetId: userId, metadata: { userEmail: user.email }, ip: getRequestIp(req) });
+
+  res.json({ message: 'Password reset successfully', temporaryPassword: tempPassword });
 });
 
 // ─── Pending Product Approval ───
