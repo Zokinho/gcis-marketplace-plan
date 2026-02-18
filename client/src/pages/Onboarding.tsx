@@ -109,7 +109,7 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
       </p>
 
       {/* Scrollable Terms and Conditions */}
-      <div className="mb-6 h-80 overflow-y-auto rounded-lg border border-subtle surface-muted p-4 text-sm leading-relaxed text-secondary">
+      <div className="mb-6 h-[28rem] overflow-y-auto rounded-lg border border-subtle surface-muted p-4 text-sm leading-relaxed text-secondary">
         <h3 className="mb-3 font-bold">Harvex&trade; Platform Terms and Conditions Agreement</h3>
 
         <h4 className="mb-2 mt-4 font-semibold">1. INTRODUCTION AND ACCEPTANCE OF TERMS</h4>
