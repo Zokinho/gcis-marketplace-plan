@@ -96,6 +96,27 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
 
   res.cookie('refreshToken', refreshTok, COOKIE_OPTIONS);
 
+  // Zoho writeback — fire-and-forget (don't block registration on Zoho)
+  if (zohoContactId) {
+    try {
+      const { pushRegistrationToZoho } = await import('../services/zohoApi');
+      await pushRegistrationToZoho(zohoContactId, {
+        id: user.id,
+        firstName,
+        lastName,
+        companyName,
+        contactType,
+        phone,
+        mailingCountry,
+      });
+    } catch (e) {
+      logger.error(
+        { err: e instanceof Error ? e : { message: String(e) } },
+        '[AUTH] Zoho registration writeback failed',
+      );
+    }
+  }
+
   logger.info({ email }, '[AUTH] New user registered');
 
   res.status(201).json({

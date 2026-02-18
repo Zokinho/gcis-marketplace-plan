@@ -316,6 +316,61 @@ export async function pushOnboardingMilestone(
   });
 }
 
+// ─── Registration Writeback ───
+
+/**
+ * Push registration data to Zoho Contact + create a registration Task.
+ * Called fire-and-forget after user creation.
+ */
+export async function pushRegistrationToZoho(
+  zohoContactId: string,
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    companyName: string;
+    contactType: string;
+    phone?: string | null;
+    mailingCountry?: string | null;
+  },
+) {
+  // 1. Update Contact fields — User_UID + profile data + EULA milestone
+  const contactFields: Record<string, any> = {
+    User_UID: user.id,
+    First_Name: user.firstName,
+    Last_Name: user.lastName,
+    Company: user.companyName,
+    Contact_Type: user.contactType,
+    EULA_Accepted: new Date().toISOString().split('T')[0],
+  };
+  if (user.phone) contactFields.Phone = user.phone;
+  if (user.mailingCountry) contactFields.Mailing_Country = user.mailingCountry;
+
+  await zohoRequest('PUT', `/Contacts/${zohoContactId}`, {
+    data: { data: [contactFields], trigger: [] },
+  });
+
+  // 2. Create a Task on the Contact timeline
+  await zohoRequest('POST', '/Tasks', {
+    data: {
+      data: [{
+        Subject: `Marketplace Registration — ${user.companyName}`,
+        Status: 'Completed',
+        Priority: 'Normal',
+        Who_Id: zohoContactId,
+        Description: [
+          `User registered on Harvex Marketplace`,
+          `Name: ${user.firstName} ${user.lastName}`,
+          `Company: ${user.companyName}`,
+          `Type: ${user.contactType}`,
+          `Date: ${new Date().toISOString()}`,
+        ].join('\n'),
+      }],
+      trigger: [],
+    },
+  });
+}
+
 // ─── Manual Listing → Zoho Product ───
 
 /**
