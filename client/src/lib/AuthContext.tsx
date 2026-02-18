@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import axios from 'axios';
+import api from './api';
 
 export interface AuthUser {
   id: string;
@@ -116,8 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Set up axios interceptor for the main api client
   useEffect(() => {
-    const { default: api } = require('./api');
-
     // Request interceptor: attach access token
     const reqInterceptor = api.interceptors.request.use(async (config: any) => {
       // Get latest token
