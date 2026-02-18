@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { clerkMiddleware } from '@clerk/express';
 import { PrismaClient } from '@prisma/client';
 import logger from './utils/logger';
 import { withCronLock, LOCK_IDS } from './utils/cronLock';
@@ -90,6 +91,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// ─── Clerk global middleware (initializes Clerk for all routes) ───
+app.use(clerkMiddleware());
 
 // ─── CSRF protection (Origin validation on mutating requests) ───
 const ALLOWED_ORIGINS = new Set(
