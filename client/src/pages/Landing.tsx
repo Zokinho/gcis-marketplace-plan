@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSignIn, useSignUp, SignedIn, SignedOut } from '@clerk/clerk-react';
+import { useSignIn, useSignUp, useClerk, SignedIn, SignedOut } from '@clerk/clerk-react';
 import HarvexLogo from '../components/HarvexLogo';
 
 const inputClass =
@@ -308,6 +308,8 @@ function CustomSignUp({ onSwitch }: { onSwitch: () => void }) {
             autoComplete="new-password"
           />
         </div>
+        {/* Clerk CAPTCHA widget (bot protection) */}
+        <div id="clerk-captcha" />
         <button
           type="submit"
           disabled={loading}
@@ -324,6 +326,18 @@ function CustomSignUp({ onSwitch }: { onSwitch: () => void }) {
         </button>
       </p>
     </div>
+  );
+}
+
+function SignOutButton() {
+  const { signOut } = useClerk();
+  return (
+    <button
+      onClick={() => signOut()}
+      className="cursor-pointer text-sm text-white/50 transition hover:text-white/80"
+    >
+      Sign out
+    </button>
   );
 }
 
@@ -353,12 +367,15 @@ export default function Landing() {
       </SignedOut>
 
       <SignedIn>
-        <Link
-          to="/marketplace"
-          className="rounded-lg bg-white px-6 py-3 font-semibold text-brand-teal transition hover:bg-brand-sage/20"
-        >
-          Go to Marketplace
-        </Link>
+        <div className="flex flex-col items-center gap-3">
+          <Link
+            to="/marketplace"
+            className="rounded-lg bg-white px-6 py-3 font-semibold text-brand-teal transition hover:bg-brand-sage/20"
+          >
+            Go to Marketplace
+          </Link>
+          <SignOutButton />
+        </div>
       </SignedIn>
     </div>
   );
