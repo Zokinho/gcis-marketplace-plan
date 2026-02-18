@@ -86,13 +86,17 @@ router.post('/upload-doc', upload.single('file'), async (req: Request, res: Resp
 
   // Helper: upload file as attachment to a Zoho Contact
   const uploadFileToZohoContact = async (zohoContactId: string) => {
-    if (!req.file) return;
+    if (!req.file) {
+      logger.warn({ userId: user.id }, '[ONBOARDING] No file in request — skipping Zoho attachment');
+      return;
+    }
     try {
       const token = await getAccessToken();
       const form = new FormData();
       const stream = Readable.from(req.file.buffer);
       form.append('file', stream, { filename: req.file.originalname, contentType: req.file.mimetype });
-      await axios.post(`${ZOHO_API_URL.replace('/crm/v7', '/crm/v7')}/Contacts/${zohoContactId}/Attachments`, form, {
+      const v2Url = ZOHO_API_URL.replace('/v7', '/v2');
+      await axios.post(`${v2Url}/Contacts/${zohoContactId}/Attachments`, form, {
         headers: { Authorization: `Zoho-oauthtoken ${token}`, ...form.getHeaders() },
         maxContentLength: 20 * 1024 * 1024,
       });

@@ -124,9 +124,7 @@ export async function acceptEula(): Promise<void> {
 export async function uploadDoc(file: File): Promise<void> {
   const formData = new FormData();
   formData.append('file', file);
-  await api.post('/onboarding/upload-doc', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  await api.post('/onboarding/upload-doc', formData);
 }
 
 // ─── Product API ───
