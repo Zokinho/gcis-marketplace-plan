@@ -29,8 +29,8 @@ export default function Onboarding() {
   const needsDoc = data?.status === 'DOC_REQUIRED';
 
   if (!needsEula && !needsDoc) {
-    // Shouldn't be here — redirect to appropriate page
-    navigate('/', { replace: true });
+    // Onboarding complete — redirect to pending approval
+    navigate('/pending', { replace: true });
     return null;
   }
 
