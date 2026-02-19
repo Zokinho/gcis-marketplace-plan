@@ -589,7 +589,8 @@ export function getSharedProductPdfUrl(token: string, productId: string): string
 export type NotificationTypeEnum =
   | 'BID_RECEIVED' | 'BID_ACCEPTED' | 'BID_REJECTED' | 'BID_COUNTERED' | 'BID_OUTCOME'
   | 'PRODUCT_NEW' | 'PRODUCT_PRICE' | 'PRODUCT_STOCK'
-  | 'MATCH_SUGGESTION' | 'COA_PROCESSED' | 'PREDICTION_DUE' | 'SHORTLIST_PRICE_DROP' | 'SYSTEM_ANNOUNCEMENT';
+  | 'MATCH_SUGGESTION' | 'COA_PROCESSED' | 'PREDICTION_DUE' | 'SHORTLIST_PRICE_DROP'
+  | 'ISO_MATCH_FOUND' | 'ISO_SELLER_RESPONSE' | 'SYSTEM_ANNOUNCEMENT';
 
 export interface NotificationRecord {
   id: string;
@@ -1045,6 +1046,121 @@ export async function recordSpotSale(
   data: { buyerId: string; quantity: number },
 ): Promise<{ transaction: { id: string; status: string } }> {
   const res = await api.post(`/spot-sales/admin/${spotSaleId}/record-sale`, data);
+  return res.data;
+}
+
+// ─── ISO Types ───
+
+export type IsoStatusType = 'OPEN' | 'MATCHED' | 'FULFILLED' | 'CLOSED' | 'EXPIRED';
+
+export interface IsoRequestRecord {
+  id: string;
+  buyerId?: string;
+  category: string | null;
+  type: string | null;
+  certification: string | null;
+  thcMin: number | null;
+  thcMax: number | null;
+  cbdMin: number | null;
+  cbdMax: number | null;
+  quantityMin: number | null;
+  quantityMax: number | null;
+  budgetMax: number | null;
+  notes: string | null;
+  status: IsoStatusType;
+  expiresAt: string;
+  matchedProduct?: ProductCard;
+  responseCount?: number;
+  hasResponded?: boolean;
+  isOwner?: boolean;
+  createdAt: string;
+}
+
+export interface IsoResponseRecord {
+  id: string;
+  isoRequestId: string;
+  sellerId: string;
+  productId: string | null;
+  message: string | null;
+  status: string;
+  createdAt: string;
+  seller?: { id: string; companyName: string | null };
+  product?: { id: string; name: string } | null;
+}
+
+// ─── ISO API ───
+
+export async function createIsoRequest(data: {
+  category?: string;
+  type?: string;
+  certification?: string;
+  thcMin?: number;
+  thcMax?: number;
+  cbdMin?: number;
+  cbdMax?: number;
+  quantityMin?: number;
+  quantityMax?: number;
+  budgetMax?: number;
+  notes?: string;
+}): Promise<{ iso: IsoRequestRecord }> {
+  const res = await api.post('/iso', data);
+  return res.data;
+}
+
+export async function fetchIsoBoard(params?: {
+  page?: number;
+  limit?: number;
+  status?: IsoStatusType;
+  category?: string;
+  mine?: boolean;
+  sort?: 'date' | 'expiry' | 'budget';
+  order?: 'asc' | 'desc';
+}): Promise<{ items: IsoRequestRecord[]; pagination: Pagination }> {
+  const query: Record<string, string> = {};
+  if (params?.page) query.page = String(params.page);
+  if (params?.limit) query.limit = String(params.limit);
+  if (params?.status) query.status = params.status;
+  if (params?.category) query.category = params.category;
+  if (params?.mine) query.mine = 'true';
+  if (params?.sort) query.sort = params.sort;
+  if (params?.order) query.order = params.order;
+  const res = await api.get('/iso', { params: query });
+  return res.data;
+}
+
+export async function fetchMyIsos(params?: {
+  page?: number;
+  limit?: number;
+  status?: IsoStatusType;
+}): Promise<{ items: IsoRequestRecord[]; pagination: Pagination }> {
+  const query: Record<string, string> = {};
+  if (params?.page) query.page = String(params.page);
+  if (params?.limit) query.limit = String(params.limit);
+  if (params?.status) query.status = params.status;
+  const res = await api.get('/iso/my', { params: query });
+  return res.data;
+}
+
+export async function fetchIsoDetail(id: string): Promise<{
+  iso: IsoRequestRecord & { responses?: IsoResponseRecord[] };
+}> {
+  const res = await api.get(`/iso/${id}`);
+  return res.data;
+}
+
+export async function updateIso(id: string, data: {
+  status?: 'CLOSED';
+  renew?: boolean;
+}): Promise<{ iso: IsoRequestRecord }> {
+  const res = await api.patch(`/iso/${id}`, data);
+  return res.data;
+}
+
+export async function respondToIso(id: string, data: {
+  productId?: string;
+  message?: string;
+}): Promise<{ response: IsoResponseRecord }> {
+  const res = await api.post(`/iso/${id}/respond`, data);
   return res.data;
 }
 

@@ -24,6 +24,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import BuyerMatchesPage from './pages/BuyerMatchesPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ShortlistPage from './pages/ShortlistPage';
+import IsoBoard from './pages/IsoBoard';
 import SpotSales from './pages/SpotSales';
 import SpotSalesAdmin from './pages/SpotSalesAdmin';
 import PendingProducts from './pages/PendingProducts';
@@ -152,6 +153,12 @@ export default function App() {
         } />
         <Route path="/shortlist" element={
           <RequireAuth><MarketplaceGuard><ShortlistPage /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/iso" element={
+          <RequireAuth><MarketplaceGuard><IsoBoard /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/iso/admin" element={
+          <RequireAuth><MarketplaceGuard><IsoBoard /></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/spot-sales" element={
           <RequireAuth><MarketplaceGuard><SpotSales /></MarketplaceGuard></RequireAuth>

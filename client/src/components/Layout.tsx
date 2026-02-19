@@ -39,8 +39,9 @@ function GuideNavLink({ onClick }: { onClick?: () => void }) {
 const ADMIN_LINKS = [
   { to: '/pending-products', label: 'Pending Products' },
   { to: '/intelligence', label: 'Intelligence' },
-  { to: '/spot-sales/admin', label: 'Manage Deals' },
-  { to: '/coa-inbox', label: 'CoA Inbox' },
+  { to: '/spot-sales/admin', label: 'Clearance' },
+  { to: '/iso/admin', label: 'ISO Board' },
+  { to: '/coa-inbox', label: 'Supplies Inbox' },
   { to: '/shares', label: 'Shares' },
   { to: '/users', label: 'Users' },
 ];
@@ -191,8 +192,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navLinks = (
     <>
       <NavLink to="/marketplace" onClick={() => setMobileOpen(false)}>Marketplace</NavLink>
-      <NavLink to="/spot-sales" exact onClick={() => setMobileOpen(false)}>Spot Sales</NavLink>
+      <NavLink to="/spot-sales" exact onClick={() => setMobileOpen(false)}>Clearance</NavLink>
       <NavLink to="/shortlist" onClick={() => setMobileOpen(false)}>Shortlist</NavLink>
+      <NavLink to="/iso" exact onClick={() => setMobileOpen(false)}>ISO Board</NavLink>
       <NavLink to="/my-matches" onClick={() => setMobileOpen(false)}>My Matches</NavLink>
       {isSeller && <NavLink to="/my-listings" onClick={() => setMobileOpen(false)}>My Listings</NavLink>}
       <NavLink to="/orders" onClick={() => setMobileOpen(false)}>Orders</NavLink>

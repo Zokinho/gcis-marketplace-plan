@@ -59,6 +59,8 @@ model User {
   shortlistItems     ShortlistItem[]  @relation("BuyerShortlist")
   productViews       ProductView[]    @relation("BuyerProductViews")
   spotSalesCreated   SpotSale[]       @relation("SpotSaleCreator")
+  isoRequests        IsoRequest[]     @relation("BuyerIsoRequests")
+  isoResponses       IsoResponse[]    @relation("SellerIsoResponses")
 }
 
 // ─── Products (synced from Zoho) ───
@@ -143,6 +145,8 @@ model Product {
   shortlistItems ShortlistItem[]
   productViews   ProductView[]
   spotSales      SpotSale[]
+  isoMatches     IsoRequest[]    @relation("IsoMatchedProduct")
+  isoResponses   IsoResponse[]   @relation("IsoResponseProduct")
 
   @@index([sellerId])
   @@index([category])
@@ -370,6 +374,8 @@ enum NotificationType {
   COA_PROCESSED
   PREDICTION_DUE
   SHORTLIST_PRICE_DROP
+  ISO_MATCH_FOUND
+  ISO_SELLER_RESPONSE
   SYSTEM_ANNOUNCEMENT
 }
 
@@ -486,6 +492,70 @@ model CuratedShare {
   useCount    Int       @default(0)
   createdById String?
   createdBy   User?     @relation(fields: [createdById], references: [id])
+}
+
+// ─── ISO Requests (buyer "In Search Of" posts) ───
+
+enum IsoStatus {
+  OPEN
+  MATCHED
+  FULFILLED
+  CLOSED
+  EXPIRED
+}
+
+model IsoRequest {
+  id              String      @id @default(cuid())
+  buyerId         String
+  buyer           User        @relation("BuyerIsoRequests", fields: [buyerId], references: [id])
+
+  // What they're looking for
+  category        String?
+  type            String?
+  certification   String?
+  thcMin          Float?
+  thcMax          Float?
+  cbdMin          Float?
+  cbdMax          Float?
+  quantityMin     Float?
+  quantityMax     Float?
+  budgetMax       Float?
+  notes           String?
+
+  // Status & lifecycle
+  status          IsoStatus   @default(OPEN)
+  expiresAt       DateTime
+
+  // Matching
+  matchedProductId String?
+  matchedProduct   Product?   @relation("IsoMatchedProduct", fields: [matchedProductId], references: [id])
+
+  responses       IsoResponse[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([buyerId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([category])
+}
+
+model IsoResponse {
+  id            String     @id @default(cuid())
+  isoRequestId  String
+  isoRequest    IsoRequest @relation(fields: [isoRequestId], references: [id])
+  sellerId      String
+  seller        User       @relation("SellerIsoResponses", fields: [sellerId], references: [id])
+  productId     String?
+  product       Product?   @relation("IsoResponseProduct", fields: [productId], references: [id])
+  message       String?
+  status        String     @default("pending")
+  createdAt     DateTime   @default(now())
+
+  @@unique([isoRequestId, sellerId])
+  @@index([sellerId])
+  @@index([isoRequestId])
 }
 
 // ─── Spot Sales (admin-curated limited-time deals) ───

@@ -15,6 +15,8 @@ export const DEFAULT_NOTIFICATION_PREFS: Record<string, boolean> = {
   COA_PROCESSED: false,
   PREDICTION_DUE: true,
   SHORTLIST_PRICE_DROP: true,
+  ISO_MATCH_FOUND: true,
+  ISO_SELLER_RESPONSE: true,
   SYSTEM_ANNOUNCEMENT: true,
 };
 

@@ -123,7 +123,7 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
           logger.error({ err }, `[SYNC] Failed to fetch file URLs for product ${p.id}`);
         }
 
-        await prisma.product.upsert({
+        const product = await prisma.product.upsert({
           where: { zohoProductId: p.id },
           update: {
             ...fields,
@@ -138,6 +138,13 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
             coaUrls: fileUrls.coaUrls,
           },
         });
+
+        // Auto-match against open ISO requests (fire-and-forget)
+        try {
+          const { matchProductToOpenIsos } = await import('./isoMatchingService');
+          matchProductToOpenIsos(product.id).catch(() => {});
+        } catch {}
+
         synced++;
       } catch (err) {
         logger.error({ err }, `[SYNC] Error syncing product ${p.id} (${p.Product_Name})`);
@@ -335,6 +342,12 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
             logger.error({ err: e }, '[SYNC] PRODUCT_PRICE notification error');
           }
         }
+
+        // Auto-match against open ISO requests (fire-and-forget)
+        try {
+          const { matchProductToOpenIsos } = await import('./isoMatchingService');
+          matchProductToOpenIsos(product.id).catch(() => {});
+        } catch {}
 
         synced++;
       } catch (err) {

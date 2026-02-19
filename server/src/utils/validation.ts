@@ -183,6 +183,8 @@ export const notificationPrefsSchema = z.object({
   COA_PROCESSED: z.boolean().optional(),
   PREDICTION_DUE: z.boolean().optional(),
   SHORTLIST_PRICE_DROP: z.boolean().optional(),
+  ISO_MATCH_FOUND: z.boolean().optional(),
+  ISO_SELLER_RESPONSE: z.boolean().optional(),
   SYSTEM_ANNOUNCEMENT: z.boolean().optional(),
 }).strict();
 
@@ -361,3 +363,37 @@ export const createListingSchema = z.object({
   budSizeLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeLarge must be a number'),
   budSizeXLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeXLarge must be a number'),
 }).passthrough(); // Allow extra form fields (multer adds _fieldname etc.)
+
+// ─── ISO schemas ───
+
+export const isoCreateSchema = z.object({
+  category:      z.string().max(100).optional(),
+  type:          z.string().max(50).optional(),
+  certification: z.string().max(100).optional(),
+  thcMin:        z.coerce.number().min(0).max(100).optional(),
+  thcMax:        z.coerce.number().min(0).max(100).optional(),
+  cbdMin:        z.coerce.number().min(0).max(100).optional(),
+  cbdMax:        z.coerce.number().min(0).max(100).optional(),
+  quantityMin:   z.coerce.number().positive().optional(),
+  quantityMax:   z.coerce.number().positive().optional(),
+  budgetMax:     z.coerce.number().positive().optional(),
+  notes:         z.string().max(2000).optional(),
+});
+
+export const isoQuerySchema = paginationQuery.extend({
+  status:   z.enum(['OPEN', 'MATCHED', 'FULFILLED', 'CLOSED', 'EXPIRED']).optional(),
+  category: z.string().max(100).optional(),
+  mine:     z.enum(['true', 'false']).default('false'),
+  sort:     z.enum(['date', 'expiry', 'budget']).default('date'),
+  order:    z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const isoRespondSchema = z.object({
+  productId: z.string().min(1).optional(),
+  message:   z.string().max(1000).optional(),
+});
+
+export const isoUpdateSchema = z.object({
+  status: z.enum(['CLOSED']).optional(),
+  renew:  z.boolean().optional(),
+});

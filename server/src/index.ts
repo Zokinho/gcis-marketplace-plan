@@ -329,6 +329,10 @@ async function mountRoutes() {
   const shortlistRoutes = (await import('./routes/shortlist')).default;
   app.use('/api/shortlist', apiLimiter, requireAuth(), marketplaceAuth, shortlistRoutes);
 
+  // ISO Board — requires JWT auth + marketplace auth
+  const isoRoutes = (await import('./routes/iso')).default;
+  app.use('/api/iso', apiLimiter, requireAuth(), marketplaceAuth, isoRoutes);
+
   // Spot Sales — admin routes first (more specific path), then buyer routes
   const { adminRouter: spotSaleAdminRoutes, buyerRouter: spotSaleBuyerRoutes } = await import('./routes/spotSales');
   app.use('/api/spot-sales/admin', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, spotSaleAdminRoutes);
@@ -409,7 +413,27 @@ function startIntelligenceCrons() {
     }, 24 * ONE_HOUR);
   }, getMillisUntilHour(2));
 
-  logger.info('Intelligence cron jobs scheduled (midnight, 1am, 2am daily)');
+  // Daily at 3am: ISO expiry
+  setTimeout(() => {
+    runIntelJob('ISO Expiry', LOCK_IDS.ISO_EXPIRY, async () => {
+      const result = await prisma.isoRequest.updateMany({
+        where: { status: 'OPEN', expiresAt: { lt: new Date() } },
+        data: { status: 'EXPIRED' },
+      });
+      return { expired: result.count };
+    });
+    setInterval(() => {
+      runIntelJob('ISO Expiry', LOCK_IDS.ISO_EXPIRY, async () => {
+        const result = await prisma.isoRequest.updateMany({
+          where: { status: 'OPEN', expiresAt: { lt: new Date() } },
+          data: { status: 'EXPIRED' },
+        });
+        return { expired: result.count };
+      });
+    }, 24 * ONE_HOUR);
+  }, getMillisUntilHour(3));
+
+  logger.info('Intelligence cron jobs scheduled (midnight, 1am, 2am, 3am daily)');
 }
 
 async function runIntelJob(name: string, lockId: number, fn: () => Promise<unknown>) {
