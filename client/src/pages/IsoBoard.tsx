@@ -478,7 +478,12 @@ export default function IsoBoard() {
     <Layout>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-primary">Wanted</h1>
+          <div className="flex items-center gap-2">
+            <svg className="h-7 w-7 text-brand-blue" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <h1 className="text-2xl font-semibold text-primary">Wanted</h1>
+          </div>
           <p className="text-sm text-muted">Post what you need, sellers respond</p>
           <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-blue to-brand-teal" />
         </div>
