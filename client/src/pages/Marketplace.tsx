@@ -8,6 +8,7 @@ import FilterSidebar from '../components/FilterSidebar';
 import ContactModal from '../components/ContactModal';
 import { fetchProducts, type ProductCard as ProductCardType, type ProductFilters, type Pagination } from '../lib/api';
 import { useShortlist } from '../lib/useShortlist';
+import MarketplaceTabs from '../components/MarketplaceTabs';
 
 export default function Marketplace() {
   const [products, setProducts] = useState<ProductCardType[]>([]);
@@ -75,6 +76,8 @@ export default function Marketplace() {
           Need help?
         </button>
       </div>
+
+      <MarketplaceTabs />
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="min-w-0 flex-1">

@@ -192,9 +192,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navLinks = (
     <>
       <NavLink to="/marketplace" onClick={() => setMobileOpen(false)}>Marketplace</NavLink>
-      <NavLink to="/spot-sales" exact onClick={() => setMobileOpen(false)}>Clearance</NavLink>
       <NavLink to="/shortlist" onClick={() => setMobileOpen(false)}>Shortlist</NavLink>
-      <NavLink to="/iso" exact onClick={() => setMobileOpen(false)}>ISO Board</NavLink>
       <NavLink to="/my-matches" onClick={() => setMobileOpen(false)}>My Matches</NavLink>
       {isSeller && <NavLink to="/my-listings" onClick={() => setMobileOpen(false)}>My Listings</NavLink>}
       <NavLink to="/orders" onClick={() => setMobileOpen(false)}>Orders</NavLink>

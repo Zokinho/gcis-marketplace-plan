@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
+import MarketplaceTabs from '../components/MarketplaceTabs';
 import SpotSaleCard from '../components/SpotSaleCard';
 import { fetchSpotSales, type SpotSaleRecord } from '../lib/api';
 import HelpModal from '../components/ContactModal';
@@ -25,8 +26,8 @@ export default function SpotSales() {
 
   const handleSendContact = (message: string) => {
     if (!contactTarget) return;
-    const subject = `Spot Sale Inquiry: ${contactTarget.product.name}`;
-    const body = `${message}\n\n---\nProduct: ${contactTarget.product.name}\nSpot Price: $${contactTarget.spotPrice.toFixed(2)}/g (${Math.round(contactTarget.discountPercent)}% off)\nFrom: ${`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}\nEmail: ${user?.email || ''}`;
+    const subject = `Clearance Inquiry: ${contactTarget.product.name}`;
+    const body = `${message}\n\n---\nProduct: ${contactTarget.product.name}\nClearance Price: $${contactTarget.spotPrice.toFixed(2)}/g (${Math.round(contactTarget.discountPercent)}% off)\nFrom: ${`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}\nEmail: ${user?.email || ''}`;
     window.location.href = `mailto:team@gciscan.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setContactTarget(null);
   };
@@ -41,7 +42,7 @@ export default function SpotSales() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z" />
             </svg>
-            <h1 className="text-2xl font-semibold text-primary">Spot Sales</h1>
+            <h1 className="text-2xl font-semibold text-primary">Clearance</h1>
           </div>
           <p className="mt-1 text-sm text-muted">Limited-time deals on select products</p>
           <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-coral to-brand-yellow" />
@@ -57,6 +58,8 @@ export default function SpotSales() {
         </button>
       </div>
 
+      <MarketplaceTabs />
+
       {/* CTA banner */}
       <div className="mb-6 rounded-lg border border-brand-coral/15 dark:border-slate-700 bg-brand-coral/5 dark:bg-slate-800/50 p-4">
         <div className="flex items-start gap-3">
@@ -66,10 +69,10 @@ export default function SpotSales() {
           <p className="text-sm text-muted">
             <span className="font-medium text-primary">Want to feature your product here?</span>{' '}
             Contact us at{' '}
-            <a href="mailto:team@gciscan.com?subject=Spot%20Sale%20Request" className="font-medium text-brand-coral dark:text-brand-yellow underline hover:no-underline">
+            <a href="mailto:team@gciscan.com?subject=Clearance%20Request" className="font-medium text-brand-coral dark:text-brand-yellow underline hover:no-underline">
               team@gciscan.com
             </a>{' '}
-            to list one of your products as a limited-time spot sale.
+            to list one of your products as a limited-time clearance deal.
           </p>
         </div>
       </div>
@@ -89,7 +92,7 @@ export default function SpotSales() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" />
             </svg>
           </div>
-          <h3 className="mb-1 text-lg font-medium text-primary">No spot sales right now</h3>
+          <h3 className="mb-1 text-lg font-medium text-primary">No clearance deals right now</h3>
           <p className="text-sm text-muted">Check back soon for limited-time deals on select products.</p>
         </div>
       )}
@@ -103,7 +106,7 @@ export default function SpotSales() {
         </div>
       )}
 
-      {/* Spot Sale Contact Modal */}
+      {/* Clearance Contact Modal */}
       {contactTarget && (
         <SpotSaleContactModal
           productName={contactTarget.product.name}
@@ -139,7 +142,7 @@ function SpotSaleContactModal({
   onClose: () => void;
 }) {
   const [message, setMessage] = useState(
-    `Hi, I'm interested in purchasing "${productName}" at the spot sale price of $${spotPrice.toFixed(2)}/g (${Math.round(discountPercent)}% off). Please let me know the next steps.`
+    `Hi, I'm interested in purchasing "${productName}" at the clearance price of $${spotPrice.toFixed(2)}/g (${Math.round(discountPercent)}% off). Please let me know the next steps.`
   );
 
   return (

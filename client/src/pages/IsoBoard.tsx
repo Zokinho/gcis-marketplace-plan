@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUserStatus } from '../lib/useUserStatus';
 import Layout from '../components/Layout';
+import MarketplaceTabs from '../components/MarketplaceTabs';
 import {
   fetchIsoBoard,
   fetchMyIsos,
@@ -179,7 +180,7 @@ function CreateIsoModal({
       onCreated();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to create ISO');
+      setError(err?.response?.data?.error || 'Failed to create request');
     } finally {
       setLoading(false);
     }
@@ -189,7 +190,7 @@ function CreateIsoModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-lg rounded-lg surface p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-primary">Post ISO Request</h2>
+          <h2 className="text-lg font-semibold text-primary">Post Wanted Request</h2>
           <button onClick={onClose} className="text-muted hover:text-primary transition">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -337,7 +338,7 @@ function CreateIsoModal({
               disabled={loading}
               className="rounded bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue transition disabled:opacity-50"
             >
-              {loading ? 'Posting...' : 'Post ISO'}
+              {loading ? 'Posting...' : 'Post Wanted'}
             </button>
           </div>
         </form>
@@ -477,16 +478,18 @@ export default function IsoBoard() {
     <Layout>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-primary">ISO Board</h1>
-          <p className="text-sm text-muted">In Search Of — post what you need, sellers respond</p>
+          <h1 className="text-2xl font-bold text-primary">Wanted</h1>
+          <p className="text-sm text-muted">Post what you need, sellers respond</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue transition"
         >
-          Post ISO
+          Post Wanted
         </button>
       </div>
+
+      <MarketplaceTabs />
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 rounded-lg border border-default surface p-1">
@@ -494,7 +497,7 @@ export default function IsoBoard() {
           onClick={() => setTab('browse')}
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${tab === 'browse' ? 'bg-brand-teal text-white' : 'text-muted hover:text-primary'}`}
         >
-          Browse ISOs
+          Browse Wanted
         </button>
         <button
           onClick={() => setTab('my')}
@@ -526,19 +529,19 @@ export default function IsoBoard() {
       ) : items.length === 0 ? (
         <div className="rounded-lg border border-default surface p-12 text-center">
           <p className="text-lg font-semibold text-primary mb-2">
-            {tab === 'my' ? 'No ISO requests yet' : 'No open ISOs'}
+            {tab === 'my' ? 'No wanted requests yet' : 'No open requests'}
           </p>
           <p className="text-sm text-muted mb-4">
             {tab === 'my'
-              ? "Post an ISO to let sellers know what you're looking for."
-              : 'Check back later or post your own ISO request.'}
+              ? "Post a wanted request to let sellers know what you're looking for."
+              : 'Check back later or post your own wanted request.'}
           </p>
           {tab === 'my' && (
             <button
               onClick={() => setShowCreate(true)}
               className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue transition"
             >
-              Post ISO
+              Post Wanted
             </button>
           )}
         </div>
