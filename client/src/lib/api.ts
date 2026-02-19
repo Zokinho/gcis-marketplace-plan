@@ -978,7 +978,7 @@ export async function fetchShortlistCount(): Promise<number> {
   return res.data.count;
 }
 
-// ─── Spot Sale Types ───
+// ─── Clearance Types ───
 
 export interface SpotSaleRecord {
   id: string;
@@ -999,7 +999,7 @@ export interface SpotSaleAdminRecord extends SpotSaleRecord {
   createdBy: { email: string; firstName: string | null; lastName: string | null };
 }
 
-// ─── Spot Sale API ───
+// ─── Clearance API ───
 
 export async function fetchSpotSales(): Promise<{ spotSales: SpotSaleRecord[] }> {
   const res = await api.get('/spot-sales');

@@ -61,7 +61,7 @@ export default function ProductCard({ product, large, onClick }: { product: Prod
           </div>
         </div>
 
-        {/* Priced to Sell badge — hidden while Spot Sales is active */}
+        {/* Priced to Sell badge — hidden while Clearance is active */}
 
         {/* Name + Available */}
         <div className="mb-1 flex items-baseline justify-between gap-2">

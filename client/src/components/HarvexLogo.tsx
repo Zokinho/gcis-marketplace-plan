@@ -37,7 +37,7 @@ export default function HarvexLogo({ size = 'md', color = 'teal', showText = tru
       </svg>
       {showText && (
         <span className={`font-logo font-normal tracking-tight ${s.text} ${c.text}`}>
-          Harvex
+          Harvex<span style={{ fontSize: '0.45em', verticalAlign: '0.6em', marginLeft: '0.05em' }}>™</span>
         </span>
       )}
     </span>

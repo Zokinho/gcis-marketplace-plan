@@ -70,7 +70,7 @@ export default function SpotSalesAdmin() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-primary">Spot Sales Management</h1>
+          <h1 className="text-2xl font-semibold text-primary">Clearance Management</h1>
           <p className="text-sm text-muted">Create and manage limited-time product deals</p>
           <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-coral to-brand-yellow" />
         </div>
@@ -78,7 +78,7 @@ export default function SpotSalesAdmin() {
           onClick={() => setShowCreate(true)}
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-blue"
         >
-          + New Spot Sale
+          + New Clearance Deal
         </button>
       </div>
 
@@ -117,11 +117,11 @@ export default function SpotSalesAdmin() {
       {/* Empty state */}
       {!loading && spotSales.length === 0 && (
         <div className="rounded-lg border border-subtle surface p-12 text-center">
-          <p className="text-sm text-muted">No spot sales found</p>
+          <p className="text-sm text-muted">No clearance deals found</p>
         </div>
       )}
 
-      {/* Spot sale cards */}
+      {/* Clearance deal cards */}
       <div className="space-y-4">
         {spotSales.map((ss) => (
           <AdminSpotSaleCard
@@ -225,14 +225,14 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
       });
       onCreated();
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to create spot sale');
+      setError(err?.response?.data?.error || 'Failed to create clearance deal');
     }
     setCreating(false);
   };
 
   return (
     <div className="mb-6 rounded-lg border border-subtle surface p-6">
-      <h3 className="mb-4 text-lg font-semibold text-primary">Create Spot Sale</h3>
+      <h3 className="mb-4 text-lg font-semibold text-primary">Create Clearance Deal</h3>
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-600 dark:text-red-400">
@@ -289,9 +289,9 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
         </div>
       </div>
 
-      {/* Spot price + discount preview */}
+      {/* Clearance price + discount preview */}
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-muted">Spot Price ($/g)</label>
+        <label className="mb-1 block text-xs font-medium text-muted">Clearance Price ($/g)</label>
         <input
           type="number"
           step="0.01"
@@ -322,7 +322,7 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
         />
         {selectedProduct && quantityNum && (selectedProduct.gramsAvailable ?? 0) > 0 && (
           <p className="mt-1 text-xs text-faint">
-            Product has {selectedProduct.gramsAvailable?.toLocaleString()}g total — spot sale for {quantityNum.toLocaleString()}g
+            Product has {selectedProduct.gramsAvailable?.toLocaleString()}g total — clearance deal for {quantityNum.toLocaleString()}g
           </p>
         )}
       </div>
@@ -368,7 +368,7 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
           disabled={!isValid || creating}
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90 disabled:opacity-50"
         >
-          {creating ? 'Creating...' : 'Create Spot Sale'}
+          {creating ? 'Creating...' : 'Create Clearance Deal'}
         </button>
         <button onClick={onCancel} className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary hover-surface-muted">
           Cancel
@@ -439,7 +439,7 @@ function AdminSpotSaleCard({
 
             {/* Meta info */}
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-faint">
-              {spotSale.quantity && <span>{spotSale.quantity.toLocaleString()}g at spot price</span>}
+              {spotSale.quantity && <span>{spotSale.quantity.toLocaleString()}g at clearance price</span>}
               <span>Expires: {new Date(spotSale.expiresAt).toLocaleString()}</span>
               <span>Created: {new Date(spotSale.createdAt).toLocaleDateString()}</span>
               <span>By: {spotSale.createdBy.email}</span>
@@ -548,7 +548,7 @@ function RecordSaleForm({
 
   return (
     <div className="mt-4 rounded-lg border border-brand-teal/20 surface p-4">
-      <h4 className="mb-3 text-sm font-semibold text-primary">Record Spot Sale</h4>
+      <h4 className="mb-3 text-sm font-semibold text-primary">Record Clearance Sale</h4>
 
       {error && (
         <div className="mb-3 rounded-lg bg-red-50 dark:bg-red-900/20 p-2 text-xs text-red-600 dark:text-red-400">

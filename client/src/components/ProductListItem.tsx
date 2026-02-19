@@ -54,7 +54,7 @@ export default function ProductListItem({ product, onClick }: { product: Product
           {product.labName && (
             <span className="rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">CoA Verified</span>
           )}
-          {/* Priced to Sell badge — hidden while Spot Sales is active */}
+          {/* Priced to Sell badge — hidden while Clearance is active */}
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-0.5 text-xs text-muted">
           {(product.thcMin != null || product.thcMax != null) && (

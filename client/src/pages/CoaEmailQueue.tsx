@@ -40,8 +40,8 @@ export default function CoaEmailQueue() {
     <Layout>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-primary">CoA Inbox</h1>
-          <p className="text-sm text-muted">Email-ingested CoA documents awaiting seller assignment</p>
+          <h1 className="text-2xl font-semibold text-primary">Supplies Inbox</h1>
+          <p className="text-sm text-muted">Email-ingested documents awaiting seller assignment</p>
           <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
         </div>
         <button

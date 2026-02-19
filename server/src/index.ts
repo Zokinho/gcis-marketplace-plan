@@ -333,7 +333,7 @@ async function mountRoutes() {
   const isoRoutes = (await import('./routes/iso')).default;
   app.use('/api/iso', apiLimiter, requireAuth(), marketplaceAuth, isoRoutes);
 
-  // Spot Sales — admin routes first (more specific path), then buyer routes
+  // Clearance — admin routes first (more specific path), then buyer routes
   const { adminRouter: spotSaleAdminRoutes, buyerRouter: spotSaleBuyerRoutes } = await import('./routes/spotSales');
   app.use('/api/spot-sales/admin', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, spotSaleAdminRoutes);
   app.use('/api/spot-sales', apiLimiter, requireAuth(), marketplaceAuth, spotSaleBuyerRoutes);

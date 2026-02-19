@@ -280,7 +280,7 @@ export const shortlistCheckSchema = z.object({
   productIds: z.string().min(1, 'productIds is required'),
 });
 
-// ─── Spot Sale schemas ───
+// ─── Clearance schemas ───
 
 export const createSpotSaleSchema = z.object({
   productId: z.string().min(1, 'productId is required'),

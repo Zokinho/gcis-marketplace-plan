@@ -1,7 +1,7 @@
 /**
- * Spot Sales Routes
- * Admin: CRUD for spot sales (limited-time discounted products).
- * Buyer: List active + unexpired spot sales.
+ * Clearance Routes
+ * Admin: CRUD for clearance deals (limited-time discounted products).
+ * Buyer: List active + unexpired clearance deals.
  */
 
 import { Router, Request, Response } from 'express';
@@ -57,7 +57,7 @@ const productSelect = {
 
 /**
  * POST /api/spot-sales/admin
- * Create a new spot sale.
+ * Create a new clearance deal.
  */
 adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: Response) => {
   const { productId, spotPrice, quantity, expiresAt } = req.body;
@@ -79,7 +79,7 @@ adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: 
     }
 
     if (spotPrice >= product.pricePerUnit) {
-      return res.status(400).json({ error: 'Spot price must be less than the original price' });
+      return res.status(400).json({ error: 'Clearance price must be less than the original price' });
     }
 
     const expiresDate = new Date(expiresAt);
@@ -87,7 +87,7 @@ adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: 
       return res.status(400).json({ error: 'Expiry must be in the future' });
     }
 
-    // Check no existing active spot sale for this product
+    // Check no existing active clearance deal for this product
     const existing = await prisma.spotSale.findFirst({
       where: {
         productId,
@@ -97,7 +97,7 @@ adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: 
     });
 
     if (existing) {
-      return res.status(409).json({ error: 'An active spot sale already exists for this product' });
+      return res.status(409).json({ error: 'An active clearance deal already exists for this product' });
     }
 
     const originalPrice = product.pricePerUnit;
@@ -132,13 +132,13 @@ adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: 
     res.status(201).json({ spotSale });
   } catch (err) {
     logger.error({ err }, '[SPOT-SALES] Create error');
-    res.status(500).json({ error: 'Failed to create spot sale' });
+    res.status(500).json({ error: 'Failed to create clearance deal' });
   }
 });
 
 /**
  * GET /api/spot-sales/admin
- * List all spot sales (paginated, filterable by status).
+ * List all clearance deals (paginated, filterable by status).
  */
 adminRouter.get('/', validateQuery(spotSaleAdminQuerySchema), async (req: Request, res: Response) => {
   const { page, limit, status } = req.query as any;
@@ -185,13 +185,13 @@ adminRouter.get('/', validateQuery(spotSaleAdminQuerySchema), async (req: Reques
     });
   } catch (err) {
     logger.error({ err }, '[SPOT-SALES] Admin list error');
-    res.status(500).json({ error: 'Failed to fetch spot sales' });
+    res.status(500).json({ error: 'Failed to fetch clearance deals' });
   }
 });
 
 /**
  * PATCH /api/spot-sales/admin/:id
- * Update a spot sale (active, spotPrice, expiresAt).
+ * Update a clearance deal (active, spotPrice, expiresAt).
  */
 adminRouter.patch('/:id', validateParams(idParamsSchema), validate(updateSpotSaleSchema), async (req: Request<{ id: string }>, res: Response) => {
   const { id } = req.params;
@@ -205,7 +205,7 @@ adminRouter.patch('/:id', validateParams(idParamsSchema), validate(updateSpotSal
     });
 
     if (!existing) {
-      return res.status(404).json({ error: 'Spot sale not found' });
+      return res.status(404).json({ error: 'Clearance deal not found' });
     }
 
     const data: any = {};
@@ -216,7 +216,7 @@ adminRouter.patch('/:id', validateParams(idParamsSchema), validate(updateSpotSal
 
     if (updates.spotPrice !== undefined) {
       if (updates.spotPrice >= existing.originalPrice) {
-        return res.status(400).json({ error: 'Spot price must be less than original price' });
+        return res.status(400).json({ error: 'Clearance price must be less than original price' });
       }
       data.spotPrice = updates.spotPrice;
       data.discountPercent = Math.round(((existing.originalPrice - updates.spotPrice) / existing.originalPrice) * 100 * 10) / 10;
@@ -244,13 +244,13 @@ adminRouter.patch('/:id', validateParams(idParamsSchema), validate(updateSpotSal
     res.json({ spotSale });
   } catch (err) {
     logger.error({ err }, '[SPOT-SALES] Update error');
-    res.status(500).json({ error: 'Failed to update spot sale' });
+    res.status(500).json({ error: 'Failed to update clearance deal' });
   }
 });
 
 /**
  * DELETE /api/spot-sales/admin/:id
- * Hard delete a spot sale.
+ * Hard delete a clearance deal.
  */
 adminRouter.delete('/:id', validateParams(idParamsSchema), async (req: Request<{ id: string }>, res: Response) => {
   const { id } = req.params;
@@ -263,7 +263,7 @@ adminRouter.delete('/:id', validateParams(idParamsSchema), async (req: Request<{
     });
 
     if (!existing) {
-      return res.status(404).json({ error: 'Spot sale not found' });
+      return res.status(404).json({ error: 'Clearance deal not found' });
     }
 
     await prisma.spotSale.delete({ where: { id } });
@@ -281,13 +281,13 @@ adminRouter.delete('/:id', validateParams(idParamsSchema), async (req: Request<{
     res.json({ success: true });
   } catch (err) {
     logger.error({ err }, '[SPOT-SALES] Delete error');
-    res.status(500).json({ error: 'Failed to delete spot sale' });
+    res.status(500).json({ error: 'Failed to delete clearance deal' });
   }
 });
 
 /**
  * POST /api/spot-sales/admin/:id/record-sale
- * Record a completed spot sale — creates Transaction, decrements inventory, updates intelligence.
+ * Record a completed clearance sale — creates Transaction, decrements inventory, updates intelligence.
  */
 adminRouter.post('/:id/record-sale', validateParams(idParamsSchema), validate(recordSpotSaleSchema), async (req: Request<{ id: string }>, res: Response) => {
   const { id } = req.params;
@@ -295,7 +295,7 @@ adminRouter.post('/:id/record-sale', validateParams(idParamsSchema), validate(re
   const { buyerId, quantity } = req.body;
 
   try {
-    // 1. Validate spot sale exists and is active + unexpired
+    // 1. Validate clearance deal exists and is active + unexpired
     const spotSale = await prisma.spotSale.findUnique({
       where: { id },
       include: {
@@ -308,14 +308,14 @@ adminRouter.post('/:id/record-sale', validateParams(idParamsSchema), validate(re
       },
     });
 
-    if (!spotSale) return res.status(404).json({ error: 'Spot sale not found' });
+    if (!spotSale) return res.status(404).json({ error: 'Clearance deal not found' });
 
     if (!spotSale.active) {
-      return res.status(400).json({ error: 'Spot sale is not active' });
+      return res.status(400).json({ error: 'Clearance deal is not active' });
     }
 
     if (new Date(spotSale.expiresAt) <= new Date()) {
-      return res.status(400).json({ error: 'Spot sale has expired' });
+      return res.status(400).json({ error: 'Clearance deal has expired' });
     }
 
     // 2. Validate buyer exists and is approved
@@ -371,8 +371,8 @@ adminRouter.post('/:id/record-sale', validateParams(idParamsSchema), validate(re
     createNotification({
       userId: buyerId,
       type: 'BID_ACCEPTED',
-      title: 'Spot sale completed!',
-      body: `Your spot purchase of ${spotSale.product.name} (${quantity}g at $${spotSale.spotPrice.toFixed(2)}/g) has been recorded`,
+      title: 'Clearance sale completed!',
+      body: `Your clearance purchase of ${spotSale.product.name} (${quantity}g at $${spotSale.spotPrice.toFixed(2)}/g) has been recorded`,
       data: { productId: spotSale.product.id, transactionId: transaction.id },
     });
 
@@ -429,7 +429,7 @@ adminRouter.post('/:id/record-sale', validateParams(idParamsSchema), validate(re
     res.json({ transaction: { id: transaction.id, status: transaction.status } });
   } catch (err) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SPOT-SALES] Failed to record sale');
-    res.status(500).json({ error: 'Failed to record spot sale' });
+    res.status(500).json({ error: 'Failed to record clearance sale' });
   }
 });
 
@@ -439,7 +439,7 @@ export const buyerRouter = Router();
 
 /**
  * GET /api/spot-sales
- * Active + unexpired spot sales with active products. Soonest-expiring first.
+ * Active + unexpired clearance deals with active products. Soonest-expiring first.
  */
 buyerRouter.get('/', async (_req: Request, res: Response) => {
   try {
@@ -460,6 +460,6 @@ buyerRouter.get('/', async (_req: Request, res: Response) => {
     res.json({ spotSales });
   } catch (err) {
     logger.error({ err }, '[SPOT-SALES] Buyer list error');
-    res.status(500).json({ error: 'Failed to fetch spot sales' });
+    res.status(500).json({ error: 'Failed to fetch clearance deals' });
   }
 });

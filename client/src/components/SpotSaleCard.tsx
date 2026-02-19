@@ -165,7 +165,7 @@ export default function SpotSaleCard({
           </button>
           {((spotSale.quantity ?? product.gramsAvailable ?? 0) > 0) && (
             <p className="text-center text-xs text-faint">
-              {(spotSale.quantity ?? product.gramsAvailable)?.toLocaleString()}g at spot price
+              {(spotSale.quantity ?? product.gramsAvailable)?.toLocaleString()}g at clearance price
             </p>
           )}
         </div>

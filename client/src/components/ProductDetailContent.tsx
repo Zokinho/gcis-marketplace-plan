@@ -123,7 +123,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
             <h1 className="text-2xl font-bold text-primary">{product.name}</h1>
             <ShortlistButton productId={product.id} size="sm" />
           </div>
-          {/* Priced to Sell badge — hidden while Spot Sales is active */}
+          {/* Priced to Sell badge — hidden while Clearance is active */}
           {(product.seller as any)?.avgFulfillmentScore != null && (
             <p className="text-xs text-faint">
               <span className="inline-flex items-center gap-1 rounded-full bg-brand-sage/20 px-2 py-0.5 text-xs font-medium text-brand-blue">
