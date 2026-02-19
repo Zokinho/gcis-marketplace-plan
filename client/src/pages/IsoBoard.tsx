@@ -478,8 +478,9 @@ export default function IsoBoard() {
     <Layout>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-primary">Wanted</h1>
+          <h1 className="text-2xl font-semibold text-primary">Wanted</h1>
           <p className="text-sm text-muted">Post what you need, sellers respond</p>
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-blue to-brand-teal" />
         </div>
         <button
           onClick={() => setShowCreate(true)}
