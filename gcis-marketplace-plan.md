@@ -991,3 +991,723 @@ Implement the bidding system:
 | Phase 5: Polish + CoA | Week 5+ | Webhooks, notifications, CoA auto-populate |
 
 **With Claude Code doing the heavy lifting, Phases 1–4 could compress to 3–4 weeks.**
+
+
+
+
+
+
+Context
+
+ The GCIS Marketplace (8 prompts complete) has a working product catalog, bid system, CoA integration, and curated shares. The deal-intelligence project at /home/okinho1/deal-intelligence/ is a standalone B2B
+  matching platform with a sophisticated 12-factor scoring engine, seller reliability scorecards, reorder prediction, churn detection, buyer propensity scoring, and market intelligence.
+
+ Why integrate? The marketplace currently has only a simple proximity score (bid price vs asking price). By porting deal-intelligence's services into the marketplace, we get:
+
+ - Smart matching — Auto-suggest products to buyers based on purchase history, preferences, timing, and 12 weighted factors
+ - Seller reliability — Score sellers on fill rate, quality, delivery, and pricing competitiveness
+ - Reorder prediction — Forecast when buyers will need to reorder, enabling proactive outreach
+ - Churn detection — Identify at-risk buyers before they leave
+ - Buyer propensity — RFM-based scoring to prioritize high-value buyers
+ - Market intelligence — Price trends, supply/demand analysis, competitive positioning
+
+ Approach: Copy and adapt deal-intelligence services into the marketplace codebase. Strip multi-tenancy (marketplace is single-tenant), remap data models (PartyA/B → User, Listing → Product), and add new
+ Prisma models for intelligence data.
+
+ ---
+ Prompt 9: Intelligence Engine Backend
+
+ Goal: Schema changes, 6 adapted services, Transaction model, cron jobs, API routes. All server-side — testable via curl before building UI.
+
+ 9.1 Prisma Schema Changes
+
+ Modify: server/prisma/schema.prisma
+
+ New Category model (enables market price tracking by category):
+
+ model Category {
+   id          String   @id @default(cuid())
+   name        String   @unique    // Maps from Product.category
+   description String?
+   createdAt   DateTime @default(now())
+   updatedAt   DateTime @updatedAt
+ }
+
+ New Transaction model (created when bid is accepted):
+
+ model Transaction {
+   id                      String    @id @default(cuid())
+   buyerId                 String
+   buyer                   User      @relation("BuyerTransactions", fields: [buyerId], references: [id])
+   sellerId                String
+   seller                  User      @relation("SellerTransactions", fields: [sellerId], references: [id])
+   productId               String
+   product                 Product   @relation(fields: [productId], references: [id])
+   bidId                   String?   @unique
+   bid                     Bid?      @relation(fields: [bidId], references: [id])
+   quantity                Float
+   pricePerUnit            Float
+   totalValue              Float
+   transactionDate         DateTime  @default(now())
+   status                  String    @default("pending")  // pending, completed, cancelled
+   // Outcome fields (filled after delivery)
+   actualQuantityDelivered Float?
+   deliveryOnTime          Boolean?
+   qualityAsExpected       Boolean?
+   outcomeNotes            String?
+   outcomeRecordedAt       DateTime?
+   // Tracking
+   zohoTaskId              String?   @unique
+   createdAt               DateTime  @default(now())
+   updatedAt               DateTime  @updatedAt
+ }
+
+ New Match model (auto-generated buyer-product suggestions):
+
+ model Match {
+   id            String    @id @default(cuid())
+   buyerId       String
+   buyer         User      @relation("BuyerMatches", fields: [buyerId], references: [id])
+   productId     String
+   product       Product   @relation(fields: [productId], references: [id])
+   score         Float     // 0-100 composite score
+   breakdown     Json      // {category, priceFit, location, relationship, reorderTiming, ...}
+   insights      Json?     // Human-readable insight strings
+   status        String    @default("pending")  // pending, viewed, converted, rejected, expired
+   convertedBidId String?
+   expiresAt     DateTime?
+   createdAt     DateTime  @default(now())
+   updatedAt     DateTime  @updatedAt
+
+   @@unique([buyerId, productId])
+ }
+
+ New SellerScore model:
+
+ model SellerScore {
+   id                  String   @id @default(cuid())
+   sellerId            String   @unique
+   seller              User     @relation(fields: [sellerId], references: [id])
+   fillRate            Float    @default(0)     // 0-100, weight 30%
+   qualityScore        Float    @default(0)     // 0-100, weight 30%
+   deliveryScore       Float    @default(0)     // 0-100, weight 25%
+   pricingScore        Float    @default(0)     // 0-100, weight 15%
+   overallScore        Float    @default(0)     // Weighted composite
+   transactionsScored  Int      @default(0)
+   lastCalculatedAt    DateTime @default(now())
+   createdAt           DateTime @default(now())
+   updatedAt           DateTime @updatedAt
+ }
+
+ New Prediction model:
+
+ model Prediction {
+   id                    String    @id @default(cuid())
+   buyerId               String
+   buyer                 User      @relation(fields: [buyerId], references: [id])
+   categoryName          String    // Product category string
+   predictedDate         DateTime
+   confidenceScore       Float     // 0-100
+   avgIntervalDays       Float
+   basedOnTransactions   Int
+   lastTransactionId     String?
+   notifiedAt            DateTime?
+   createdAt             DateTime  @default(now())
+   updatedAt             DateTime  @updatedAt
+
+   @@unique([buyerId, categoryName])
+ }
+
+ New ChurnSignal model:
+
+ model ChurnSignal {
+   id                String    @id @default(cuid())
+   buyerId           String
+   buyer             User      @relation(fields: [buyerId], references: [id])
+   categoryName      String?
+   riskLevel         String    // low, medium, high, critical
+   riskScore         Float     // 0-100
+   daysSincePurchase Int
+   avgIntervalDays   Float
+   isActive          Boolean   @default(true)
+   resolvedAt        DateTime?
+   resolvedReason    String?
+   createdAt         DateTime  @default(now())
+   updatedAt         DateTime  @updatedAt
+ }
+
+ New PropensityScore model:
+
+ model PropensityScore {
+   id                String    @id @default(cuid())
+   buyerId           String
+   buyer             User      @relation(fields: [buyerId], references: [id])
+   categoryName      String?
+   overallScore      Float     // 0-100 composite
+   recencyScore      Float     // 0-100, weight 25%
+   frequencyScore    Float     // 0-100, weight 20%
+   monetaryScore     Float     // 0-100, weight 15%
+   categoryAffinity  Float     // 0-100, weight 15%
+   engagementScore   Float     // 0-100, weight 25%
+   features          Json?     // Input features for explainability
+   expiresAt         DateTime  // Cache expiration (24hr)
+   createdAt         DateTime  @default(now())
+   updatedAt         DateTime  @updatedAt
+
+   @@unique([buyerId, categoryName])
+ }
+
+ New MarketPrice model:
+
+ model MarketPrice {
+   id                  String    @id @default(cuid())
+   categoryName        String    // Product category string
+   avgPrice            Float
+   minPrice            Float
+   maxPrice            Float
+   transactionCount    Int
+   totalVolume         Float
+   rollingAvg7d        Float?
+   rollingAvg30d       Float?
+   priceChange7d       Float?    // Percentage
+   priceChange30d      Float?    // Percentage
+   periodStart         DateTime
+   periodEnd           DateTime
+   createdAt           DateTime  @default(now())
+   updatedAt           DateTime  @updatedAt
+
+   @@unique([categoryName, periodStart])
+ }
+
+ Add fields to User model:
+
+ // Add to User model
+ lastTransactionDate    DateTime?
+ transactionCount       Int       @default(0)
+ totalTransactionValue  Float     @default(0)
+ avgFulfillmentScore    Float?    // From SellerScore
+
+ Add fields to Product model:
+
+ // Add to Product model
+ matchCount             Int       @default(0)
+
+ Add relation to Bid model:
+
+ // Add to Bid model
+ transaction            Transaction?
+
+ 9.2 Matching Engine Service
+
+ Create: server/src/services/matchingEngine.ts
+
+ Adapted from deal-intelligence matchingEngine.ts (783 lines). Key changes:
+ - Remove tenantId constructor parameter and all tenant-scoped queries
+ - Replace PartyA → User (buyers), PartyB → User (sellers), Listing → Product
+ - Replace categoryId → categoryName (string-based categories)
+ - Use marketplace Prisma client from ../index
+ - Simplify from 12 to 10 initial factors (exclude deal velocity, custom attributes for v1)
+
+ Reference: /home/okinho1/deal-intelligence/server/src/services/matchingEngine.ts
+
+ Scoring Factors (10 total, weights sum to 100%):
+ ┌──────────────────────┬────────┬──────────────────────────────────────────────────────┐
+ │        Factor        │ Weight │                        Source                        │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Category match       │ 15%    │ Buyer's bid/transaction history by category          │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Price fit            │ 12%    │ Product price vs buyer's typical spend               │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Location match       │ 5%     │ buyer.mailingCountry vs seller.mailingCountry        │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Relationship history │ 10%    │ Prior transactions with this seller                  │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Reorder timing       │ 10%    │ From Prediction model                                │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Quantity fit         │ 8%     │ Product.gramsAvailable vs buyer's typical order size │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Seller reliability   │ 10%    │ From SellerScore model                               │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Price vs market      │ 10%    │ Product price vs MarketPrice.rollingAvg30d           │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Supply/demand        │ 5%     │ Active buyers predicted to reorder / active products │
+ ├──────────────────────┼────────┼──────────────────────────────────────────────────────┤
+ │ Buyer propensity     │ 15%    │ From PropensityScore model                           │
+ └──────────────────────┴────────┴──────────────────────────────────────────────────────┘
+ Key Functions:
+ - scoreMatch(buyer, product): Promise<MatchResult> — Score single buyer-product pair
+ - generateMatchesForProduct(productId): Promise<number> — Generate matches for a product
+ - regenerateAllMatches(): Promise<{products, matches}> — Full regeneration
+
+ 9.3 Seller Score Service
+
+ Create: server/src/services/sellerScoreService.ts
+
+ Adapted from deal-intelligence sellerScoreService.ts (277 lines). Key changes:
+ - Remove tenantId; query Transactions directly
+ - Replace PartyB → User (sellers)
+ - Use marketplace's Transaction model with outcome fields
+
+ Key Functions:
+ - calculateSellerScores(sellerId): Promise<ScoreResult>
+ - updateSellerScore(sellerId): Promise<void>
+ - recalculateAllSellerScores(): Promise<{sellersUpdated}>
+ - getTopRatedSellers(limit): Promise<Array>
+
+ Score Components (same as deal-intel):
+ - Fill Rate (30%) — actualQuantityDelivered / ordered
+ - Quality (30%) — % where qualityAsExpected = true
+ - Delivery (25%) — % where deliveryOnTime = true
+ - Pricing (15%) — Competitiveness vs category average
+
+ 9.4 Prediction Engine
+
+ Create: server/src/services/predictionEngine.ts
+
+ Adapted from deal-intelligence predictionEngine.ts (427 lines). Key changes:
+ - Remove tenantId
+ - Replace PartyA → User (buyers)
+ - Use categoryName string instead of categoryId foreign key
+ - Use marketplace's Transaction model
+
+ Key Functions:
+ - generatePredictionsForBuyer(buyerId): Promise<number>
+ - generatePredictions(): Promise<{buyersProcessed, predictionsCreated}>
+ - getOverduePredictions(limit): Promise<Array>
+ - getUpcomingPredictions(days, limit): Promise<Array>
+ - cleanupStalePredictions(): Promise<number>
+
+ Algorithm (same as deal-intel):
+ 1. Find buyer's transactions by category (min 2 required)
+ 2. Calculate intervals between consecutive purchases
+ 3. Filter outliers (< 3 days or > 365 days)
+ 4. Average interval + standard deviation for confidence
+ 5. Predicted date = lastTransaction + avgDays
+
+ 9.5 Churn Detection Service
+
+ Create: server/src/services/churnDetectionService.ts
+
+ Adapted from deal-intelligence churnDetectionService.ts. Key changes:
+ - Remove tenantId
+ - Replace PartyA → User (buyers with bids/transactions)
+ - Use categoryName instead of categoryId
+
+ Key Functions:
+ - analyzeChurnRisk(buyerId, categoryName?): Promise<ChurnRisk[]>
+ - detectAllChurnSignals(): Promise<{signalsCreated, signalsUpdated}>
+ - getAtRiskBuyers(options): Promise<AtRiskBuyer[]>
+ - getChurnStats(): Promise<{...}>
+ - resolveChurnSignal(signalId, reason): Promise<void>
+ - resolveOnPurchase(buyerId, categoryName?): Promise<number>
+
+ Risk Levels (same as deal-intel):
+ - daysSince / avgInterval >= 3 → critical (80-100)
+ - ratio 2-3 → high (60-80)
+ - ratio 1.5-2 → medium (40-60)
+ - ratio 1-1.5 → low (0-40)
+
+ 9.6 Propensity Service
+
+ Create: server/src/services/propensityService.ts
+
+ Adapted from deal-intelligence propensityService.ts. Key changes:
+ - Remove tenantId
+ - Replace PartyA → User
+ - Use marketplace's Match, Transaction, ChurnSignal, Prediction models
+ - categoryName instead of categoryId
+
+ Score Components (same as deal-intel):
+ - Recency (25%) — Days since last purchase (inverse scale)
+ - Frequency (20%) — Transaction count + recent activity
+ - Monetary (15%) — Total spend + avg order value
+ - Category Affinity (15%) — Multi-category engagement
+ - Engagement (25%) — Match interaction rate (viewed/converted)
+
+ 9.7 Market Context Service
+
+ Create: server/src/services/marketContextService.ts
+
+ Adapted from deal-intelligence marketContextService.ts. Key changes:
+ - Remove tenantId
+ - Use categoryName string keys
+ - Price normalization: use pricePerUnit directly (all prices are per-gram in marketplace)
+ - No UnitService needed (marketplace uses grams exclusively)
+
+ Key Functions:
+ - updateMarketPrice(categoryName, price, quantity): Promise<void>
+ - calculateRollingAverages(categoryName): Promise<void>
+ - scorePriceVsMarket(productId): Promise<PriceComparison>
+ - scoreSupplyDemand(productId): Promise<SupplyDemandAnalysis>
+ - getMarketContext(categoryName): Promise<MarketContext>
+ - getMarketTrends(): Promise<MarketTrend[]>
+ - getMarketInsights(): Promise<{trends, topCategories, supplyDemandOverview}>
+
+ 9.8 Transaction Lifecycle
+
+ Modify: server/src/routes/bids.ts
+
+ Add bid acceptance flow that creates a Transaction:
+ ┌─────────────────────────────┬──────────────────────────────────────────────────────┐
+ │          Endpoint           │                       Purpose                        │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────┤
+ │ PATCH /api/bids/:id/accept  │ Seller accepts bid → creates Transaction             │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────┤
+ │ PATCH /api/bids/:id/reject  │ Seller rejects bid                                   │
+ ├─────────────────────────────┼──────────────────────────────────────────────────────┤
+ │ PATCH /api/bids/:id/outcome │ Record delivery outcome (quantity, on-time, quality) │
+ └─────────────────────────────┴──────────────────────────────────────────────────────┘
+ When a bid is accepted:
+ 1. Create Transaction linking buyer, seller, product, bid
+ 2. Update bid status to ACCEPTED
+ 3. Update buyer's lastTransactionDate, transactionCount, totalTransactionValue
+ 4. Call churnDetectionService.resolveOnPurchase() — auto-resolve churn signals
+ 5. Call marketContextService.updateMarketPrice() — record price for market tracking
+ 6. Optionally trigger match regeneration for that buyer
+
+ 9.9 Intelligence API Routes
+
+ Create: server/src/routes/intelligence.ts
+
+ All behind requireAuth + marketplaceAuth + requireAdmin:
+ ┌─────────────────────────────────────────────┬────────┬──────────────────────────────────────────────────────────┐
+ │                  Endpoint                   │ Method │                         Purpose                          │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/dashboard                 │ GET    │ Consolidated stats (matches, predictions, churn, market) │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/matches                   │ GET    │ Pending matches (sorted by score, filterable)            │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/matches/:id               │ GET    │ Match detail with score breakdown                        │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/matches/generate          │ POST   │ Trigger match generation for all/specific products       │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/predictions               │ GET    │ Upcoming reorder predictions                             │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/predictions/calendar      │ GET    │ Calendar view (grouped by week)                          │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/churn/at-risk             │ GET    │ At-risk buyers with risk levels                          │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/churn/stats               │ GET    │ Churn statistics                                         │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/churn/detect              │ POST   │ Run churn detection                                      │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/market/trends             │ GET    │ Market trends across categories                          │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/market/insights           │ GET    │ Market insights for dashboard                            │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/market/:categoryName      │ GET    │ Category market context                                  │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/propensity/top            │ GET    │ Top buyers by propensity                                 │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/seller-scores             │ GET    │ All seller scores                                        │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/seller-scores/:sellerId   │ GET    │ Single seller scorecard                                  │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/seller-scores/recalculate │ POST   │ Trigger recalculation                                    │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/transactions              │ GET    │ Transaction history (paginated)                          │
+ ├─────────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────┤
+ │ /api/intelligence/transactions/:id          │ GET    │ Transaction detail                                       │
+ └─────────────────────────────────────────────┴────────┴──────────────────────────────────────────────────────────┘
+ Buyer-facing matches (behind requireAuth + marketplaceAuth):
+ ┌──────────────────────────┬────────┬─────────────────────────┐
+ │         Endpoint         │ Method │         Purpose         │
+ ├──────────────────────────┼────────┼─────────────────────────┤
+ │ /api/matches             │ GET    │ Buyer's pending matches │
+ ├──────────────────────────┼────────┼─────────────────────────┤
+ │ /api/matches/:id         │ GET    │ Match detail            │
+ ├──────────────────────────┼────────┼─────────────────────────┤
+ │ /api/matches/:id/dismiss │ POST   │ Dismiss/reject match    │
+ └──────────────────────────┴────────┴─────────────────────────┘
+ 9.10 Cron Jobs
+
+ Modify: server/src/index.ts
+
+ Add intelligence cron jobs (alongside existing Zoho 15-min + CoA 5-min):
+ ┌──────────────────┬──────────────────────────────┬──────────────────────────────────────────────────┐
+ │       Job        │           Schedule           │                     Service                      │
+ ├──────────────────┼──────────────────────────────┼──────────────────────────────────────────────────┤
+ │ Match generation │ After each Zoho product sync │ matchingEngine.regenerateAllMatches()            │
+ ├──────────────────┼──────────────────────────────┼──────────────────────────────────────────────────┤
+ │ Predictions      │ Daily 00:00                  │ predictionEngine.generatePredictions() + cleanup │
+ ├──────────────────┼──────────────────────────────┼──────────────────────────────────────────────────┤
+ │ Seller scores    │ Daily 02:00                  │ sellerScoreService.recalculateAllSellerScores()  │
+ ├──────────────────┼──────────────────────────────┼──────────────────────────────────────────────────┤
+ │ Propensity       │ Daily 01:00                  │ propensityService.calculateAllPropensities()     │
+ ├──────────────────┼──────────────────────────────┼──────────────────────────────────────────────────┤
+ │ Churn detection  │ Daily 00:30                  │ churnDetectionService.detectAllChurnSignals()    │
+ └──────────────────┴──────────────────────────────┴──────────────────────────────────────────────────┘
+ All conditional on having Transaction data (skip if zero transactions).
+
+ 9.11 Wire Up
+
+ Modify: server/src/index.ts
+ - Mount /api/intelligence routes (admin)
+ - Mount /api/matches routes (buyer-facing)
+ - Add bid accept/reject/outcome routes
+ - Start intelligence cron jobs
+
+ Modify: server/src/routes/marketplace.ts
+ - Include matchCount in product listings
+ - Include seller's avgFulfillmentScore in product detail
+
+ ---
+ Prompt 10: Intelligence Frontend
+
+ Goal: Intelligence dashboard, match explorer, predictions, churn, market trends, seller scorecards. Enhanced existing pages with intelligence data.
+
+ 10.1 Client API Extensions
+
+ Modify: client/src/lib/api.ts
+
+ New types:
+ interface MatchRecord {
+   id, buyerId, productId, score, breakdown, insights, status, createdAt
+   buyer: { id, email, companyName, firstName, lastName }
+   product: { id, name, category, type, pricePerUnit, gramsAvailable, imageUrls }
+ }
+
+ interface PredictionRecord {
+   id, buyerId, categoryName, predictedDate, confidenceScore, avgIntervalDays
+   buyer: { id, email, companyName, firstName, lastName }
+ }
+
+ interface ChurnRecord {
+   id, buyerId, categoryName, riskLevel, riskScore, daysSincePurchase, avgIntervalDays, isActive
+   buyer: { id, email, companyName }
+ }
+
+ interface SellerScoreRecord {
+   id, sellerId, fillRate, qualityScore, deliveryScore, pricingScore, overallScore, transactionsScored
+   seller: { id, email, companyName }
+ }
+
+ interface MarketTrend {
+   categoryName, currentAvgPrice, previousAvgPrice, percentChange, trend, volume
+ }
+
+ interface MarketContext {
+   categoryName, avgPrice30d, minPrice30d, maxPrice30d
+   priceChange7d, priceChange30d, transactionCount30d, totalVolume30d
+   activeBuyers, activeListings, supplyDemandRatio
+ }
+
+ interface IntelDashboard {
+   pendingMatches, totalMatches, avgMatchScore
+   upcomingPredictions, overduePredictions
+   atRiskBuyers: { critical, high, medium, low }
+   marketTrends: MarketTrend[]
+   topSellers: SellerScoreRecord[]
+   topBuyers: { id, companyName, propensityScore }[]
+ }
+
+ interface TransactionRecord {
+   id, buyerId, sellerId, productId, bidId, quantity, pricePerUnit, totalValue
+   status, transactionDate, actualQuantityDelivered, deliveryOnTime, qualityAsExpected
+   buyer, seller, product
+ }
+
+ New functions: fetchIntelDashboard(), fetchMatches(), fetchMatchById(), generateMatches(), fetchPredictions(), fetchPredictionCalendar(), fetchAtRiskBuyers(), fetchChurnStats(), runChurnDetection(),
+ fetchMarketTrends(), fetchMarketInsights(), fetchMarketContext(), fetchSellerScores(), fetchSellerScore(), recalculateSellerScores(), fetchBuyerMatches(), dismissMatch(), fetchTransactions(), acceptBid(),
+ rejectBid(), recordOutcome(), fetchTopPropensityBuyers()
+
+ 10.2 New Pages
+ ┌──────────────────────┬────────────────────────────┬───────┬──────────────────────────────────────────┐
+ │         Page         │           Route            │ Auth  │                 Purpose                  │
+ ├──────────────────────┼────────────────────────────┼───────┼──────────────────────────────────────────┤
+ │ IntelDashboard       │ /intelligence              │ Admin │ Hub with KPIs, charts, quick actions     │
+ ├──────────────────────┼────────────────────────────┼───────┼──────────────────────────────────────────┤
+ │ MatchExplorer        │ /intelligence/matches      │ Admin │ Browse all matches with score breakdown  │
+ ├──────────────────────┼────────────────────────────┼───────┼──────────────────────────────────────────┤
+ │ PredictionsPage      │ /intelligence/predictions  │ Admin │ Calendar + list of reorder predictions   │
+ ├──────────────────────┼────────────────────────────┼───────┼──────────────────────────────────────────┤
+ │ ChurnPage            │ /intelligence/churn        │ Admin │ At-risk buyers with risk levels, actions │
+ ├──────────────────────┼────────────────────────────┼───────┼──────────────────────────────────────────┤
+ │ MarketIntelPage      │ /intelligence/market       │ Admin │ Price trends, supply/demand by category  │
+ ├──────────────────────┼────────────────────────────┼───────┼──────────────────────────────────────────┤
+ │ SellerScorecardsPage │ /intelligence/sellers      │ Admin │ Seller reliability rankings              │
+ ├──────────────────────┼────────────────────────────┼───────┼──────────────────────────────────────────┤
+ │ TransactionsPage     │ /intelligence/transactions │ Admin │ Transaction history + outcome recording  │
+ ├──────────────────────┼────────────────────────────┼───────┼──────────────────────────────────────────┤
+ │ BuyerMatchesPage     │ /my-matches                │ Buyer │ Personalized product recommendations     │
+ └──────────────────────┴────────────────────────────┴───────┴──────────────────────────────────────────┘
+ 10.3 Intelligence Dashboard (/intelligence)
+
+ Top-level hub page showing:
+ - KPI Cards: Active matches, predictions due this week, at-risk buyers, avg seller score
+ - Match Activity: Recent high-score matches (top 10)
+ - Predictions Timeline: Next 7 days of predicted reorders
+ - Churn Alerts: Critical/high-risk buyers requiring attention
+ - Market Snapshot: Category price trends (sparklines or mini bar chart)
+ - Quick Actions: Generate matches, run churn detection, recalculate scores
+
+ 10.4 Match Explorer (/intelligence/matches)
+
+ - Sortable table of matches (score, buyer, product, status, date)
+ - Score breakdown visualization (horizontal bar chart per factor)
+ - Insight chips (e.g., "Buyer purchases this category monthly", "Price 15% below market")
+ - Filters: min score, category, status, buyer, date range
+ - Click-through to product detail and buyer info
+
+ 10.5 Buyer Matches Page (/my-matches)
+
+ - Card grid of recommended products (sorted by match score)
+ - Each card shows: product image, name, match score badge, price, key insights
+ - "View Product" → ProductDetail page
+ - "Not Interested" → dismiss match
+ - "Place Bid" → opens BidForm
+
+ 10.6 New Components
+ ┌────────────────────┬──────────────────────────────────────────────┬──────────────────────────────────────────────────────────────┐
+ │     Component      │                     File                     │                           Purpose                            │
+ ├────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┤
+ │ ScoreBreakdown     │ client/src/components/ScoreBreakdown.tsx     │ Horizontal bar chart of scoring factors                      │
+ ├────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┤
+ │ RiskBadge          │ client/src/components/RiskBadge.tsx          │ Color-coded risk level chip (low/med/high/critical)          │
+ ├────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┤
+ │ SellerScoreCard    │ client/src/components/SellerScoreCard.tsx    │ 4-metric visual card (fill rate, quality, delivery, pricing) │
+ ├────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┤
+ │ MarketTrendChart   │ client/src/components/MarketTrendChart.tsx   │ Simple category price trend visualization                    │
+ ├────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┤
+ │ PredictionCalendar │ client/src/components/PredictionCalendar.tsx │ Weekly view of predicted reorders                            │
+ ├────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┤
+ │ MatchCard          │ client/src/components/MatchCard.tsx          │ Product recommendation card with match score                 │
+ ├────────────────────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┤
+ │ OutcomeForm        │ client/src/components/OutcomeForm.tsx        │ Record delivery outcome (quantity, on-time, quality)         │
+ └────────────────────┴──────────────────────────────────────────────┴──────────────────────────────────────────────────────────────┘
+ 10.7 Enhanced Existing Pages
+
+ Modify: client/src/pages/ProductDetail.tsx
+ - Add "Match Score" badge when buyer has a match for this product
+ - Add seller reliability score display (from SellerScore)
+ - Add "Market Position" indicator (price vs category average)
+
+ Modify: client/src/pages/MyListings.tsx
+ - Add seller score summary at top (4 metrics)
+ - Add match count per product
+ - Add "Buyer Interest" indicator (how many matches exist)
+
+ Modify: client/src/pages/Orders.tsx
+ - Add accept/reject actions for sellers viewing bids on their products
+ - Add outcome recording for completed transactions
+
+ Modify: client/src/components/Layout.tsx
+ - Add "Intelligence" nav link for admin users (with sub-items)
+ - Add "My Matches" nav link for all buyers
+
+ Modify: client/src/App.tsx
+ - Add routes for all new intelligence pages
+ - Add /my-matches buyer-facing route
+
+ ---
+ Prompt 11 (Future): Zoho Deep Sync
+
+ Not in current scope but planned:
+ - Sync Transactions → Zoho Deals module
+ - Sync Matches as Zoho Notes or Activities
+ - Sync Predictions as Zoho Tasks (reorder reminders)
+ - Push seller scores to Zoho Contact custom fields
+ - Push churn signals as Zoho alerts
+ - Two-way deal status sync
+
+ ---
+ Data Model Mapping (deal-intel → marketplace)
+ ┌──────────────────────────────┬──────────────────────────────────────┬──────────────────────────────┐
+ │          Deal-Intel          │             Marketplace              │            Notes             │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ PartyA                       │ User (contactType contains "Buyer")  │ Single model, role-based     │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ PartyB                       │ User (contactType contains "Seller") │ Same User model              │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ Listing                      │ Product (isActive=true)              │ Already exists               │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ Transaction (deal-intel)     │ Transaction (new model)              │ Created on bid acceptance    │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ Match (deal-intel)           │ Match (new model)                    │ Buyer × Product pairs        │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ SellerScore (deal-intel)     │ SellerScore (new model)              │ 1:1 with seller User         │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ Prediction (deal-intel)      │ Prediction (new model)               │ Buyer × Category             │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ ChurnSignal (deal-intel)     │ ChurnSignal (new model)              │ Per buyer                    │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ PropensityScore (deal-intel) │ PropensityScore (new model)          │ Buyer × Category             │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ MarketPrice (deal-intel)     │ MarketPrice (new model)              │ Per category period          │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ Category (deal-intel)        │ Category (new model)                 │ Auto-populated from products │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ Tenant                       │ N/A (single tenant)                  │ Removed                      │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ CustomAttribute              │ N/A (v1)                             │ Future enhancement           │
+ ├──────────────────────────────┼──────────────────────────────────────┼──────────────────────────────┤
+ │ DealVelocity                 │ N/A (v1)                             │ Future enhancement           │
+ └──────────────────────────────┴──────────────────────────────────────┴──────────────────────────────┘
+ ---
+ Files Summary
+
+ Prompt 9 — Create:
+
+ - server/src/services/matchingEngine.ts
+ - server/src/services/sellerScoreService.ts
+ - server/src/services/predictionEngine.ts
+ - server/src/services/churnDetectionService.ts
+ - server/src/services/propensityService.ts
+ - server/src/services/marketContextService.ts
+ - server/src/routes/intelligence.ts
+
+ Prompt 9 — Modify:
+
+ - server/prisma/schema.prisma (7 new models + field additions to User, Product, Bid)
+ - server/src/index.ts (mount routes, start cron jobs)
+ - server/src/routes/bids.ts (add accept/reject/outcome endpoints)
+ - server/src/routes/marketplace.ts (include matchCount, seller score)
+
+ Prompt 10 — Create:
+
+ - client/src/pages/IntelDashboard.tsx
+ - client/src/pages/MatchExplorer.tsx
+ - client/src/pages/PredictionsPage.tsx
+ - client/src/pages/ChurnPage.tsx
+ - client/src/pages/MarketIntelPage.tsx
+ - client/src/pages/SellerScorecardsPage.tsx
+ - client/src/pages/TransactionsPage.tsx
+ - client/src/pages/BuyerMatchesPage.tsx
+ - client/src/components/ScoreBreakdown.tsx
+ - client/src/components/RiskBadge.tsx
+ - client/src/components/SellerScoreCard.tsx
+ - client/src/components/MarketTrendChart.tsx
+ - client/src/components/PredictionCalendar.tsx
+ - client/src/components/MatchCard.tsx
+ - client/src/components/OutcomeForm.tsx
+
+ Prompt 10 — Modify:
+
+ - client/src/lib/api.ts (new types + ~20 API functions)
+ - client/src/App.tsx (new routes)
+ - client/src/components/Layout.tsx (nav links)
+ - client/src/pages/ProductDetail.tsx (match score, seller reliability, market position)
+ - client/src/pages/MyListings.tsx (seller score, match counts)
+ - client/src/pages/Orders.tsx (accept/reject bids, record outcomes)
+
+ ---
+ Verification
+
+ After Prompt 9:
+
+ 1. Run prisma db push to apply schema changes
+ 2. Verify TypeScript compiles: cd server && npx tsc --noEmit
+ 3. Start server: npx ts-node src/index.ts
+ 4. Test match generation: curl -X POST http://localhost:3001/api/intelligence/matches/generate (with admin auth)
+ 5. Test predictions: curl http://localhost:3001/api/intelligence/predictions (with admin auth)
+ 6. Test bid acceptance: curl -X PATCH http://localhost:3001/api/bids/:id/accept (with seller auth)
+ 7. Verify cron jobs log on schedule
+
+ After Prompt 10:
+
+ 1. Start Vite dev server
+ 2. Navigate to /intelligence — dashboard loads with KPIs
+ 3. Navigate to /intelligence/matches — match explorer shows scored matches
+ 4. Navigate to /my-matches as buyer — personalized recommendations appear
+ 5. Accept a bid as seller → Transaction created → outcome form available
+ 6. Verify TypeScript compiles: cd client && npx tsc --noEmit
