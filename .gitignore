@@ -57,6 +57,9 @@ uploads/
 # SSL certificates (Let's Encrypt)
 certbot/
 
+# Security scan reports
+zap-reports/
+
 # Dev artifacts
 color-demo.html
 harvex-shortlist-feature-snippet.md
