@@ -4,7 +4,23 @@ node_modules/
 # Environment
 .env
 .env.local
-.env.*.local
+.env.production
+.env.*
+!.env.example
+
+# Secrets & credentials
+*.pem
+*.key
+*.p12
+*.jks
+*.secret
+credentials.json
+secrets.json
+*service-account*.json
+firebase-adminsdk*.json
+serviceAccountKey*.json
+google-services.json
+GoogleService-Info.plist
 
 # Build output
 dist/
