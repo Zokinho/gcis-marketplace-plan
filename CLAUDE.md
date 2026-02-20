@@ -17,7 +17,7 @@ B2B cannabis marketplace connecting licensed producers (sellers) with buyers. Pr
 | **CRM** | Zoho CRM API v7 (Canada region — zohocloud.ca) |
 | **CoA** | Proxy to CoA microservice (Python/FastAPI at localhost:8000) |
 | **Database** | PostgreSQL 16 via Docker on **port 5434** |
-| **Testing** | Vitest + Supertest (382 tests across 22 files) |
+| **Testing** | Vitest + Supertest (404 tests across 23 files) |
 | **Logging** | Pino (structured JSON) + pino-sentry-transport |
 | **Monitoring** | Sentry (backend + frontend) + Prometheus metrics |
 
@@ -62,6 +62,8 @@ See `.env.example`. Key vars:
 | `VITE_SENTRY_DSN` | Frontend Sentry DSN (build-time, optional) |
 | `SENTRY_TRACES_SAMPLE_RATE` | Sentry trace sampling rate (default `0.1`) |
 | `ENABLE_METRICS` | `true`/`false` — enables Prometheus `/metrics` endpoint |
+| `MARKETPLACE_COUPLED` | `true` follows Zoho Product_Active, `false` independent visibility (testing) |
+| `CSP_EXTRA_CONNECT_SRC` | Extra connect-src domains for CSP (comma-separated, optional) |
 
 ---
 
@@ -79,7 +81,7 @@ gcis-marketplace-plan/
 │   ├── tsconfig.json
 │   ├── vitest.config.ts
 │   ├── prisma/
-│   │   ├── schema.prisma           # Full data model (16 models)
+│   │   ├── schema.prisma           # Full data model (21 models)
 │   │   └── migrations/             # Versioned migrations (baseline + incremental)
 │   └── src/
 │       ├── index.ts                # Express entry, middleware, route mounting, cron setup
@@ -97,6 +99,8 @@ gcis-marketplace-plan/
 │       │   ├── onboarding.ts       # EULA accept, doc upload, onboarding status
 │       │   ├── shares.ts           # Admin CRUD + public share viewer (token-based)
 │       │   ├── shortlist.ts       # Toggle, list, check, count (buyer shortlist)
+│       │   ├── iso.ts              # ISO board — create, browse, respond, admin, auto-matching
+│       │   ├── spotSales.ts        # Spot sales — buyer view + admin CRUD + record sale
 │       │   ├── user.ts             # User status/profile
 │       │   └── webhooks.ts         # Zoho webhook (product/contact updates)
 │       ├── services/
@@ -111,6 +115,7 @@ gcis-marketplace-plan/
 │       │   ├── propensityService.ts      # RFM+ buyer scoring
 │       │   ├── sellerDetection.ts  # Match email/company to marketplace sellers
 │       │   ├── sellerScoreService.ts     # 4-metric seller reliability
+│       │   ├── isoMatchingService.ts    # 7-factor ISO→Product auto-matching
 │       │   ├── zohoApi.ts          # Zoho CRM CRUD operations
 │       │   ├── zohoAuth.ts         # OAuth token management
 │       │   └── zohoSync.ts         # Full + delta product/contact sync (15-min cron)
@@ -121,6 +126,7 @@ gcis-marketplace-plan/
 │       │   ├── logger.ts           # Pino structured logger + pino-sentry-transport
 │       │   ├── metrics.ts          # Prometheus registry, HTTP + cron metrics, metricsMiddleware
 │       │   ├── proximity.ts        # Bid proximity score calculator
+│       │   ├── s3.ts               # S3-compatible uploads (DigitalOcean Spaces), presigned URLs
 │       │   ├── sentry.ts           # Sentry SDK init, user context helpers
 │       │   └── validation.ts       # Zod schemas + validate/validateQuery/validateParams
 │       └── __tests__/
@@ -140,6 +146,7 @@ gcis-marketplace-plan/
 │           ├── sellerDetection.test.ts # 16 tests
 │           ├── shares.test.ts      # 19 tests
 │           ├── shortlist.test.ts   # 16 tests
+│           ├── iso.test.ts        # 22 tests
 │           └── validation.test.ts  # 49 tests
 │
 ├── client/
@@ -179,6 +186,8 @@ gcis-marketplace-plan/
 │       │   ├── SellerScoreCard.tsx # 4-metric seller card
 │       │   ├── ShortlistButton.tsx  # Bookmark icon (reusable, sm/md sizes)
 │       │   ├── ShareModal.tsx      # Share link creation modal
+│       │   ├── SpotSaleCard.tsx    # Spot sale card with countdown timer + discount badge
+│       │   ├── ProductImage.tsx    # Smart image (S3 presigned URL cache, legacy path fallback)
 │       │   ├── TestResultsDisplay.tsx # CoA test results viewer
 │       │   └── ThemeToggle.tsx     # Dark/light mode toggle
 │       └── pages/
@@ -205,14 +214,17 @@ gcis-marketplace-plan/
 │           ├── MarketIntelPage.tsx # Market trends (admin)
 │           ├── SellerScorecardsPage.tsx # Seller reliability (admin)
 │           ├── TransactionsPage.tsx    # Transaction history (admin)
-│           └── BuyerMatchesPage.tsx    # Buyer-facing matches
+│           ├── BuyerMatchesPage.tsx    # Buyer-facing matches
+│           ├── IsoBoard.tsx           # ISO board — browse/my tabs, create/respond modals
+│           ├── SpotSales.tsx          # Buyer spot sales view (countdown timers)
+│           └── SpotSalesAdmin.tsx     # Admin spot sale management (CRUD + record sale)
 ```
 
 ---
 
 ## Data Model (Prisma)
 
-17 models in `server/prisma/schema.prisma`:
+21 models in `server/prisma/schema.prisma`:
 
 | Model | Purpose |
 |-------|---------|
@@ -227,12 +239,16 @@ gcis-marketplace-plan/
 | **PropensityScore** | RFM+ buyer purchasing propensity |
 | **MarketPrice** | Category price trends with rolling averages |
 | **Category** | Auto-populated product categories |
-| **Notification** | In-app notifications (12 types, user preferences) |
+| **ProductView** | Browsing behavior tracking (5-min dedup, feeds propensity scoring) |
+| **Notification** | In-app notifications (15 types, user preferences) |
 | **SyncLog** | Zoho sync audit trail |
 | **CoaSyncRecord** | CoA email → product pipeline tracking |
 | **CuratedShare** | Token-based public product catalog links |
 | **ShortlistItem** | Buyer-saved products (unique buyer+product, feeds intelligence) |
 | **AuditLog** | Admin action audit trail |
+| **SpotSale** | Admin-curated limited-time deals with countdown timers |
+| **IsoRequest** | Buyer "In Search Of" demand posts (auto-expires 30 days) |
+| **IsoResponse** | Seller responses to ISO requests ("I have this") |
 
 ### Full-Text Search
 
@@ -286,6 +302,14 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 | GET | `/api/shortlist` | Paginated shortlist (sort/filter) |
 | GET | `/api/shortlist/check?productIds=a,b,c` | Bulk check shortlist state (max 50) |
 | GET | `/api/shortlist/count` | Total shortlist count |
+| POST | `/api/iso` | Create ISO request (auto-expires 30 days) |
+| GET | `/api/iso` | Browse ISO board (anonymized, OPEN only by default) |
+| GET | `/api/iso/my` | Buyer's own ISOs (full detail, paginated) |
+| GET | `/api/iso/matches` | Buyer's auto-matched ISOs (status=MATCHED) |
+| GET | `/api/iso/:id` | ISO detail (anonymized for non-owners) |
+| PATCH | `/api/iso/:id` | Close or renew own ISO |
+| POST | `/api/iso/:id/respond` | Seller "I have this" response |
+| GET | `/api/spot-sales` | Active spot sales (soonest-expiring first) |
 
 ### Seller (requires seller role)
 | Method | Path | Purpose |
@@ -314,6 +338,12 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 | GET | `/api/shares` | Manage curated shares |
 | POST | `/api/shares` | Create curated share |
 | DELETE | `/api/shares/:id` | Delete share |
+| GET | `/api/iso/admin` | All ISOs (non-anonymized, includes buyer/seller info) |
+| POST | `/api/spot-sales/admin` | Create spot sale |
+| GET | `/api/spot-sales/admin` | List all spot sales (paginated, filterable) |
+| PATCH | `/api/spot-sales/admin/:id` | Update spot sale (price, expiry, qty, active) |
+| DELETE | `/api/spot-sales/admin/:id` | Delete spot sale |
+| POST | `/api/spot-sales/admin/:id/record-sale` | Record completed sale → Transaction + decrement inventory |
 
 ### Intelligence (admin)
 | Method | Path | Purpose |
@@ -371,6 +401,7 @@ Admin:      requireAuth() → marketplaceAuth → requireAdmin
 | Predictions + Churn | Daily midnight | 100003, 100004 | Reorder forecasts + at-risk buyers |
 | Propensity Scores | Daily 1am | 100005 | RFM+ buyer scoring |
 | Seller Scores | Daily 2am | 100006 | 4-metric reliability recalc |
+| ISO Expiry | Daily 3am | 100007 | Mark expired OPEN ISOs as EXPIRED |
 
 All cron jobs use **PostgreSQL advisory locks** (`withCronLock()`) to prevent duplicate execution across multiple server instances.
 
@@ -406,6 +437,7 @@ All cron jobs use **PostgreSQL advisory locks** (`withCronLock()`) to prevent du
 
 ### Propensity Score (RFM+)
 - Recency (25%), Frequency (20%), Monetary (15%), Category Affinity (15%), Engagement (25%)
+- **Enhanced features** (Prompt 17): viewsLast30d, uniqueProductsViewed30d, viewToShortlistRate, bidRejectionRate, totalBidsPlaced, bidConversionRate
 
 ---
 
@@ -437,7 +469,7 @@ All routes use **Zod schemas** via middleware:
 - `validateQuery(schema)` — query parameters (with coercion)
 - `validateParams(schema)` — URL parameters
 
-17 schemas in `server/src/utils/validation.ts` covering auth, marketplace, notifications, intelligence, bids, CoA, and admin routes.
+30+ schemas in `server/src/utils/validation.ts` covering auth, marketplace, notifications, intelligence, bids, CoA, admin, ISO, and spot sales routes.
 
 ### Other Measures
 - **Helmet** + **CORS** (configurable origin)
@@ -460,7 +492,7 @@ All routes use **Zod schemas** via middleware:
 
 ## Audit Log
 
-Actions logged: `user.approve`, `user.reject`, `sync.trigger`, `coa.confirm`, `coa.dismiss`, `bid.accept`, `bid.reject`, `bid.outcome`, `notification.broadcast`
+Actions logged: `user.approve`, `user.reject`, `sync.trigger`, `coa.confirm`, `coa.dismiss`, `bid.accept`, `bid.reject`, `bid.outcome`, `notification.broadcast`, `spot-sale.create`, `spot-sale.update`, `spot-sale.delete`, `spot-sale.record`
 
 `GET /api/admin/audit-log` — Paginated, filterable by action, actorId, targetType, date range.
 
@@ -468,7 +500,7 @@ Actions logged: `user.approve`, `user.reject`, `sync.trigger`, `coa.confirm`, `c
 
 ## Notification System
 
-13 notification types: `BID_RECEIVED`, `BID_ACCEPTED`, `BID_REJECTED`, `BID_COUNTERED`, `BID_OUTCOME`, `PRODUCT_NEW`, `PRODUCT_PRICE`, `PRODUCT_STOCK`, `MATCH_SUGGESTION`, `COA_PROCESSED`, `PREDICTION_DUE`, `SHORTLIST_PRICE_DROP`, `SYSTEM_ANNOUNCEMENT`
+15 notification types: `BID_RECEIVED`, `BID_ACCEPTED`, `BID_REJECTED`, `BID_COUNTERED`, `BID_OUTCOME`, `PRODUCT_NEW`, `PRODUCT_PRICE`, `PRODUCT_STOCK`, `MATCH_SUGGESTION`, `COA_PROCESSED`, `PREDICTION_DUE`, `SHORTLIST_PRICE_DROP`, `ISO_MATCH_FOUND`, `ISO_SELLER_RESPONSE`, `SYSTEM_ANNOUNCEMENT`
 
 - Fire-and-forget `createNotification()` respects per-user preferences
 - `SYSTEM_ANNOUNCEMENT` always delivered (cannot be disabled)
@@ -494,7 +526,7 @@ All monitoring is **env-gated** — without `SENTRY_DSN` / `ENABLE_METRICS`, beh
 - **Cron metrics**: `cron_job_duration_seconds` (histogram), `cron_job_last_success_timestamp` (gauge), `cron_job_errors_total` (counter)
 - **Process metrics**: Default Node.js process metrics (CPU, memory, event loop, GC) via `collectDefaultMetrics()`
 - **Route normalization**: UUIDs and numeric IDs replaced with `:id` to prevent label cardinality explosion
-- All 6 cron jobs automatically instrumented via `withCronLock()` in `cronLock.ts`
+- All 7 cron jobs automatically instrumented via `withCronLock()` in `cronLock.ts`
 
 ### Key Files
 | File | Purpose |
@@ -510,7 +542,7 @@ All monitoring is **env-gated** — without `SENTRY_DSN` / `ENABLE_METRICS`, beh
 
 ```bash
 cd server
-npm test              # Run all 382 tests
+npm test              # Run all 404 tests
 npm run test:watch    # Watch mode
 npm run test:coverage # With coverage report
 ```
@@ -530,6 +562,7 @@ npm run test:coverage # With coverage report
 | admin.test.ts | 18 | Integration — user management + sync + queue |
 | sellerDetection.test.ts | 16 | Unit — email/company/producer matching |
 | shortlist.test.ts | 16 | Integration — toggle, list, check, count |
+| iso.test.ts | 22 | Integration — ISO board CRUD, respond, anonymization |
 | authUtils.test.ts | 13 | Unit — JWT/bcrypt round-trip tests |
 | marketplaceVisibility.test.ts | 11 | Unit — visibility mode switching |
 | cronLock.test.ts | 11 | Unit — PostgreSQL advisory lock behavior |
@@ -571,30 +604,32 @@ sudo docker compose up -d postgres
 sudo docker compose up -d
 
 # Full stack — production (HTTPS via Let's Encrypt)
+# ⚠️  MUST run on the production server, not locally!
+ssh root@159.203.20.213
+cd ~/gcis-marketplace-plan
 sudo bash scripts/init-letsencrypt.sh   # First time only
-sudo bash scripts/deploy.sh             # Standard deploy (recommended)
-sudo bash scripts/deploy.sh --full      # Full no-cache rebuild (use if deploy seems stale)
+bash scripts/deploy.sh                  # Standard deploy (always --no-cache)
 ```
 
 ### Production Deploy Steps (`scripts/deploy.sh`)
 
 The deploy script automates these steps — **always use it** instead of manual `docker compose` commands:
 
-1. `git pull --ff-only` — Pull latest code
-2. `docker compose build server client` — Rebuild server + client images
-3. `docker compose up -d server client` — Recreate containers (postgres untouched)
-4. Verify containers are running + health check
-5. Verify build artifacts (CSS/JS hashes) + cache headers
-
-Use `--full` flag to add `--no-cache` to the build step if a deploy appears stale.
+1. **Hostname guard** — warns if run on a local dev machine (detects "desktop", "laptop", "wsl" in hostname)
+2. `git pull --ff-only` — Pull latest code
+3. **Self-update** — re-execs itself after git pull so the latest script version runs the build
+4. `docker compose build --no-cache server client` — Always rebuilds from scratch
+5. `docker compose up -d server client` — Recreate containers (postgres untouched)
+6. Verify containers are running + health check
+7. Verify build artifacts (CSS/JS hashes) + cache headers
 
 ### Cache Strategy (Nginx)
 
-Nginx is configured to prevent stale deploys:
-- **`/assets/*`** — `Cache-Control: max-age=1y, immutable` (Vite content-hashed filenames)
-- **`index.html` + SPA routes** — `Cache-Control: no-cache, no-store, must-revalidate`
+Nginx sends `Cache-Control: no-cache, no-store, must-revalidate` at the **server level** (applies to all responses including `index.html` and SPA routes). This ensures browsers always fetch the latest `index.html` which references content-hashed asset filenames.
 
-This ensures browsers always fetch the latest `index.html` (which references new asset hashes) while caching the heavy JS/CSS bundles indefinitely.
+Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cache-bust on each build. Browsers do conditional 304 requests for cached assets.
+
+**Note**: Location-block `add_header` directives were unreliable (silently dropped due to Nginx header inheritance), so all cache headers live at the server block level.
 
 ### Container Details
 - **Server Dockerfile**: `prisma migrate deploy` on startup (safe for production)
@@ -657,19 +692,24 @@ This ensures browsers always fetch the latest `index.html` (which references new
 | 9 | 13 | Security hardening — Zod validation, $queryRaw, auth on file proxy, PDF validation |
 | 10 | 14 | Admin audit log — AuditLog model, fire-and-forget logging, filterable API |
 | 11 | 15 | Shortlist — product saving, intelligence integration, price-drop notifications |
+| 12 | 16 | Spot Sales — admin-curated limited-time deals with countdown timers |
+| 13 | 17 | Intelligence enhancements — ProductView tracking, match conversion, bid elasticity, propensity features |
+| 14 | 18 | S3-compatible file uploads — DigitalOcean Spaces with presigned URLs, ProductImage component |
 | 15 | 19 | HTTPS/SSL — Nginx TLS termination, Let's Encrypt, HSTS, HTTPS redirect |
 | 16 | 20 | Monitoring — Sentry error tracking, Prometheus metrics, pino-sentry transport |
-| 17 | 22 | Self-hosted auth — Replace Clerk with bcrypt + JWT, multi-step sign-up wizard |
+| 17 | 21 | Marketplace visibility decoupling — independent marketplaceVisible flag, MARKETPLACE_COUPLED env |
+| 18 | 22 | Self-hosted auth — Replace Clerk with bcrypt + JWT, multi-step sign-up wizard |
+| 19 | 23 | ISO feature — buyer demand posts, seller responses, 7-factor auto-matching, expiry cron |
 
 ### Production Hardening (cross-cutting)
 - Structured logging (pino) — replaced 130+ console.log/error calls
 - Global error handling — Express catch-all, process.on handlers, React ErrorBoundary
 - Database indexes on all foreign keys
-- PostgreSQL advisory lock cron locking (6 jobs)
+- PostgreSQL advisory lock cron locking (7 jobs)
 - Docker startup with `prisma migrate deploy`
 - Health check with detailed mode (DB, Zoho, CoA)
 - Rate limiting (4 tiers)
-- 382 tests across 22 files
+- 404 tests across 23 files
 - Dark mode support across all pages
 - Sentry error tracking (backend + frontend) with pino log transport
 - Prometheus metrics (HTTP + cron) with `/metrics` endpoint
