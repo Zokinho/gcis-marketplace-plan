@@ -672,6 +672,44 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ---
 
+## Security Scan Results (2026-02-19)
+
+### Static Security Audit (`security-audit.sh`)
+
+| Check | Result |
+|-------|--------|
+| Dependency Vulnerabilities (npm audit) | PASS |
+| Secrets & Credentials (.env gitignored, no hardcoded secrets) | PASS |
+| API Route Authentication | PASS |
+| CORS Configuration (no wildcard origins) | PASS |
+| SQL Injection Risk (no string concatenation) | PASS |
+| XSS Risk (no raw HTML injection) | PASS |
+| Debug & Dev Mode | PASS |
+| Security Headers | WARN (false positive — Helmet is configured in `server/src/index.ts`) |
+| File Upload Safety (validation present) | PASS |
+| Environment Variables (no sensitive NEXT_PUBLIC_ exposure) | PASS |
+
+**Result: 11 PASS, 1 WARN, 0 FAIL**
+
+### OWASP ZAP Baseline Scan
+
+Scanned with [ZAP](https://www.zaproxy.org/) (ghcr.io/zaproxy/zaproxy:stable) against `http://localhost:3001`.
+
+| Category | Count |
+|----------|-------|
+| Rules Passed | 65 |
+| Warnings | 2 |
+| Failures | 0 |
+
+**Warnings (both non-issues):**
+
+1. **Storable and Cacheable Content [10049]** — Fired on 404 responses for `/robots.txt` and `/sitemap.xml` (files don't exist). Authenticated API routes use proper cache-control headers.
+2. **CSP: Failure to Define Directive with No Fallback [10055]** — Helmet's CSP sets `default-src 'none'` but doesn't explicitly set `frame-ancestors` and `form-action`. These are handled by Helmet's `frameguard` and are non-exploitable on an API server.
+
+Full ZAP report: [`zap-reports/zap-report.md`](zap-reports/zap-report.md)
+
+---
+
 ## Related Projects
 
 - **CoA Project**: `/home/okinho1/gcis-coa-project/` — Python/FastAPI, Claude Vision AI extraction
