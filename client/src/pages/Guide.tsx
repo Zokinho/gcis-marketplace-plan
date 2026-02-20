@@ -59,7 +59,7 @@ const SECTIONS = [
   },
   {
     id: 'iso-board',
-    title: 'ISO Board (In Search Of)',
+    title: 'Wanted (In Search Of)',
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -68,7 +68,7 @@ const SECTIONS = [
     sellerOnly: false,
     defaultOpen: false,
     steps: [
-      { title: 'Post what you\'re looking for', description: 'As a buyer, click "ISO Board" in the navigation, then "Post ISO" to describe the product you need — category, type, THC/CBD range, quantity, target price, and certifications.' },
+      { title: 'Post what you\'re looking for', description: 'As a buyer, click "Wanted" in the marketplace tabs, then "Post ISO" to describe the product you need — category, type, THC/CBD range, quantity, target price, and certifications.' },
       { title: 'Browse the board', description: 'The "Browse" tab shows all open ISO requests from other buyers (anonymized). Use this to understand market demand.' },
       { title: 'View your ISOs', description: 'Switch to the "My ISOs" tab to see all your posted requests, their status (Open, Matched, Fulfilled, Closed, Expired), and any seller responses.' },
       { title: 'Respond as a seller', description: 'Sellers can respond to any open ISO by clicking "I Have This" and selecting a matching product from their inventory. The buyer and admin are notified.' },
@@ -78,7 +78,7 @@ const SECTIONS = [
   },
   {
     id: 'spot-sales',
-    title: 'Spot Sales',
+    title: 'Clearance',
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -87,10 +87,10 @@ const SECTIONS = [
     sellerOnly: false,
     defaultOpen: false,
     steps: [
-      { title: 'Find active deals', description: 'Click "Spot Sales" in the navigation to see limited-time deals curated by the admin team. These are typically clearance or time-sensitive offers.' },
-      { title: 'Check the countdown', description: 'Each spot sale shows a countdown timer. Once it reaches zero, the deal expires and is no longer available.' },
-      { title: 'View deal details', description: 'Click on a spot sale card to see the full product details including the discounted price, original price, and available quantity.' },
-      { title: 'Act quickly', description: 'Spot sales have limited quantities. If you see something you like, place a bid soon before the deal expires or stock runs out.' },
+      { title: 'Find active deals', description: 'Click "Clearance" in the marketplace tabs to see limited-time deals curated by the admin team. These are typically clearance or time-sensitive offers.' },
+      { title: 'Check the countdown', description: 'Each clearance deal shows a countdown timer. Once it reaches zero, the deal expires and is no longer available.' },
+      { title: 'View deal details', description: 'Click on a clearance card to see the full product details including the discounted price, original price, and available quantity.' },
+      { title: 'Act quickly', description: 'Clearance deals have limited quantities. If you see something you like, place a bid soon before the deal expires or stock runs out.' },
     ],
   },
   {
@@ -128,24 +128,6 @@ const SECTIONS = [
       { title: 'Create a new listing', description: 'Click "Create Listing" to add a new product. You can upload a CoA (Certificate of Analysis) to auto-fill product details.' },
       { title: 'Share your products', description: 'Create shareable links to send your product catalog to specific buyers or partners without requiring them to log in.' },
       { title: 'Review incoming bids', description: 'Check the "Orders" page for the Seller view to see bids from buyers. You can accept or reject each bid.' },
-    ],
-  },
-  {
-    id: 'coa-upload',
-    title: 'CoA Upload & Product Creation',
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-      </svg>
-    ),
-    sellerOnly: true,
-    defaultOpen: false,
-    steps: [
-      { title: 'Go to Create Listing', description: 'Click "Create Listing" in the navigation to start adding a new product to the marketplace.' },
-      { title: 'Upload your CoA PDF', description: 'Drag and drop your Certificate of Analysis PDF or click to browse. The system uses AI to automatically extract test results, THC/CBD percentages, terpene profiles, and product details.' },
-      { title: 'Review extracted data', description: 'After the CoA is processed, review the auto-filled product information. You can edit any field before confirming.' },
-      { title: 'Set pricing and quantity', description: 'Enter your asking price per gram and the available quantity. These can be updated later from your listings page.' },
-      { title: 'Publish your listing', description: 'Once everything looks good, confirm the listing. It will appear in the marketplace and be matched against buyer ISOs automatically.' },
     ],
   },
 ] as const;
@@ -260,7 +242,12 @@ export default function Guide() {
       <div ref={containerRef} className="mx-auto max-w-4xl">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-primary">Platform Guide</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold text-primary">
+            <svg className="h-6 w-6 text-brand-teal dark:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+            </svg>
+            Platform Guide
+          </h1>
           <p className="mt-1 text-sm text-muted">
             Step-by-step instructions for using Harvex. Click any section to expand it.
           </p>
