@@ -1,3 +1,9 @@
+# Cache control: hashed assets cached forever, everything else no-cache
+map $uri $cache_control {
+    ~^/assets/ "public, max-age=31536000, immutable";
+    default    "no-cache, no-store, must-revalidate";
+}
+
 # HTTP — ACME challenge + redirect to HTTPS
 server {
     listen 80;
@@ -38,7 +44,7 @@ server {
     resolver 8.8.8.8 8.8.4.4 valid=300s;
     resolver_timeout 5s;
 
-    # Security headers
+    # Security + cache headers (all at server level to avoid Nginx inheritance issues)
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -47,6 +53,7 @@ server {
     add_header Cross-Origin-Opener-Policy "same-origin" always;
     add_header Cross-Origin-Embedder-Policy "credentialless" always;
     add_header Cross-Origin-Resource-Policy "same-origin" always;
+    add_header Cache-Control $cache_control always;
 
     # Basic auth (optional — enabled when /etc/nginx/.htpasswd exists)
     auth_basic "Restricted";
@@ -56,17 +63,9 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Cache hashed assets aggressively (Vite produces content-hashed filenames)
+    # Hashed assets — long-lived cache (map handles the Cache-Control value)
     location /assets/ {
         expires 1y;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
-    }
-
-    # Never cache index.html — ensures browsers always fetch latest asset references
-    location = /index.html {
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-        add_header Expires "0" always;
     }
 
     # Webhook endpoint — no basic auth
@@ -110,6 +109,5 @@ server {
     # SPA fallback - serve index.html for all client routes
     location / {
         try_files $uri $uri/ /index.html;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
     }
 }
