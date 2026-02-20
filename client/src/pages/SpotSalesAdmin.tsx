@@ -72,7 +72,7 @@ export default function SpotSalesAdmin() {
         <div>
           <h1 className="text-2xl font-semibold text-primary">Clearance Management</h1>
           <p className="text-sm text-muted">Create and manage limited-time product deals</p>
-          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-coral to-brand-yellow" />
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-coral to-brand-yellow teal:from-brand-yellow teal:to-brand-coral" />
         </div>
         <button
           onClick={() => setShowCreate(true)}

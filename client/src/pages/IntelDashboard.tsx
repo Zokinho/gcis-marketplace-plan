@@ -65,7 +65,7 @@ export default function IntelDashboard() {
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-primary">Intelligence Dashboard</h2>
         <p className="text-sm text-muted">AI-powered insights for your marketplace</p>
-        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-blue to-brand-teal" />
+        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-blue to-brand-teal teal:from-brand-yellow teal:to-brand-coral" />
       </div>
 
       {/* KPI Cards */}

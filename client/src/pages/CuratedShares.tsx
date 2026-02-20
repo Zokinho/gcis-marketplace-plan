@@ -31,7 +31,7 @@ export default function CuratedShares() {
         <div>
           <h1 className="text-2xl font-semibold text-primary">Curated Shares</h1>
           <p className="text-sm text-muted">Create and manage shareable product catalogs</p>
-          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue teal:from-brand-yellow teal:to-brand-coral" />
         </div>
         <button
           onClick={() => setShowCreate(true)}

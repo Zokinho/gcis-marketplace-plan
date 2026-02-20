@@ -193,7 +193,7 @@ export default function Guide() {
           <p className="mt-1 text-sm text-muted">
             Step-by-step instructions for using Harvex. Click any section to expand it.
           </p>
-          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-yellow to-brand-teal" />
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-yellow to-brand-teal teal:from-brand-yellow teal:to-brand-coral" />
         </div>
 
         {/* Quick links */}

@@ -56,7 +56,7 @@ export default function ShortlistPage() {
             <p className="text-sm text-muted">Products you've saved for later</p>
           </div>
         </div>
-        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-coral to-brand-teal dark:from-brand-yellow" />
+        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-coral to-brand-teal dark:from-brand-yellow teal:from-brand-yellow teal:to-brand-coral" />
       </div>
 
       {/* How it works — dismissible */}
@@ -134,8 +134,8 @@ export default function ShortlistPage() {
       {/* Empty state */}
       {!loading && !error && items.length === 0 && (
         <div className="rounded-lg border border-brand-gray dark:border-slate-700 surface p-12 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-coral/10 dark:bg-brand-yellow/10">
-            <svg className="h-8 w-8 text-brand-coral/50 dark:text-brand-yellow/50" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-coral/10 dark:bg-brand-yellow/10 teal:bg-brand-yellow/15">
+            <svg className="h-8 w-8 text-brand-coral/50 dark:text-brand-yellow/50 teal:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
             </svg>
           </div>

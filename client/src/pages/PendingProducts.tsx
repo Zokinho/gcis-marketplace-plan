@@ -55,7 +55,7 @@ export default function PendingProducts() {
         <p className="text-sm text-muted">
           Review and approve seller-submitted listings before they appear in the marketplace.
         </p>
-        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
+        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue teal:from-brand-yellow teal:to-brand-coral" />
       </div>
 
       {error && (
@@ -72,8 +72,8 @@ export default function PendingProducts() {
 
       {!loading && products.length === 0 && (
         <div className="rounded-lg border border-brand-gray dark:border-slate-700 surface p-12 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10 dark:bg-brand-sage/20">
-            <svg className="h-8 w-8 text-brand-sage" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-sage/10 dark:bg-brand-sage/20 teal:bg-brand-yellow/15">
+            <svg className="h-8 w-8 text-brand-sage teal:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
           </div>

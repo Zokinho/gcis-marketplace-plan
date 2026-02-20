@@ -136,7 +136,7 @@ export default function CreateListing() {
           <div>
             <h2 className="text-2xl font-semibold text-primary">Create Listing</h2>
             <p className="text-sm text-muted">Add a new product to the marketplace manually.</p>
-            <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
+            <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue teal:from-brand-yellow teal:to-brand-coral" />
           </div>
         </div>
 

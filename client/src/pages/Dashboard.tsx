@@ -74,7 +74,7 @@ export default function Dashboard() {
           <p className="text-sm text-muted">
             Your Harvex dashboard — browse products, manage orders, and track your activity.
           </p>
-          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue teal:from-brand-yellow teal:to-brand-coral" />
         </div>
       </div>
 

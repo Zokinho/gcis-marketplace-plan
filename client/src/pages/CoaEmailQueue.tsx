@@ -42,7 +42,7 @@ export default function CoaEmailQueue() {
         <div>
           <h1 className="text-2xl font-semibold text-primary">Supplies Inbox</h1>
           <p className="text-sm text-muted">Email-ingested documents awaiting seller assignment</p>
-          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue" />
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue teal:from-brand-yellow teal:to-brand-coral" />
         </div>
         <button
           onClick={handlePoll}
