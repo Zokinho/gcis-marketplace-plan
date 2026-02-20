@@ -10,8 +10,8 @@ const TYPE_COLORS: Record<string, string> = {
 
 const CERT_COLORS: Record<string, string> = {
   GACP: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  GMP1: 'bg-brand-sage/20 text-brand-teal dark:bg-brand-sage/15 dark:text-brand-sage',
-  GMP2: 'bg-brand-sage/20 text-brand-teal dark:bg-brand-sage/15 dark:text-brand-sage',
+  GMP1: 'bg-brand-sage/20 text-brand-teal dark:bg-brand-sage/15 dark:text-brand-sage teal:bg-white/20 teal:text-brand-yellow',
+  GMP2: 'bg-brand-sage/20 text-brand-teal dark:bg-brand-sage/15 dark:text-brand-sage teal:bg-white/20 teal:text-brand-yellow',
   GPP: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
   'IMC-GAP': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
 };
@@ -146,10 +146,10 @@ export default function SpotSaleCard({
 
         {/* Countdown */}
         <div className="mb-3 flex items-center gap-1.5 text-xs">
-          <svg className="h-4 w-4 text-amber-500 dark:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <svg className="h-4 w-4 text-amber-500 dark:text-brand-yellow teal:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
-          <span className={countdown.expired ? 'font-medium text-red-500' : 'font-medium text-amber-600 dark:text-brand-yellow'}>
+          <span className={countdown.expired ? 'font-medium text-red-500' : 'font-medium text-amber-600 dark:text-brand-yellow teal:text-brand-yellow'}>
             {formatCountdown(countdown)}
           </span>
         </div>

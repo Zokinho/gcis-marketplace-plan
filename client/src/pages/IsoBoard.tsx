@@ -54,7 +54,7 @@ function IsoCard({
   onRenew: (id: string) => void;
 }) {
   return (
-    <div className="rounded-lg border border-default surface p-4 shadow-sm hover:shadow-md transition">
+    <div className="rounded-lg border card-blue p-4 shadow-sm hover:shadow-md transition backdrop-blur-sm">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           {iso.category && (
@@ -498,7 +498,7 @@ export default function IsoBoard() {
       <MarketplaceTabs />
 
       {/* Tabs */}
-      <div className="mb-4 flex gap-1 rounded-lg border border-default surface p-1">
+      <div className="mb-4 flex gap-1 rounded-lg border card-blue backdrop-blur-sm p-1">
         <button
           onClick={() => setTab('browse')}
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${tab === 'browse' ? 'bg-brand-teal text-white' : 'text-muted hover:text-primary'}`}

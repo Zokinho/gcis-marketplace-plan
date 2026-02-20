@@ -61,7 +61,7 @@ export default function ShortlistPage() {
 
       {/* How it works — dismissible */}
       {!infoDismissed && (
-        <div className="mb-6 rounded-lg border border-brand-blue/10 dark:border-slate-700 bg-brand-blue/5 dark:bg-slate-800/50 p-4">
+        <div className="mb-6 rounded-lg border border-brand-blue/10 dark:border-slate-700 bg-brand-blue/5 dark:bg-slate-800/50 teal:bg-white/15 teal:border-white/20 p-4">
           <div className="flex items-start gap-3">
             <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand-blue dark:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
