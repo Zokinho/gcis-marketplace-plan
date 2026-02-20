@@ -376,7 +376,7 @@ export default function CreateListing() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 dark:bg-slate-800/60 dark:border-slate-700 shadow-md p-5">
+    <div className="rounded-lg border card-blue shadow-md p-5">
       <h3 className="mb-4 border-l-2 border-brand-teal dark:border-brand-yellow pl-3 text-base font-semibold text-primary">{title}</h3>
       <div className="space-y-4">{children}</div>
     </div>

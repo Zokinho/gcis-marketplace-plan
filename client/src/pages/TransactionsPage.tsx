@@ -52,8 +52,8 @@ export default function TransactionsPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="font-medium text-red-700">{error}</p>
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+          <p className="font-medium text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 
@@ -67,15 +67,15 @@ export default function TransactionsPage() {
         <>
           <div className="space-y-3">
             {transactions.map((tx) => (
-              <div key={tx.id} className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4">
+              <div key={tx.id} className="rounded-lg border card-blue shadow-md p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-primary">{tx.product?.name || 'Unknown'}</span>
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                        tx.status === 'completed' ? 'bg-sky-100 text-brand-blue'
-                        : tx.status === 'cancelled' ? 'bg-red-100 text-red-700'
-                        : 'bg-amber-100 text-amber-700'
+                        tx.status === 'completed' ? 'bg-sky-100 dark:bg-sky-900/30 text-brand-blue'
+                        : tx.status === 'cancelled' ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                        : 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
                       }`}>
                         {tx.status}
                       </span>
@@ -92,8 +92,8 @@ export default function TransactionsPage() {
                     {tx.outcomeRecordedAt && (
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         {tx.actualQuantityDelivered != null && <span className="text-muted">Delivered: {tx.actualQuantityDelivered}g</span>}
-                        {tx.deliveryOnTime != null && <span className={tx.deliveryOnTime ? 'text-brand-blue' : 'text-red-600'}>On Time: {tx.deliveryOnTime ? 'Yes' : 'No'}</span>}
-                        {tx.qualityAsExpected != null && <span className={tx.qualityAsExpected ? 'text-brand-blue' : 'text-red-600'}>Quality OK: {tx.qualityAsExpected ? 'Yes' : 'No'}</span>}
+                        {tx.deliveryOnTime != null && <span className={tx.deliveryOnTime ? 'text-brand-blue' : 'text-red-600 dark:text-red-400'}>On Time: {tx.deliveryOnTime ? 'Yes' : 'No'}</span>}
+                        {tx.qualityAsExpected != null && <span className={tx.qualityAsExpected ? 'text-brand-blue' : 'text-red-600 dark:text-red-400'}>Quality OK: {tx.qualityAsExpected ? 'Yes' : 'No'}</span>}
                       </div>
                     )}
                   </div>

@@ -19,7 +19,7 @@ function IsoStatusBadge({ status }: { status: IsoStatusType }) {
     OPEN: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
     MATCHED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
     FULFILLED: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-    CLOSED: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    CLOSED: 'surface-muted text-secondary',
     EXPIRED: 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400',
   };
   return (
@@ -327,7 +327,7 @@ function CreateIsoModal({
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex gap-3 justify-end">
             <button type="button" onClick={onClose} className="rounded px-4 py-2 text-sm text-muted hover:text-primary transition">
@@ -395,7 +395,7 @@ function RespondModal({
               className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <div className="flex gap-3 justify-end">
             <button type="button" onClick={onClose} className="rounded px-4 py-2 text-sm text-muted hover:text-primary transition">
               Cancel

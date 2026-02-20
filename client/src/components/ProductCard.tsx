@@ -41,17 +41,17 @@ export default function ProductCard({ product, large, onClick }: { product: Prod
         <div className="mb-2 flex items-start justify-between gap-1">
           <div className="flex flex-wrap gap-1.5">
             {product.category && (
-              <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-secondary">
+              <span className="rounded-full surface-muted px-2 py-0.5 text-xs font-medium text-secondary">
                 {product.category}
               </span>
             )}
             {product.type && (
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[product.type] || 'surface-muted text-secondary'}`}>
                 {product.type}
               </span>
             )}
             {product.certification && product.certification.split(', ').map((cert) => (
-              <span key={cert} className={`rounded-full px-2 py-0.5 text-xs font-medium ${CERT_COLORS[cert.trim()] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+              <span key={cert} className={`rounded-full px-2 py-0.5 text-xs font-medium ${CERT_COLORS[cert.trim()] || 'surface-muted text-secondary'}`}>
                 {cert.trim()}
               </span>
             ))}
@@ -70,7 +70,7 @@ export default function ProductCard({ product, large, onClick }: { product: Prod
           </h3>
           <span className="flex-shrink-0 text-xs font-medium">
             {available ? (
-              <span className="text-brand-teal">{product.gramsAvailable?.toLocaleString()}g available</span>
+              <span className="text-brand-teal dark:text-brand-sage">{product.gramsAvailable?.toLocaleString()}g available</span>
             ) : upcoming ? (
               <span className="text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</span>
             ) : (

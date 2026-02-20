@@ -90,12 +90,12 @@ export default function ShareViewer() {
                 {/* Badges */}
                 <div className="mb-3 flex flex-wrap gap-1.5">
                   {product.category && (
-                    <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-slate-300">
+                    <span className="rounded-full surface-muted px-2 py-0.5 text-[10px] font-medium text-secondary">
                       {product.category}
                     </span>
                   )}
                   {product.type && (
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[product.type] || 'surface-muted text-secondary'}`}>
                       {product.type}
                     </span>
                   )}

@@ -76,8 +76,8 @@ export default function MatchExplorer() {
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="font-medium text-red-700">{error}</p>
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+          <p className="font-medium text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 
@@ -93,7 +93,7 @@ export default function MatchExplorer() {
         <>
           <div className="space-y-3">
             {matches.map((match) => (
-              <div key={match.id} className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md transition hover:shadow-lg">
+              <div key={match.id} className="rounded-lg border card-blue shadow-md transition hover:shadow-lg">
                 <div
                   className="flex cursor-pointer items-center justify-between p-4"
                   onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
@@ -111,14 +111,14 @@ export default function MatchExplorer() {
                     {match.insights && match.insights.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {(match.insights as Array<{ type: string; text: string }>).slice(0, 3).map((insight, i) => (
-                          <span key={i} className="rounded-full bg-brand-offwhite dark:bg-slate-700 px-2 py-0.5 text-xs text-muted">
+                          <span key={i} className="rounded-full surface-muted px-2 py-0.5 text-xs text-muted">
                             {insight.text}
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
-                  <span className="shrink-0 rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium capitalize text-gray-600 dark:text-slate-300">
+                  <span className="shrink-0 rounded-full surface-muted px-2 py-0.5 text-xs font-medium capitalize text-secondary">
                     {match.status}
                   </span>
                 </div>

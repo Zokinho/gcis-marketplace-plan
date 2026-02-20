@@ -99,17 +99,17 @@ export default function SpotSaleCard({
         {/* Badges */}
         <div className="mb-2 flex flex-wrap gap-1.5">
           {product.category && (
-            <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-secondary">
+            <span className="rounded-full surface-muted px-2 py-0.5 text-xs font-medium text-secondary">
               {product.category}
             </span>
           )}
           {product.type && (
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[product.type] || 'surface-muted text-secondary'}`}>
               {product.type}
             </span>
           )}
           {product.certification && product.certification.split(', ').map((cert) => (
-            <span key={cert} className={`rounded-full px-2 py-0.5 text-xs font-medium ${CERT_COLORS[cert.trim()] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+            <span key={cert} className={`rounded-full px-2 py-0.5 text-xs font-medium ${CERT_COLORS[cert.trim()] || 'surface-muted text-secondary'}`}>
               {cert.trim()}
             </span>
           ))}

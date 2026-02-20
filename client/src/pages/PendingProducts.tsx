@@ -93,7 +93,7 @@ export default function PendingProducts() {
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <h3 className="text-base font-semibold text-primary">{product.name}</h3>
                   {product.category && (
-                    <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-slate-300">
+                    <span className="rounded-full surface-muted px-2 py-0.5 text-xs font-medium text-secondary">
                       {product.category}
                     </span>
                   )}

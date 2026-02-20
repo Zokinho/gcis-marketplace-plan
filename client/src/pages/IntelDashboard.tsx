@@ -7,7 +7,7 @@ import { fetchIntelDashboard, generateMatches, runChurnDetection, recalculateSel
 
 function KpiCard({ label, value, color = 'text-primary' }: { label: string; value: string | number; color?: string }) {
   return (
-    <div className="rounded-lg border border-brand-blue/15 border-l-4 border-l-brand-blue bg-brand-blue/5 shadow-md p-4">
+    <div className="rounded-lg border card-blue border-l-4 border-l-brand-blue shadow-md p-4">
       <p className="text-xs font-medium text-faint">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${color}`}>{value}</p>
     </div>
@@ -53,8 +53,8 @@ export default function IntelDashboard() {
   if (error || !data) {
     return (
       <Layout>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="font-medium text-red-700">{error || 'Failed to load'}</p>
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+          <p className="font-medium text-red-700 dark:text-red-400">{error || 'Failed to load'}</p>
         </div>
       </Layout>
     );
@@ -76,13 +76,13 @@ export default function IntelDashboard() {
         <KpiCard
           label="At-Risk Buyers"
           value={data.atRiskBuyers.critical + data.atRiskBuyers.high}
-          color={data.atRiskBuyers.critical > 0 ? 'text-red-600' : 'text-primary'}
+          color={data.atRiskBuyers.critical > 0 ? 'text-red-600 dark:text-red-400' : 'text-primary'}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent High-Score Matches */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+        <div className="rounded-lg border card-blue shadow-md p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="border-l-2 border-brand-blue pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Top Matches</h3>
             <Link to="/intelligence/matches" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
@@ -95,7 +95,7 @@ export default function IntelDashboard() {
         </div>
 
         {/* Churn Alerts */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+        <div className="rounded-lg border card-blue shadow-md p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="border-l-2 border-brand-coral pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Churn Alerts</h3>
             <Link to="/intelligence/churn" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
@@ -108,7 +108,7 @@ export default function IntelDashboard() {
         </div>
 
         {/* Market Trends */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+        <div className="rounded-lg border card-blue shadow-md p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="border-l-2 border-brand-sage pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Market Trends</h3>
             <Link to="/intelligence/market" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
@@ -117,7 +117,7 @@ export default function IntelDashboard() {
         </div>
 
         {/* Top Sellers */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+        <div className="rounded-lg border card-blue shadow-md p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="border-l-2 border-brand-yellow pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Top Sellers</h3>
             <Link to="/intelligence/sellers" className="text-xs font-medium text-brand-blue hover:underline">View All</Link>
@@ -137,7 +137,7 @@ export default function IntelDashboard() {
         </div>
         {/* Match Conversion */}
         {data.matchConversion && (
-          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+          <div className="rounded-lg border card-blue shadow-md p-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="border-l-2 border-brand-blue pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Match Conversion</h3>
               <Link to="/intelligence/matches" className="text-xs font-medium text-brand-blue hover:underline">View Matches</Link>
@@ -173,7 +173,7 @@ export default function IntelDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-6 rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+      <div className="mt-6 rounded-lg border card-blue shadow-md p-5">
         <h3 className="mb-3 border-l-2 border-brand-teal pl-2 text-sm font-bold uppercase tracking-wide text-brand-teal">Quick Actions</h3>
         <div className="flex flex-wrap gap-2">
           <button

@@ -141,7 +141,7 @@ function BuyerBidsView() {
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 statusFilter === f.value
                   ? 'bg-brand-teal text-white'
-                  : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                  : 'surface-muted text-secondary hover:surface-inset'
               }`}
             >
               {f.label}
@@ -299,7 +299,7 @@ function SellerBidsView() {
           {bids.map((bid) => {
             const statusCfg = STATUS_CONFIG[bid.status as BidStatusType] || { label: bid.status, class: 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400' };
             return (
-              <div key={bid.id} className={`rounded-lg border border-brand-blue/15 border-l-4 bg-brand-blue/5 shadow-md p-4 sm:p-5 ${
+              <div key={bid.id} className={`rounded-lg border card-blue border-l-4 shadow-md p-4 sm:p-5 ${
                 bid.status === 'ACCEPTED' ? 'border-l-brand-teal' :
                 bid.status === 'REJECTED' ? 'border-l-brand-coral' :
                 bid.status === 'PENDING' ? 'border-l-brand-blue' :
@@ -384,7 +384,7 @@ function BidCard({ bid }: { bid: BidRecord }) {
   const proximityColor = getProximityColor(bid.proximityScore);
 
   return (
-    <div className={`rounded-lg border border-brand-blue/15 border-l-4 bg-brand-blue/5 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
+    <div className={`rounded-lg border card-blue border-l-4 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
       bid.status === 'ACCEPTED' ? 'border-l-brand-teal' :
       bid.status === 'REJECTED' ? 'border-l-brand-coral' :
       bid.status === 'PENDING' ? 'border-l-brand-blue' :
@@ -405,7 +405,7 @@ function BidCard({ bid }: { bid: BidRecord }) {
               {statusCfg.label}
             </span>
             {bid.product.type && (
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[bid.product.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[bid.product.type] || 'surface-muted text-secondary'}`}>
                 {bid.product.type}
               </span>
             )}

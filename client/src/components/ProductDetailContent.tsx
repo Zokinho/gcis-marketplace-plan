@@ -15,8 +15,8 @@ const TYPE_COLORS: Record<string, string> = {
 
 const CERT_COLORS: Record<string, string> = {
   GACP: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  GMP1: 'bg-brand-sage/20 text-brand-teal',
-  GMP2: 'bg-brand-sage/20 text-brand-teal',
+  GMP1: 'bg-brand-sage/20 text-brand-teal dark:text-brand-sage',
+  GMP2: 'bg-brand-sage/20 text-brand-teal dark:text-brand-sage',
   GPP: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
   'IMC-GAP': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
 };
@@ -75,7 +75,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
       <div className="lg:col-span-2 space-y-6">
         {/* Image Gallery */}
         {product.imageUrls && product.imageUrls.length > 0 && (
-          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4">
+          <div className="rounded-lg border card-blue shadow-md p-4">
             <div className="mb-3 flex items-center justify-center overflow-hidden rounded-lg surface-muted" style={{ minHeight: '320px' }}>
               <ProductImage
                 src={product.imageUrls[selectedImage]}
@@ -102,18 +102,18 @@ export default function ProductDetailContent({ productId }: { productId: string 
         )}
 
         {/* Header */}
-        <div className="rounded-lg border border-brand-blue/15 border-l-4 border-l-brand-teal bg-brand-blue/5 shadow-md p-6">
+        <div className="rounded-lg border card-blue border-l-4 border-l-brand-teal shadow-md p-6">
           <div className="mb-3 flex flex-wrap gap-2">
             {product.category && (
-              <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-3 py-1 text-xs font-medium text-gray-600 dark:text-slate-300">{product.category}</span>
+              <span className="rounded-full surface-muted px-3 py-1 text-xs font-medium text-secondary">{product.category}</span>
             )}
             {product.type && (
-              <span className={`rounded-full px-3 py-1 text-xs font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-medium ${TYPE_COLORS[product.type] || 'surface-muted text-secondary'}`}>
                 {product.type}
               </span>
             )}
             {product.certification && product.certification.split(', ').map((cert) => (
-              <span key={cert} className={`rounded-full px-3 py-1 text-xs font-medium ${CERT_COLORS[cert.trim()] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+              <span key={cert} className={`rounded-full px-3 py-1 text-xs font-medium ${CERT_COLORS[cert.trim()] || 'surface-muted text-secondary'}`}>
                 {cert.trim()}
               </span>
             ))}
@@ -148,7 +148,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
                 </svg>
                 {product.viewStats.uniqueViewers} unique viewer{product.viewStats.uniqueViewers !== 1 ? 's' : ''}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand-yellow/20 px-2 py-0.5 text-xs font-medium text-brand-teal">
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-yellow/20 px-2 py-0.5 text-xs font-medium text-brand-teal dark:text-brand-sage">
                 <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
                   <path fillRule="evenodd" d="M6.32 2.577a49.255 49.255 0 0 1 11.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 0 1-1.085.67L12 18.089l-7.165 3.583A.75.75 0 0 1 3.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93Z" clipRule="evenodd" />
                 </svg>
@@ -163,8 +163,8 @@ export default function ProductDetailContent({ productId }: { productId: string 
         </div>
 
         {/* Key specs */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-6">
-          <h2 className="mb-4 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Specifications</h2>
+        <div className="rounded-lg border card-blue shadow-md p-6">
+          <h2 className="mb-4 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Specifications</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Spec label="THC" value={formatRange(product.thcMin, product.thcMax, '%')} />
             <Spec label="CBD" value={formatRange(product.cbdMin, product.cbdMax, '%')} />
@@ -185,15 +185,15 @@ export default function ProductDetailContent({ productId }: { productId: string 
 
         {/* Terpene profile */}
         {(terpenes.length > 0 || product.highestTerpenes || product.aromas) && (
-          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-6">
-            <h2 className="mb-4 border-l-2 border-brand-sage pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Terpene Profile</h2>
+          <div className="rounded-lg border card-blue shadow-md p-6">
+            <h2 className="mb-4 border-l-2 border-brand-sage pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Terpene Profile</h2>
 
             {terpenes.length > 0 && (
               <div className="mb-4">
                 <p className="mb-2 text-xs font-medium text-muted">Dominant Terpenes</p>
                 <div className="flex flex-wrap gap-2">
                   {terpenes.map((t) => (
-                    <span key={t} className="rounded-full bg-brand-sage/20 px-3 py-1 text-xs font-medium text-brand-teal">
+                    <span key={t} className="rounded-full bg-brand-sage/20 px-3 py-1 text-xs font-medium text-brand-teal dark:text-brand-sage">
                       {t}
                     </span>
                   ))}
@@ -219,13 +219,13 @@ export default function ProductDetailContent({ productId }: { productId: string 
 
         {/* Bud size distribution */}
         {budSizes.length > 0 && (
-          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-6">
-            <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Bud Size Distribution</h2>
+          <div className="rounded-lg border card-blue shadow-md p-6">
+            <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Bud Size Distribution</h2>
             <div className="space-y-2">
               {budSizes.map((b) => (
                 <div key={b.label} className="flex items-center gap-3">
                   <span className="w-32 shrink-0 text-xs text-secondary">{b.label}</span>
-                  <div className="h-4 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
+                  <div className="h-4 flex-1 overflow-hidden rounded-full surface-muted">
                     <div
                       className="h-full rounded-full bg-brand-teal transition-all"
                       style={{ width: `${b.value}%` }}
@@ -240,8 +240,8 @@ export default function ProductDetailContent({ productId }: { productId: string 
 
         {/* CoA downloads — restricted to product owner / admins */}
         {canViewCoa && product.coaUrls.length > 0 && (
-          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-6">
-            <h2 className="mb-3 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Certificates of Analysis</h2>
+          <div className="rounded-lg border card-blue shadow-md p-6">
+            <h2 className="mb-3 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Certificates of Analysis</h2>
             <div className="flex flex-wrap gap-2">
               {product.coaUrls.map((url, i) => (
                 <a
@@ -249,7 +249,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal transition hover:bg-brand-sage/10"
+                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal dark:text-brand-sage transition hover:bg-brand-sage/10"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -263,14 +263,14 @@ export default function ProductDetailContent({ productId }: { productId: string 
 
         {/* CoA Test Results (from AI extraction) — restricted to product owner / admins */}
         {canViewCoa && product.testResults && (
-          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-6">
-            <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">CoA Data</h2>
+          <div className="rounded-lg border card-blue shadow-md p-6">
+            <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">CoA Data</h2>
             {product.coaPdfUrl && (
               <a
                 href={product.coaPdfUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mb-4 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal transition hover:bg-brand-sage/10"
+                className="mb-4 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal dark:text-brand-sage transition hover:bg-brand-sage/10"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -301,8 +301,8 @@ export default function ProductDetailContent({ productId }: { productId: string 
 
         {/* CoA Upload for sellers viewing their own product */}
         {canViewCoa && isSeller && !product.testResults && (
-          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-6">
-            <h2 className="mb-4 border-l-2 border-brand-sage pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Upload CoA</h2>
+          <div className="rounded-lg border card-blue shadow-md p-6">
+            <h2 className="mb-4 border-l-2 border-brand-sage pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Upload CoA</h2>
             <p className="mb-4 text-sm text-muted">
               Upload a Certificate of Analysis PDF to auto-fill test results for this product.
             </p>

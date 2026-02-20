@@ -43,13 +43,13 @@ export default function ProductListItem({ product, onClick }: { product: Product
         <div className="mb-1 flex flex-wrap items-center gap-1.5">
           <h3 className="text-sm font-semibold text-primary group-hover:text-brand-teal dark:group-hover:text-brand-yellow">{product.name}</h3>
           {product.category && (
-            <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-secondary">{product.category}</span>
+            <span className="rounded-full surface-muted px-2 py-0.5 text-[10px] font-medium text-secondary">{product.category}</span>
           )}
           {product.type && (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>{product.type}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[product.type] || 'surface-muted text-secondary'}`}>{product.type}</span>
           )}
           {product.certification && product.certification.split(', ').map((cert) => (
-            <span key={cert} className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${CERT_COLORS[cert.trim()] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>{cert.trim()}</span>
+            <span key={cert} className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${CERT_COLORS[cert.trim()] || 'surface-muted text-secondary'}`}>{cert.trim()}</span>
           ))}
           {product.labName && (
             <span className="rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">CoA Verified</span>
@@ -73,7 +73,7 @@ export default function ProductListItem({ product, onClick }: { product: Product
       <div className="hidden flex-shrink-0 text-right sm:block">
         <p className="text-xs">
           {available ? (
-            <span className="font-medium text-brand-teal">{product.gramsAvailable?.toLocaleString()}g available</span>
+            <span className="font-medium text-brand-teal dark:text-brand-sage">{product.gramsAvailable?.toLocaleString()}g available</span>
           ) : upcoming ? (
             <span className="font-medium text-amber-600">{product.upcomingQty?.toLocaleString()}g upcoming</span>
           ) : (

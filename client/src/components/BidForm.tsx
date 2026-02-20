@@ -122,7 +122,7 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
         </div>
       </div>
 
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <button
         type="submit"

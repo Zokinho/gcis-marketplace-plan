@@ -8,7 +8,7 @@ interface Props {
 }
 
 function ScoreMetric({ label, value, weight }: { label: string; value: number; weight: string }) {
-  const color = value >= 80 ? 'text-brand-blue' : value >= 60 ? 'text-brand-yellow' : value >= 40 ? 'text-brand-coral' : 'text-red-600';
+  const color = value >= 80 ? 'text-brand-blue' : value >= 60 ? 'text-brand-yellow' : value >= 40 ? 'text-brand-coral' : 'text-red-600 dark:text-red-400';
   return (
     <div className="text-center">
       <p className="text-xs text-faint">{label} ({weight})</p>
@@ -21,7 +21,7 @@ export default function SellerScoreCard({ fillRate, qualityScore, deliveryScore,
   const overallColor = overallScore >= 80 ? 'text-brand-blue' : overallScore >= 60 ? 'text-brand-yellow' : 'text-brand-coral';
 
   return (
-    <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+    <div className="rounded-lg border card-blue shadow-md p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-bold uppercase tracking-wide text-muted">Seller Score</h3>
         <span className={`text-2xl font-bold ${overallColor}`}>{Math.round(overallScore)}%</span>

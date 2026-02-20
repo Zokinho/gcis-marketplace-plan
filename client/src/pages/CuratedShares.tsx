@@ -205,12 +205,12 @@ function ShareCard({ share, onUpdate }: { share: CuratedShareData; onUpdate: () 
   };
 
   return (
-    <div className={`rounded-lg border border-brand-blue/15 border-l-4 bg-brand-blue/5 shadow-md p-5 ${share.active ? 'border-l-brand-teal' : 'border-l-gray-300 dark:border-l-slate-600 opacity-60'}`}>
+    <div className={`rounded-lg border card-blue border-l-4 shadow-md p-5 ${share.active ? 'border-l-brand-teal' : 'border-l-gray-300 dark:border-l-slate-600 opacity-60'}`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-primary">{share.label}</h3>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${share.active ? 'bg-brand-sage/20 text-brand-teal' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400'}`}>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${share.active ? 'bg-brand-sage/20 text-brand-teal' : 'surface-muted text-faint'}`}>
               {share.active ? 'Active' : 'Inactive'}
             </span>
           </div>

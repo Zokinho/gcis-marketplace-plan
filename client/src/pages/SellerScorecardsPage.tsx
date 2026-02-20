@@ -59,8 +59,8 @@ export default function SellerScorecardsPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="font-medium text-red-700">{error}</p>
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+          <p className="font-medium text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 

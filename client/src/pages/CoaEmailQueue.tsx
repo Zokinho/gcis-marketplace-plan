@@ -115,10 +115,10 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
     high: 'bg-brand-sage/20 text-brand-teal',
     medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700',
     low: 'bg-red-100 dark:bg-red-900/20 text-red-700',
-  }[item.confidence || ''] || 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300';
+  }[item.confidence || ''] || 'surface-muted text-secondary';
 
   return (
-    <div className="rounded-lg border border-brand-blue/15 border-l-4 border-l-brand-teal bg-brand-blue/5 shadow-md p-5">
+    <div className="rounded-lg border card-blue border-l-4 border-l-brand-teal shadow-md p-5">
       <div className="mb-3 flex items-start justify-between">
         <div>
           <h3 className="font-semibold text-primary">{item.coaProductName || 'Untitled Product'}</h3>
@@ -131,7 +131,7 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${confidenceColor}`}>
             {item.confidence ? `${item.confidence} confidence` : 'no match'}
           </span>
-          <span className="rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300 px-2 py-0.5 text-xs">
+          <span className="rounded-full surface-muted text-secondary px-2 py-0.5 text-xs">
             {item.status}
           </span>
         </div>

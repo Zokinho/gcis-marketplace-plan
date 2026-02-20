@@ -274,11 +274,11 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     ? { label: 'Pending', class: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
     : isMarketplaceVisible
       ? { label: 'Active', class: 'bg-brand-sage/20 text-brand-teal' }
-      : { label: 'Paused', class: 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400' };
+      : { label: 'Paused', class: 'surface-muted text-faint' };
   // Show sub-badge when Zoho active state differs from marketplace visibility
   const showZohoBadge = listing.marketplaceVisible != null && listing.isActive !== listing.marketplaceVisible;
 
-  const sourceBadge = SOURCE_BADGES[listing.source] || { label: listing.source, class: 'bg-gray-50 text-gray-500 dark:bg-slate-700 dark:text-slate-400' };
+  const sourceBadge = SOURCE_BADGES[listing.source] || { label: listing.source, class: 'surface-muted text-faint' };
 
   const thcDisplay = listing.thcMin != null && listing.thcMax != null && listing.thcMin !== listing.thcMax
     ? `${listing.thcMin}–${listing.thcMax}%`
@@ -293,14 +293,14 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       : null;
 
   return (
-    <div className={`rounded-lg border border-brand-blue/15 border-l-4 bg-brand-blue/5 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
+    <div className={`rounded-lg border card-blue border-l-4 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
       listing.requestPending ? 'border-l-amber-400' :
       isMarketplaceVisible ? 'border-l-brand-teal' :
       'border-l-gray-300 dark:border-l-slate-600'
     }`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         {/* Thumbnail */}
-        <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-slate-700">
+        <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg surface-muted">
           {listing.imageUrls?.[0] ? (
             <ProductImage src={listing.imageUrls[0]} alt={listing.name} className="h-full w-full object-cover" />
           ) : (
@@ -326,12 +326,12 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
               </span>
             )}
             {listing.type && (
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[listing.type] || 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[listing.type] || 'surface-muted text-secondary'}`}>
                 {listing.type}
               </span>
             )}
             {listing.category && (
-              <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-slate-300">
+              <span className="rounded-full surface-muted px-2 py-0.5 text-xs font-medium text-secondary">
                 {listing.category}
               </span>
             )}

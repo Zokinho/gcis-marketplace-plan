@@ -398,11 +398,11 @@ function AdminSpotSaleCard({
   const statusColors: Record<string, string> = {
     active: 'bg-brand-sage/20 text-brand-teal',
     expired: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-    deactivated: 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400',
+    deactivated: 'surface-muted text-faint',
   };
 
   return (
-    <div className={`rounded-lg border border-brand-blue/15 border-l-4 bg-brand-blue/5 shadow-md p-5 ${
+    <div className={`rounded-lg border card-blue border-l-4 shadow-md p-5 ${
       status === 'active' ? 'border-l-brand-teal' : 'border-l-gray-300 dark:border-l-slate-600 opacity-70'
     }`}>
       <div className="flex items-start justify-between gap-4">

@@ -150,7 +150,7 @@ export default function ShareModal({ listings, onClose }: Props) {
                     className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                       expiresInDays === days
                         ? 'bg-brand-blue text-white'
-                        : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                        : 'surface-muted text-secondary hover:surface-inset'
                     }`}
                   >
                     {days}d
@@ -182,7 +182,7 @@ export default function ShareModal({ listings, onClose }: Props) {
                         type="checkbox"
                         checked={selected.has(l.id)}
                         onChange={() => toggleProduct(l.id)}
-                        className="h-3.5 w-3.5 rounded border-gray-300 dark:border-slate-600 text-brand-blue focus:ring-brand-blue"
+                        className="h-3.5 w-3.5 rounded border-default text-brand-blue focus:ring-brand-blue"
                       />
                       <span className="flex-1 text-sm text-primary">{l.name}</span>
                       {l.pricePerUnit != null && (
@@ -261,7 +261,7 @@ export default function ShareModal({ listings, onClose }: Props) {
                       {share.active ? (
                         <span className="rounded-full bg-brand-sage/20 px-2 py-0.5 text-xs font-medium text-brand-sage">Active</span>
                       ) : (
-                        <span className="rounded-full bg-gray-200 dark:bg-slate-600 px-2 py-0.5 text-xs font-medium text-muted">Inactive</span>
+                        <span className="rounded-full surface-muted px-2 py-0.5 text-xs font-medium text-muted">Inactive</span>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">

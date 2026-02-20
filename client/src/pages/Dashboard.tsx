@@ -103,7 +103,7 @@ function DashboardCard({
   return (
     <Link
       to={href}
-      className={`rounded-lg border border-brand-blue/15 border-l-4 ${accentColor} bg-brand-blue/5 p-6 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg`}
+      className={`rounded-lg border card-blue border-l-4 ${accentColor} p-6 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg`}
     >
       <div className="mb-3">{icon}</div>
       <h3 className="mb-2 text-lg font-semibold text-primary">{title}</h3>

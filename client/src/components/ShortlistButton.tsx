@@ -29,7 +29,7 @@ export default function ShortlistButton({ productId, size = 'sm' }: ShortlistBut
       } ${
         active
           ? 'text-brand-coral dark:text-brand-yellow'
-          : 'text-gray-400 hover:text-brand-teal dark:text-gray-500 dark:hover:text-brand-teal'
+          : 'text-gray-400 hover:text-brand-teal dark:text-gray-500 dark:hover:text-brand-sage'
       }`}
       aria-label={active ? 'Remove from shortlist' : 'Add to shortlist'}
       title={active ? 'Remove from shortlist' : 'Add to shortlist'}

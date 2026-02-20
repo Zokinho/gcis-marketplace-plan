@@ -128,7 +128,7 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border card-blue py-2 text-sm font-medium text-brand-teal backdrop-blur-sm lg:hidden"
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border card-blue py-2 text-sm font-medium text-brand-teal dark:text-brand-sage backdrop-blur-sm lg:hidden"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
@@ -269,7 +269,7 @@ function RatioFilter({
             title={p.desc}
             className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
               ratio === p.value
-                ? 'border-brand-teal bg-brand-sage/20 text-brand-teal'
+                ? 'border-brand-teal bg-brand-sage/20 text-brand-teal dark:text-brand-sage'
                 : 'border-default text-secondary hover-surface-muted'
             }`}
           >
@@ -371,7 +371,7 @@ function MultiSelectDropdown({
           {selected.map((item) => (
             <span
               key={item}
-              className="inline-flex items-center gap-1 rounded-full bg-brand-sage/20 px-2 py-0.5 text-[10px] font-medium text-brand-teal"
+              className="inline-flex items-center gap-1 rounded-full bg-brand-sage/20 px-2 py-0.5 text-[10px] font-medium text-brand-teal dark:text-brand-sage"
             >
               {item}
               <button onClick={() => toggle(item)} className="hover:text-brand-teal/60">
@@ -386,7 +386,7 @@ function MultiSelectDropdown({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-lg border border-default bg-white shadow-lg dark:bg-brand-dark">
+        <div className="absolute left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-lg border border-default surface shadow-lg">
           {allOptions.map((item) => (
             <button
               key={item}

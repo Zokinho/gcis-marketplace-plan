@@ -121,15 +121,15 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
               className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
                 i <= currentIdx
                   ? 'bg-brand-teal text-white'
-                  : 'bg-gray-200 dark:bg-slate-600 text-muted'
+                  : 'surface-muted text-muted'
               }`}
             >
               {i < currentIdx ? '\u2713' : i + 1}
             </div>
-            <span className={`text-xs ${i <= currentIdx ? 'text-brand-teal font-medium' : 'text-faint'}`}>
+            <span className={`text-xs ${i <= currentIdx ? 'text-brand-teal dark:text-brand-sage font-medium' : 'text-faint'}`}>
               {s.label}
             </span>
-            {i < steps.length - 1 && <div className={`h-px w-6 ${i < currentIdx ? 'bg-brand-teal/60' : 'bg-gray-200 dark:bg-slate-600'}`} />}
+            {i < steps.length - 1 && <div className={`h-px w-6 ${i < currentIdx ? 'bg-brand-teal/60' : 'surface-muted'}`} />}
           </div>
         ))}
       </div>
@@ -229,7 +229,7 @@ export default function CoaUpload({ onProductCreated }: { onProductCreated?: (pr
       {/* Error step */}
       {step === 'error' && (
         <div className="py-6 text-center">
-          <p className="mb-2 text-sm font-medium text-red-600">{error}</p>
+          <p className="mb-2 text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
           <button onClick={reset} className="text-sm font-medium text-brand-teal underline hover:text-brand-teal/80">
             Try again
           </button>

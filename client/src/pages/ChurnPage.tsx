@@ -63,21 +63,21 @@ export default function ChurnPage() {
       {/* Stats */}
       {stats && (
         <div className="mb-6 grid gap-4 sm:grid-cols-4">
-          <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4 text-center">
+          <div className="rounded-lg border card-blue shadow-md p-4 text-center">
             <p className="text-xs text-faint">Total At Risk</p>
             <p className="text-2xl font-bold text-primary">{stats.totalAtRisk}</p>
           </div>
-          <div className="rounded-lg border bg-red-50 p-4 text-center">
+          <div className="rounded-lg border bg-red-50 dark:bg-red-900/20 p-4 text-center">
             <p className="text-xs text-red-400">Critical</p>
-            <p className="text-2xl font-bold text-red-700">{stats.criticalCount}</p>
+            <p className="text-2xl font-bold text-red-700 dark:text-red-400">{stats.criticalCount}</p>
           </div>
-          <div className="rounded-lg border bg-orange-50 p-4 text-center">
+          <div className="rounded-lg border bg-orange-50 dark:bg-orange-900/20 p-4 text-center">
             <p className="text-xs text-orange-400">High</p>
-            <p className="text-2xl font-bold text-orange-700">{stats.highCount}</p>
+            <p className="text-2xl font-bold text-orange-700 dark:text-orange-400">{stats.highCount}</p>
           </div>
-          <div className="rounded-lg border bg-amber-50 p-4 text-center">
+          <div className="rounded-lg border bg-amber-50 dark:bg-amber-900/20 p-4 text-center">
             <p className="text-xs text-amber-400">Medium</p>
-            <p className="text-2xl font-bold text-amber-700">{stats.mediumCount}</p>
+            <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{stats.mediumCount}</p>
           </div>
         </div>
       )}
@@ -88,7 +88,7 @@ export default function ChurnPage() {
           <button
             key={level}
             onClick={() => setMinLevel(level)}
-            className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${minLevel === level ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}
+            className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${minLevel === level ? 'bg-brand-blue text-white' : 'surface-muted text-secondary'}`}
           >
             {level}+
           </button>
@@ -102,8 +102,8 @@ export default function ChurnPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="font-medium text-red-700">{error}</p>
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+          <p className="font-medium text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 
@@ -116,7 +116,7 @@ export default function ChurnPage() {
       {!loading && !error && buyers.length > 0 && (
         <div className="space-y-3">
           {buyers.map((entry: any) => (
-            <div key={entry.buyer.id} className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4">
+            <div key={entry.buyer.id} className="rounded-lg border card-blue shadow-md p-4">
               <div className="mb-2 flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-primary">{entry.buyer.companyName || entry.buyer.email}</p>
@@ -132,7 +132,7 @@ export default function ChurnPage() {
               {entry.signals.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {entry.signals.map((signal: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg bg-brand-offwhite dark:bg-slate-700 px-3 py-1.5 text-xs">
+                    <div key={i} className="flex items-center justify-between rounded-lg surface-muted px-3 py-1.5 text-xs">
                       <span className="text-secondary">{signal.categoryName || 'Overall'}</span>
                       <span className="text-muted">
                         {signal.daysSincePurchase}d since purchase (avg {Math.round(signal.avgIntervalDays)}d)

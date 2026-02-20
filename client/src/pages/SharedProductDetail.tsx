@@ -110,12 +110,12 @@ export default function SharedProductDetail() {
             <div className="rounded-lg border border-subtle surface p-6">
               <div className="mb-3 flex flex-wrap gap-2">
                 {product.category && (
-                  <span className="rounded-full bg-gray-100 dark:bg-slate-700 px-3 py-1 text-xs font-medium text-gray-600 dark:text-slate-300">
+                  <span className="rounded-full surface-muted px-3 py-1 text-xs font-medium text-secondary">
                     {product.category}
                   </span>
                 )}
                 {product.type && (
-                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${TYPE_COLORS[product.type] || 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300'}`}>
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${TYPE_COLORS[product.type] || 'surface-muted text-secondary'}`}>
                     {product.type}
                   </span>
                 )}
@@ -165,7 +165,7 @@ export default function SharedProductDetail() {
                 <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted">Terpene Profile</h2>
                 <div className="flex flex-wrap gap-2">
                   {terpenes.map((t) => (
-                    <span key={t} className="rounded-full bg-brand-sage/20 px-3 py-1 text-xs font-medium text-brand-teal">
+                    <span key={t} className="rounded-full bg-brand-sage/20 px-3 py-1 text-xs font-medium text-brand-teal dark:text-brand-sage">
                       {t}
                     </span>
                   ))}
@@ -195,7 +195,7 @@ export default function SharedProductDetail() {
           {/* Right: Actions */}
           <div className="lg:sticky lg:top-6 lg:self-start">
             <div className="rounded-lg border border-subtle surface p-6">
-              <h3 className="mb-4 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal">Documents</h3>
+              <h3 className="mb-4 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Documents</h3>
 
               {/* PDF download */}
               {product.coaPdfUrl && token && (
@@ -203,7 +203,7 @@ export default function SharedProductDetail() {
                   href={getSharedProductPdfUrl(token, product.id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mb-3 flex items-center gap-2 rounded-lg border border-subtle px-4 py-3 text-sm font-medium text-brand-teal transition hover:bg-brand-sage/10"
+                  className="mb-3 flex items-center gap-2 rounded-lg border border-subtle px-4 py-3 text-sm font-medium text-brand-teal dark:text-brand-sage transition hover:bg-brand-sage/10"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -239,7 +239,7 @@ export default function SharedProductDetail() {
               <div className="mt-6 border-t border-subtle pt-4">
                 <Link
                   to={`/share/${token}`}
-                  className="text-sm font-medium text-brand-teal underline hover:text-brand-teal/80"
+                  className="text-sm font-medium text-brand-teal dark:text-brand-sage underline hover:text-brand-teal/80"
                 >
                   Back to catalog
                 </Link>

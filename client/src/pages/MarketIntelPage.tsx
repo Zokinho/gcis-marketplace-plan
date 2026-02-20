@@ -48,20 +48,20 @@ export default function MarketIntelPage() {
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="font-medium text-red-700">{error}</p>
+        <div className="mb-6 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+          <p className="font-medium text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Price Trends */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+        <div className="rounded-lg border card-blue shadow-md p-5">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Price Trends (30d)</h3>
           <MarketTrendChart trends={trends} />
         </div>
 
         {/* Top Categories by Volume */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+        <div className="rounded-lg border card-blue shadow-md p-5">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Top Categories by Volume</h3>
           {topCategories.length === 0 ? (
             <p className="text-sm text-faint">No transaction data yet</p>
@@ -85,16 +85,16 @@ export default function MarketIntelPage() {
         </div>
 
         {/* Supply/Demand */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+        <div className="rounded-lg border card-blue shadow-md p-5">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Supply / Demand</h3>
           {supplyDemand.length === 0 ? (
             <p className="text-sm text-faint">No data yet</p>
           ) : (
             <div className="space-y-2">
               {supplyDemand.map((sd) => {
-                const color = sd.assessment === 'high_demand' ? 'text-brand-blue bg-sky-100'
-                  : sd.assessment === 'oversupply' ? 'text-red-700 bg-red-50'
-                  : 'text-secondary bg-brand-offwhite dark:bg-slate-700';
+                const color = sd.assessment === 'high_demand' ? 'text-brand-blue bg-sky-100 dark:bg-sky-900/30'
+                  : sd.assessment === 'oversupply' ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+                  : 'text-secondary surface-muted';
                 return (
                   <div key={sd.categoryName} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm">
                     <span className="text-secondary">{sd.categoryName}</span>
@@ -109,7 +109,7 @@ export default function MarketIntelPage() {
         </div>
 
         {/* Category Detail */}
-        <div className="rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-5">
+        <div className="rounded-lg border card-blue shadow-md p-5">
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
             {selectedCategory ? `${selectedCategory} Detail` : 'Select a Category'}
           </h3>

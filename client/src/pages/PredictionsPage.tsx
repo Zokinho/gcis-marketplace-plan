@@ -57,8 +57,8 @@ export default function PredictionsPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="font-medium text-red-700">{error}</p>
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+          <p className="font-medium text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 
@@ -71,13 +71,13 @@ export default function PredictionsPage() {
           <div className="mb-4 flex gap-2">
             <button
               onClick={() => setListType('upcoming')}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${listType === 'upcoming' ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${listType === 'upcoming' ? 'bg-brand-blue text-white' : 'surface-muted text-secondary'}`}
             >
               Upcoming
             </button>
             <button
               onClick={() => setListType('overdue')}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${listType === 'overdue' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${listType === 'overdue' ? 'bg-red-600 text-white' : 'surface-muted text-secondary'}`}
             >
               Overdue
             </button>
@@ -90,7 +90,7 @@ export default function PredictionsPage() {
           ) : (
             <div className="space-y-2">
               {listData.map((pred) => (
-                <div key={pred.id} className={`flex items-center justify-between rounded-lg border border-brand-blue/15 bg-brand-blue/5 shadow-md p-4 ${listType === 'overdue' ? 'border-red-200' : ''}`}>
+                <div key={pred.id} className={`flex items-center justify-between rounded-lg border card-blue shadow-md p-4 ${listType === 'overdue' ? 'border-red-200' : ''}`}>
                   <div>
                     <p className="font-medium text-primary">{pred.buyer?.companyName || pred.buyer?.email}</p>
                     <p className="text-xs text-faint">{pred.categoryName} &middot; {pred.basedOnTransactions} transactions &middot; avg {Math.round(pred.avgIntervalDays)}d interval</p>
