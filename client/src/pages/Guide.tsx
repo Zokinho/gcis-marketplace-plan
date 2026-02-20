@@ -41,6 +41,59 @@ const SECTIONS = [
     ],
   },
   {
+    id: 'shortlist',
+    title: 'Saving & Shortlisting Products',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+      </svg>
+    ),
+    sellerOnly: false,
+    defaultOpen: false,
+    steps: [
+      { title: 'Bookmark a product', description: 'Click the bookmark icon on any product card or product detail page to save it to your shortlist for quick access later.' },
+      { title: 'View your shortlist', description: 'Click "Shortlist" in the navigation to see all your saved products in one place. You can sort and filter your shortlist.' },
+      { title: 'Get price drop alerts', description: 'When a product you\'ve shortlisted drops in price, you\'ll receive a notification automatically.' },
+      { title: 'Remove from shortlist', description: 'Click the bookmark icon again on any shortlisted product to remove it. This works from the marketplace, product detail, or shortlist page.' },
+    ],
+  },
+  {
+    id: 'iso-board',
+    title: 'ISO Board (In Search Of)',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+      </svg>
+    ),
+    sellerOnly: false,
+    defaultOpen: false,
+    steps: [
+      { title: 'Post what you\'re looking for', description: 'As a buyer, click "ISO Board" in the navigation, then "Post ISO" to describe the product you need — category, type, THC/CBD range, quantity, target price, and certifications.' },
+      { title: 'Browse the board', description: 'The "Browse" tab shows all open ISO requests from other buyers (anonymized). Use this to understand market demand.' },
+      { title: 'View your ISOs', description: 'Switch to the "My ISOs" tab to see all your posted requests, their status (Open, Matched, Fulfilled, Closed, Expired), and any seller responses.' },
+      { title: 'Respond as a seller', description: 'Sellers can respond to any open ISO by clicking "I Have This" and selecting a matching product from their inventory. The buyer and admin are notified.' },
+      { title: 'Auto-matching', description: 'When new products are synced from Zoho, the system automatically checks them against open ISOs and notifies buyers of matches.' },
+      { title: 'Manage your ISOs', description: 'You can close an ISO when you no longer need the product, or renew it for another 30 days before it expires.' },
+    ],
+  },
+  {
+    id: 'spot-sales',
+    title: 'Spot Sales',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
+    ),
+    sellerOnly: false,
+    defaultOpen: false,
+    steps: [
+      { title: 'Find active deals', description: 'Click "Spot Sales" in the navigation to see limited-time deals curated by the admin team. These are typically clearance or time-sensitive offers.' },
+      { title: 'Check the countdown', description: 'Each spot sale shows a countdown timer. Once it reaches zero, the deal expires and is no longer available.' },
+      { title: 'View deal details', description: 'Click on a spot sale card to see the full product details including the discounted price, original price, and available quantity.' },
+      { title: 'Act quickly', description: 'Spot sales have limited quantities. If you see something you like, place a bid soon before the deal expires or stock runs out.' },
+    ],
+  },
+  {
     id: 'notifications-matches',
     title: 'Notifications & Matches',
     icon: (
@@ -75,6 +128,24 @@ const SECTIONS = [
       { title: 'Create a new listing', description: 'Click "Create Listing" to add a new product. You can upload a CoA (Certificate of Analysis) to auto-fill product details.' },
       { title: 'Share your products', description: 'Create shareable links to send your product catalog to specific buyers or partners without requiring them to log in.' },
       { title: 'Review incoming bids', description: 'Check the "Orders" page for the Seller view to see bids from buyers. You can accept or reject each bid.' },
+    ],
+  },
+  {
+    id: 'coa-upload',
+    title: 'CoA Upload & Product Creation',
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+      </svg>
+    ),
+    sellerOnly: true,
+    defaultOpen: false,
+    steps: [
+      { title: 'Go to Create Listing', description: 'Click "Create Listing" in the navigation to start adding a new product to the marketplace.' },
+      { title: 'Upload your CoA PDF', description: 'Drag and drop your Certificate of Analysis PDF or click to browse. The system uses AI to automatically extract test results, THC/CBD percentages, terpene profiles, and product details.' },
+      { title: 'Review extracted data', description: 'After the CoA is processed, review the auto-filled product information. You can edit any field before confirming.' },
+      { title: 'Set pricing and quantity', description: 'Enter your asking price per gram and the available quantity. These can be updated later from your listings page.' },
+      { title: 'Publish your listing', description: 'Once everything looks good, confirm the listing. It will appear in the marketplace and be matched against buyer ISOs automatically.' },
     ],
   },
 ] as const;
