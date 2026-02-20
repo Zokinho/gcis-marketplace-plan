@@ -7,17 +7,30 @@ set -euo pipefail
 # Always rebuilds with --no-cache to guarantee fresh builds.
 # Docker BuildKit's layer cache can serve stale COPY layers even when
 # source files have changed — --no-cache prevents this.
+#
+# Self-update: After git pull, the script re-execs itself if it changed
+# on disk, so the latest version always runs the build/deploy steps.
 
+SCRIPT_PATH="$(realpath "$0")"
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
 SERVICES="server client"
 
-echo "=== GCIS Marketplace Deploy ==="
-echo ""
+# Re-exec guard: skip git pull if already re-execed
+if [[ "${DEPLOY_REEXEC:-}" == "1" ]]; then
+  echo "[1/5] Code already pulled (re-exec)."
+  echo ""
+else
+  echo "=== GCIS Marketplace Deploy ==="
+  echo ""
 
-# 1. Pull latest code
-echo "[1/5] Pulling latest code..."
-git pull --ff-only
-echo ""
+  # 1. Pull latest code
+  echo "[1/5] Pulling latest code..."
+  git pull --ff-only
+  echo ""
+
+  # Re-exec with latest script if it changed
+  exec env DEPLOY_REEXEC=1 bash "$SCRIPT_PATH"
+fi
 
 # 2. Build containers (always no-cache to avoid stale layers)
 echo "[2/5] Building containers (no-cache)..."
