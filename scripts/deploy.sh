@@ -2,7 +2,10 @@
 set -euo pipefail
 
 # GCIS Marketplace — Production Deployment Script
-# Usage: sudo bash scripts/deploy.sh
+#
+# ⚠️  RUN THIS ON THE PRODUCTION SERVER, NOT LOCALLY!
+#     ssh root@159.203.20.213
+#     cd ~/gcis-marketplace-plan && bash scripts/deploy.sh
 #
 # Always rebuilds with --no-cache to guarantee fresh builds.
 # Docker BuildKit's layer cache can serve stale COPY layers even when
@@ -14,6 +17,20 @@ set -euo pipefail
 SCRIPT_PATH="$(realpath "$0")"
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
 SERVICES="server client"
+
+# Guard: warn if running on a local dev machine instead of production
+if hostname | grep -qiE "desktop|laptop|local|wsl"; then
+  echo "⚠️  WARNING: This looks like a local machine ($(hostname))."
+  echo "   Deploy should run on the PRODUCTION server:"
+  echo "     ssh root@159.203.20.213"
+  echo "     cd ~/gcis-marketplace-plan && bash scripts/deploy.sh"
+  echo ""
+  read -p "Continue anyway? [y/N] " confirm
+  if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+    echo "Aborted."
+    exit 1
+  fi
+fi
 
 # Re-exec guard: skip git pull if already re-execed
 if [[ "${DEPLOY_REEXEC:-}" == "1" ]]; then
