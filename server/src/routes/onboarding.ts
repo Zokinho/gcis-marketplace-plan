@@ -9,7 +9,7 @@ import { pushOnboardingMilestone } from '../services/zohoApi';
 import { zohoRequest, getAccessToken, ZOHO_API_URL } from '../services/zohoAuth';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 /**
  * POST /api/onboarding/accept-eula
@@ -119,7 +119,17 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
  * POST /api/onboarding/upload-doc
  * Records that the user uploaded their agreement document.
  */
-router.post('/upload-doc', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/upload-doc', (req: Request, res: Response, next: Function) => {
+  upload.single('file')(req, res, (err: any) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File too large. Maximum size is 20 MB.' });
+      }
+      return res.status(400).json({ error: err.message || 'File upload failed' });
+    }
+    next();
+  });
+}, async (req: Request, res: Response) => {
   const userId = (req as any).authUserId;
 
   if (!userId) {

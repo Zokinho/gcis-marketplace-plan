@@ -311,7 +311,7 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
                 className="hidden"
               />
             </label>
-            <p className="mt-3 text-xs text-faint">PDF, DOC, DOCX, PNG, or JPG (max 10 MB)</p>
+            <p className="mt-3 text-xs text-faint">PDF, DOC, DOCX, PNG, or JPG (max 20 MB)</p>
           </>
         )}
       </div>
