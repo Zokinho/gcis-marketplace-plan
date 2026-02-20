@@ -49,8 +49,8 @@ echo ""
 
 # 5. Verify build artifacts
 echo "[5/5] Verifying build artifacts..."
-CSS_FILE=$(docker exec gcis-client ls /usr/share/nginx/html/assets/*.css 2>/dev/null | head -1)
-JS_FILE=$(docker exec gcis-client ls /usr/share/nginx/html/assets/*.js 2>/dev/null | head -1)
+CSS_FILE=$(docker exec gcis-client sh -c 'ls /usr/share/nginx/html/assets/*.css 2>/dev/null' || true)
+JS_FILE=$(docker exec gcis-client sh -c 'ls /usr/share/nginx/html/assets/*.js 2>/dev/null' || true)
 if [ -n "$CSS_FILE" ] && [ -n "$JS_FILE" ]; then
   echo "  CSS: $(basename $CSS_FILE)"
   echo "  JS:  $(basename $JS_FILE)"
