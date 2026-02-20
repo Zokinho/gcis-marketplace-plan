@@ -109,7 +109,7 @@ export default function UserManagement() {
       'Active': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
     };
     return (
-      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[status] || ''}`}>
+      <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[status] || ''}`}>
         {status}
       </span>
     );

@@ -90,7 +90,7 @@ describe('E2E: Admin operations + audit trail', () => {
     expect(res.status).toBe(200);
     expect(res.body.users).toHaveLength(2);
     expect(prisma.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { approved: false, docUploaded: true } }),
+      expect.objectContaining({ where: { approved: false, OR: [{ docUploaded: true }, { zohoContactId: { not: null } }] } }),
     );
   });
 

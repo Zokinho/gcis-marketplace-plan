@@ -207,7 +207,13 @@ describe('GET /users', () => {
 
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { approved: false, docUploaded: true },
+        where: {
+          approved: false,
+          OR: [
+            { docUploaded: true },
+            { zohoContactId: { not: null } },
+          ],
+        },
       }),
     );
   });

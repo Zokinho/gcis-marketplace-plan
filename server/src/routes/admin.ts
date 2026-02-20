@@ -250,7 +250,13 @@ router.get('/users', validateQuery(adminUsersQuerySchema), async (req: Request, 
 
   let where: Prisma.UserWhereInput = {};
   if (filter === 'pending') {
-    where = { approved: false, docUploaded: true };
+    where = {
+      approved: false,
+      OR: [
+        { docUploaded: true },
+        { zohoContactId: { not: null } },
+      ],
+    };
   } else if (filter === 'approved') {
     where = { approved: true };
   } else if (filter === 'rejected') {
