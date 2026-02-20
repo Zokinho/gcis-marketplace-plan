@@ -56,6 +56,19 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Cache hashed assets aggressively (Vite produces content-hashed filenames)
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Never cache index.html — ensures browsers always fetch latest asset references
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+    }
+
     # Webhook endpoint — no basic auth
     location /api/webhooks {
         auth_basic off;
@@ -97,5 +110,6 @@ server {
     # SPA fallback - serve index.html for all client routes
     location / {
         try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
     }
 }

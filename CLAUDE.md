@@ -572,9 +572,31 @@ sudo docker compose up -d
 
 # Full stack — production (HTTPS via Let's Encrypt)
 sudo bash scripts/init-letsencrypt.sh   # First time only
-sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+sudo bash scripts/deploy.sh             # Standard deploy (recommended)
+sudo bash scripts/deploy.sh --full      # Full no-cache rebuild (use if deploy seems stale)
 ```
 
+### Production Deploy Steps (`scripts/deploy.sh`)
+
+The deploy script automates these steps — **always use it** instead of manual `docker compose` commands:
+
+1. `git pull --ff-only` — Pull latest code
+2. `docker compose build server client` — Rebuild server + client images
+3. `docker compose up -d server client` — Recreate containers (postgres untouched)
+4. Verify containers are running + health check
+5. Verify build artifacts (CSS/JS hashes) + cache headers
+
+Use `--full` flag to add `--no-cache` to the build step if a deploy appears stale.
+
+### Cache Strategy (Nginx)
+
+Nginx is configured to prevent stale deploys:
+- **`/assets/*`** — `Cache-Control: max-age=1y, immutable` (Vite content-hashed filenames)
+- **`index.html` + SPA routes** — `Cache-Control: no-cache, no-store, must-revalidate`
+
+This ensures browsers always fetch the latest `index.html` (which references new asset hashes) while caching the heavy JS/CSS bundles indefinitely.
+
+### Container Details
 - **Server Dockerfile**: `prisma migrate deploy` on startup (safe for production)
 - **Client Dockerfile**: Dual-mode Nginx — dev (HTTP) or production (TLS termination via `SSL_DOMAIN` env)
 - **Docker Compose**: postgres (5434→5432), server (3001), client (80)
