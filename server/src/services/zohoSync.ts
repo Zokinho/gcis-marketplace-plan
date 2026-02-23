@@ -451,7 +451,7 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
           where: { id: existingUser.id },
           data: {
             approved: c.Account_Confirmed ?? existingUser.approved,
-            contactType: c.Contact_Type || existingUser.contactType,
+            contactType: Array.isArray(c.Contact_Type) ? c.Contact_Type.join(';') : (c.Contact_Type || existingUser.contactType),
             firstName: c.First_Name || existingUser.firstName,
             lastName: c.Last_Name || existingUser.lastName,
             companyName: c.Company || existingUser.companyName,
