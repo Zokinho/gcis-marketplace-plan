@@ -450,7 +450,8 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
         await prisma.user.update({
           where: { id: existingUser.id },
           data: {
-            approved: c.Account_Confirmed ?? existingUser.approved,
+            // Only let Zoho promote to approved, never demote — marketplace approval is authoritative
+            approved: (c.Account_Confirmed === true) || existingUser.approved,
             contactType: Array.isArray(c.Contact_Type) ? c.Contact_Type.join(';') : (c.Contact_Type || existingUser.contactType),
             firstName: c.First_Name || existingUser.firstName,
             lastName: c.Last_Name || existingUser.lastName,
