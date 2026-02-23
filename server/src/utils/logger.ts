@@ -3,10 +3,12 @@ import pino from 'pino';
 function buildTransport(): pino.TransportMultiOptions | undefined {
   const targets: pino.TransportTargetOptions[] = [];
 
-  // Always log to stdout in dev (transport mode)
-  if (process.env.NODE_ENV !== 'production') {
-    targets.push({ target: 'pino/file', options: { destination: 1 }, level: 'debug' });
-  }
+  // Always log to stdout (info in production, debug in dev)
+  targets.push({
+    target: 'pino/file',
+    options: { destination: 1 },
+    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  });
 
   // Forward error+ logs to Sentry when DSN is configured
   if (process.env.SENTRY_DSN) {

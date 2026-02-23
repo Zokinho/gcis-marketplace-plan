@@ -39,7 +39,8 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
-      args: {}
+      args:
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     container_name: gcis-client
     restart: unless-stopped
     depends_on:

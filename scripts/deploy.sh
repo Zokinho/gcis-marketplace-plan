@@ -86,6 +86,14 @@ if [ -n "$CSS_FILE" ] && [ -n "$JS_FILE" ]; then
   TEAL_COUNT=$(docker exec gcis-client sh -c "grep -o 'teal:' /usr/share/nginx/html/assets/*.js | wc -l" 2>/dev/null || echo "0")
   echo "  Teal classes: $TEAL_COUNT references"
 
+  # Verify Sentry DSN baked into client bundle
+  SENTRY_FOUND=$(docker exec gcis-client sh -c "grep -c 'ingest.us.sentry.io' /usr/share/nginx/html/assets/*.js 2>/dev/null" || echo "0")
+  if [ "$SENTRY_FOUND" -gt 0 ]; then
+    echo "  Frontend Sentry: OK (DSN baked in)"
+  else
+    echo "  Frontend Sentry: MISSING — check VITE_SENTRY_DSN in .env"
+  fi
+
   # Verify cache headers are active
   CACHE_HEADER=$(docker exec gcis-client grep -c "no-cache" /etc/nginx/conf.d/default.conf 2>/dev/null || echo "0")
   if [ "$CACHE_HEADER" -gt 0 ]; then
