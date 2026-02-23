@@ -34,15 +34,10 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
     return res.json({ message: 'EULA already accepted', eulaAcceptedAt: user.eulaAcceptedAt });
   }
 
-  // Determine if user is a buyer-only (no doc upload required)
-  const isBuyerOnly = !user.contactType || !user.contactType.includes('Seller');
-
   const updated = await prisma.user.update({
     where: { id: user.id },
     data: {
       eulaAcceptedAt: new Date(),
-      // Buyers skip doc upload — mark as done so they go straight to PENDING_APPROVAL
-      ...(isBuyerOnly ? { docUploaded: true } : {}),
     },
   });
 
@@ -53,62 +48,6 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
     } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[ONBOARDING] Zoho EULA writeback failed'); }
   }
 
-  // For buyers: create Zoho Contact now (sellers create it on doc upload)
-  if (isBuyerOnly && !user.zohoContactId) {
-    try {
-      const contactData: Record<string, any> = {
-        First_Name: user.firstName || '',
-        Last_Name: user.lastName || user.email,
-        Email: user.email,
-        Company: user.companyName || '',
-        Account_Name: user.companyName || '',
-        Contact_Type: (user.contactType || 'Buyer').split(';').map((s: string) => s.trim()).filter(Boolean),
-        User_UID: user.id,
-        EULA_Accepted: new Date().toISOString().split('T')[0],
-      };
-      if (user.phone) contactData.Phone = user.phone;
-      if (user.mailingCountry) contactData.Mailing_Country = user.mailingCountry;
-
-      const result = await zohoRequest('POST', '/Contacts', {
-        data: { data: [contactData], trigger: [] },
-      });
-      const newZohoContactId = result?.data?.[0]?.details?.id;
-      if (newZohoContactId) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { zohoContactId: newZohoContactId },
-        });
-
-        // Create registration Task on the new Contact
-        await zohoRequest('POST', '/Tasks', {
-          data: {
-            data: [{
-              Subject: `Marketplace Registration — ${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
-              Status: 'Not Started',
-              Priority: 'Normal',
-              Who_Id: newZohoContactId,
-              Description: [
-                'User registered on Harvex Marketplace',
-                `Name: ${user.firstName || ''} ${user.lastName || ''}`.trim(),
-                `Company: ${user.companyName || 'N/A'}`,
-                `Type: ${user.contactType || 'N/A'}`,
-                `Date: ${user.createdAt.toISOString()}`,
-              ].join('\n'),
-            }],
-            trigger: [],
-          },
-        });
-
-        logger.info({ userId: user.id, newZohoContactId }, '[ONBOARDING] Zoho Contact created for buyer on terms acceptance');
-      }
-    } catch (e) {
-      logger.error(
-        { err: e instanceof Error ? e : { message: String(e) }, userId: user.id },
-        '[ONBOARDING] Zoho Contact creation for buyer failed',
-      );
-    }
-  }
-
   res.json({
     message: 'EULA accepted',
     eulaAcceptedAt: updated.eulaAcceptedAt,
@@ -117,13 +56,16 @@ router.post('/accept-eula', async (req: Request, res: Response) => {
 
 /**
  * POST /api/onboarding/upload-doc
- * Records that the user uploaded their agreement document.
+ * Records that the user uploaded their Health Canada License and CRA License.
  */
 router.post('/upload-doc', (req: Request, res: Response, next: Function) => {
-  upload.single('file')(req, res, (err: any) => {
+  upload.fields([
+    { name: 'healthCanadaLicense', maxCount: 1 },
+    { name: 'craLicense', maxCount: 1 },
+  ])(req, res, (err: any) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'File too large. Maximum size is 20 MB.' });
+        return res.status(413).json({ error: 'File too large. Maximum size is 20 MB per file.' });
       }
       return res.status(400).json({ error: err.message || 'File upload failed' });
     }
@@ -149,7 +91,16 @@ router.post('/upload-doc', (req: Request, res: Response, next: Function) => {
   }
 
   if (user.docUploaded) {
-    return res.json({ message: 'Document already uploaded' });
+    return res.json({ message: 'Documents already uploaded' });
+  }
+
+  // Validate both files are present
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+  const healthCanadaFile = files?.healthCanadaLicense?.[0];
+  const craFile = files?.craLicense?.[0];
+
+  if (!healthCanadaFile || !craFile) {
+    return res.status(400).json({ error: 'Both Health Canada License and CRA License are required' });
   }
 
   await prisma.user.update({
@@ -157,25 +108,21 @@ router.post('/upload-doc', (req: Request, res: Response, next: Function) => {
     data: { docUploaded: true },
   });
 
-  // Helper: upload file as attachment to a Zoho Contact
-  const uploadFileToZohoContact = async (zohoContactId: string) => {
-    if (!req.file) {
-      logger.warn({ userId: user.id }, '[ONBOARDING] No file in request — skipping Zoho attachment');
-      return;
-    }
+  // Helper: upload a single file as attachment to a Zoho Contact
+  const uploadFileToZohoContact = async (zohoContactId: string, file: Express.Multer.File) => {
     try {
       const token = await getAccessToken();
       const form = new FormData();
-      const stream = Readable.from(req.file.buffer);
-      form.append('file', stream, { filename: req.file.originalname, contentType: req.file.mimetype });
+      const stream = Readable.from(file.buffer);
+      form.append('file', stream, { filename: file.originalname, contentType: file.mimetype });
       const v2Url = ZOHO_API_URL.replace('/v7', '/v2');
       await axios.post(`${v2Url}/Contacts/${zohoContactId}/Attachments`, form, {
         headers: { Authorization: `Zoho-oauthtoken ${token}`, ...form.getHeaders() },
         maxContentLength: 20 * 1024 * 1024,
       });
-      logger.info({ userId: user.id, zohoContactId }, '[ONBOARDING] Agreement file uploaded to Zoho Contact');
+      logger.info({ userId: user.id, zohoContactId, filename: file.originalname }, '[ONBOARDING] License file uploaded to Zoho Contact');
     } catch (e) {
-      logger.error({ err: e instanceof Error ? e : { message: String(e) }, userId: user.id }, '[ONBOARDING] Zoho file attachment failed');
+      logger.error({ err: e instanceof Error ? e : { message: String(e) }, userId: user.id, filename: file.originalname }, '[ONBOARDING] Zoho file attachment failed');
     }
   };
 
@@ -184,7 +131,8 @@ router.post('/upload-doc', (req: Request, res: Response, next: Function) => {
     try {
       await pushOnboardingMilestone(user.zohoContactId, 'agreement_uploaded');
     } catch (e) { logger.error({ err: e instanceof Error ? e : { message: String(e) } }, '[ONBOARDING] Zoho doc upload writeback failed'); }
-    await uploadFileToZohoContact(user.zohoContactId);
+    await uploadFileToZohoContact(user.zohoContactId, healthCanadaFile);
+    await uploadFileToZohoContact(user.zohoContactId, craFile);
   } else {
     // Create Zoho Contact for users not already in CRM
     try {
@@ -234,20 +182,21 @@ router.post('/upload-doc', (req: Request, res: Response, next: Function) => {
           },
         });
 
-        logger.info({ userId: user.id, newZohoContactId }, '[ONBOARDING] Zoho Contact created on agreement upload');
+        logger.info({ userId: user.id, newZohoContactId }, '[ONBOARDING] Zoho Contact created on license upload');
 
-        // Upload agreement file to new Contact
-        await uploadFileToZohoContact(newZohoContactId);
+        // Upload both license files to new Contact
+        await uploadFileToZohoContact(newZohoContactId, healthCanadaFile);
+        await uploadFileToZohoContact(newZohoContactId, craFile);
       }
     } catch (e) {
       logger.error(
         { err: e instanceof Error ? e : { message: String(e) }, userId: user.id },
-        '[ONBOARDING] Zoho Contact creation on agreement upload failed',
+        '[ONBOARDING] Zoho Contact creation on license upload failed',
       );
     }
   }
 
-  res.json({ message: 'Document upload recorded' });
+  res.json({ message: 'Documents uploaded successfully' });
 });
 
 export default router;

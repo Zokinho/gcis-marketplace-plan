@@ -147,7 +147,7 @@ describe('E2E: Signup → Onboarding → Approval flow', () => {
     expect(res.body.status).toBe('DOC_REQUIRED');
   });
 
-  it('user uploads document → docUploaded set', async () => {
+  it('user uploads both license documents → docUploaded set', async () => {
     const app = createOnboardingApp('new-user-1');
 
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
@@ -161,10 +161,30 @@ describe('E2E: Signup → Onboarding → Approval flow', () => {
       docUploaded: true,
     } as any);
 
-    const res = await request(app).post('/api/onboarding/upload-doc');
+    const res = await request(app)
+      .post('/api/onboarding/upload-doc')
+      .attach('healthCanadaLicense', Buffer.from('fake-hc-license'), 'hc-license.pdf')
+      .attach('craLicense', Buffer.from('fake-cra-license'), 'cra-license.pdf');
 
     expect(res.status).toBe(200);
-    expect(res.body.message).toBe('Document upload recorded');
+    expect(res.body.message).toBe('Documents uploaded successfully');
+  });
+
+  it('upload fails if only one file is provided → 400', async () => {
+    const app = createOnboardingApp('new-user-1');
+
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      ...newUser,
+      eulaAcceptedAt: new Date(),
+      docUploaded: false,
+    } as any);
+
+    const res = await request(app)
+      .post('/api/onboarding/upload-doc')
+      .attach('healthCanadaLicense', Buffer.from('fake-hc-license'), 'hc-license.pdf');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Both Health Canada License and CRA License are required');
   });
 
   it('after doc upload, status → PENDING_APPROVAL', async () => {

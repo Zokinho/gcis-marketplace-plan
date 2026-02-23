@@ -121,9 +121,10 @@ export async function acceptEula(): Promise<void> {
   await api.post('/onboarding/accept-eula');
 }
 
-export async function uploadDoc(file: File): Promise<void> {
+export async function uploadDocs(healthCanadaLicense: File, craLicense: File): Promise<void> {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('healthCanadaLicense', healthCanadaLicense);
+  formData.append('craLicense', craLicense);
   await api.post('/onboarding/upload-doc', formData);
 }
 

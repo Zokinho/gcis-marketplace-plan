@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useUserStatus } from '../lib/useUserStatus';
-import { acceptEula, uploadDoc } from '../lib/api';
+import { acceptEula, uploadDocs } from '../lib/api';
 import HarvexLogo from '../components/HarvexLogo';
 
 export default function Onboarding() {
@@ -27,8 +27,6 @@ export default function Onboarding() {
   // Determine which step to show
   const needsEula = data?.status === 'EULA_REQUIRED';
   const needsDoc = data?.status === 'DOC_REQUIRED';
-  const isSeller = data?.user?.contactType?.includes('Seller') ?? false;
-
   if (!needsEula && !needsDoc) {
     // Onboarding complete — redirect to pending approval
     navigate('/pending', { replace: true });
@@ -36,7 +34,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col surface-base">
+    <div className="flex min-h-screen flex-col bg-gray-100 dark:bg-slate-900">
       <header className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-4 shadow-sm">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
           <HarvexLogo size="sm" color="white" />
@@ -48,12 +46,8 @@ export default function Onboarding() {
         {/* Progress indicator */}
         <div className="mb-8 flex items-center justify-center gap-4">
           <StepIndicator step={1} label="Accept Terms" active={needsEula} completed={!needsEula} />
-          {isSeller && (
-            <>
-              <div className="h-px w-12 bg-gray-300 dark:bg-slate-600" />
-              <StepIndicator step={2} label="Upload Agreement" active={needsDoc} completed={false} />
-            </>
-          )}
+          <div className="h-px w-12 bg-gray-300 dark:bg-slate-600" />
+          <StepIndicator step={2} label="Upload Licenses" active={needsDoc} completed={false} />
         </div>
 
         {needsEula && <EulaStep onComplete={refetch} />}
@@ -69,7 +63,7 @@ function StepIndicator({ step, label, active, completed }: {
   active: boolean;
   completed: boolean;
 }) {
-  const bgColor = completed ? 'bg-brand-teal text-white' : active ? 'bg-brand-teal text-white' : 'bg-gray-200 dark:bg-slate-600 text-muted';
+  const bgColor = completed ? 'bg-brand-teal text-white' : active ? 'bg-brand-teal text-white' : 'bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400';
   return (
     <div className="flex items-center gap-2">
       <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${bgColor}`}>
@@ -79,7 +73,7 @@ function StepIndicator({ step, label, active, completed }: {
           </svg>
         ) : step}
       </div>
-      <span className={`text-sm font-medium ${active || completed ? 'text-primary' : 'text-faint'}`}>{label}</span>
+      <span className={`text-sm font-medium ${active || completed ? 'text-gray-900 dark:text-slate-200' : 'text-gray-400 dark:text-slate-500'}`}>{label}</span>
     </div>
   );
 }
@@ -104,17 +98,17 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
   }, [accepted, onComplete]);
 
   return (
-    <div className="overflow-hidden rounded-lg surface shadow-lg">
+    <div className="overflow-hidden rounded-lg bg-white dark:bg-slate-800 shadow-lg">
       <div className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-4 sm:px-8">
         <h2 className="text-2xl font-semibold text-white">Harvex&trade; Platform Terms and Conditions</h2>
       </div>
       <div className="p-6 sm:p-8">
-      <p className="mb-6 text-sm text-muted">
+      <p className="mb-6 text-sm text-gray-500 dark:text-slate-400">
         Please read and accept the following agreement to continue.
       </p>
 
       {/* Scrollable Terms and Conditions */}
-      <div className="mb-6 h-[28rem] overflow-y-auto rounded-lg border border-subtle surface-muted p-4 text-sm leading-relaxed text-secondary">
+      <div className="mb-6 h-[28rem] overflow-y-auto rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 p-4 text-sm leading-relaxed text-gray-700 dark:text-slate-300" style={{ scrollbarColor: '#9ca3af transparent' }}>
         <h3 className="mb-3 font-bold">Harvex&trade; Platform Terms and Conditions Agreement</h3>
 
         <h4 className="mb-2 mt-4 font-semibold">1. INTRODUCTION AND ACCEPTANCE OF TERMS</h4>
@@ -194,7 +188,7 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
         <p className="mb-2"><strong>12.2 Entire Agreement.</strong> This Agreement constitutes the entire agreement between the User and the Company with respect to access to and use of the Harvex Platform. It supersedes all prior and contemporaneous understandings, communications, or agreements, whether oral or written, relating to its subject matter. This Agreement does not govern any broader commercial relationship or brokerage engagement between the User and the Company, which shall be governed exclusively by a separate Consulting &amp; Services Agreement, if executed.</p>
         <p className="mb-3"><strong>12.3 Execution.</strong> This Agreement may be executed in one or more counterparts, each of which shall be deemed an original and all of which taken together shall constitute one and the same instrument. This Agreement may be executed and delivered electronically (including by PDF or electronic signature), and such execution shall be deemed binding as if signed in original ink.</p>
 
-        <p className="mt-4 text-xs italic text-muted">
+        <p className="mt-4 text-xs italic text-gray-500 dark:text-slate-400">
           IN WITNESS WHEREOF, by clicking the acceptance box, the authorized signatory of the User confirms that the User has read, understood, and agreed to be bound by this Agreement as of the Effective Date.
         </p>
       </div>
@@ -205,9 +199,9 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
           type="checkbox"
           checked={accepted}
           onChange={(e) => setAccepted(e.target.checked)}
-          className="mt-0.5 h-5 w-5 rounded border-default text-brand-teal focus:ring-brand-teal"
+          className="mt-0.5 h-5 w-5 rounded border-gray-300 dark:border-slate-600 text-brand-teal focus:ring-brand-teal"
         />
-        <span className="text-sm text-secondary">
+        <span className="text-sm text-gray-700 dark:text-slate-300">
           As an authorized signatory of the Company, I hereby affirm that we have read the Harvex Terms and Conditions 2025 and duly accept them.
         </span>
       </label>
@@ -228,92 +222,124 @@ function EulaStep({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-function DocUploadStep({ onComplete }: { onComplete: () => void }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function FileDropZone({ label, description, file, onFileChange, onRemove }: {
+  label: string;
+  description: string;
+  file: File | null;
+  onFileChange: (file: File) => void;
+  onRemove: () => void;
+}) {
   const [dragOver, setDragOver] = useState(false);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) setFile(droppedFile);
-  }, []);
+    if (droppedFile) onFileChange(droppedFile);
+  }, [onFileChange]);
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) setFile(selectedFile);
-  }, []);
-
-  const handleSubmit = useCallback(async () => {
-    if (!file) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await uploadDoc(file);
-      onComplete();
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to upload document');
-    } finally {
-      setSubmitting(false);
-    }
-  }, [file, onComplete]);
+    if (selectedFile) onFileChange(selectedFile);
+  }, [onFileChange]);
 
   return (
-    <div className="overflow-hidden rounded-lg surface shadow-lg">
-      <div className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-4 sm:px-8">
-        <h2 className="text-2xl font-semibold text-white">Upload Agreement Document</h2>
-      </div>
-      <div className="p-6 sm:p-8">
-      <p className="mb-6 text-sm text-muted">
-        Please upload your signed buyer/seller agreement to complete your account setup.
-      </p>
-
-      {/* Drop zone */}
+    <div>
+      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-200">{label}</label>
+      <p className="mb-3 text-xs text-gray-500 dark:text-slate-400">{description}</p>
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`mb-6 flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition ${
-          dragOver ? 'border-brand-teal bg-brand-sage/10' : 'border-default surface-muted'
+        className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition ${
+          dragOver ? 'border-brand-teal bg-brand-sage/10' : 'border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700'
         }`}
       >
         {file ? (
           <div className="text-center">
-            <svg className="mx-auto mb-2 h-10 w-10 text-brand-teal" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="mx-auto mb-2 h-8 w-8 text-brand-teal" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
-            <p className="font-medium text-primary">{file.name}</p>
-            <p className="text-sm text-muted">{(file.size / 1024).toFixed(1)} KB</p>
+            <p className="font-medium text-gray-900 dark:text-slate-200 text-sm">{file.name}</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400">{(file.size / 1024).toFixed(1)} KB</p>
             <button
-              onClick={() => setFile(null)}
-              className="mt-2 text-sm text-red-600 hover:text-red-700"
+              onClick={onRemove}
+              className="mt-2 text-xs text-red-600 hover:text-red-700"
             >
               Remove
             </button>
           </div>
         ) : (
           <>
-            <svg className="mb-3 h-10 w-10 text-faint" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="mb-2 h-8 w-8 text-gray-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
             </svg>
-            <p className="mb-1 font-medium text-secondary">
+            <p className="mb-1 text-sm font-medium text-gray-600 dark:text-slate-300">
               Drag and drop your file here
             </p>
-            <p className="mb-3 text-sm text-muted">or</p>
-            <label className="cursor-pointer rounded-lg surface px-4 py-2 text-sm font-medium text-brand-teal shadow-sm ring-1 ring-gray-300 dark:ring-slate-600 transition hover-surface-muted">
+            <p className="mb-2 text-xs text-gray-500 dark:text-slate-400">or</p>
+            <label className="cursor-pointer rounded-lg bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-brand-teal shadow-sm ring-1 ring-gray-300 dark:ring-slate-600 transition hover:bg-gray-50 dark:hover:bg-slate-700">
               Browse Files
               <input
                 type="file"
                 accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                onChange={handleFileChange}
+                onChange={handleInputChange}
                 className="hidden"
               />
             </label>
-            <p className="mt-3 text-xs text-faint">PDF, DOC, DOCX, PNG, or JPG (max 20 MB)</p>
+            <p className="mt-2 text-xs text-gray-400 dark:text-slate-500">PDF, DOC, DOCX, PNG, or JPG (max 20 MB)</p>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DocUploadStep({ onComplete }: { onComplete: () => void }) {
+  const [healthCanadaFile, setHealthCanadaFile] = useState<File | null>(null);
+  const [craFile, setCraFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = useCallback(async () => {
+    if (!healthCanadaFile || !craFile) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await uploadDocs(healthCanadaFile, craFile);
+      onComplete();
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to upload documents');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [healthCanadaFile, craFile, onComplete]);
+
+  return (
+    <div className="overflow-hidden rounded-lg bg-white dark:bg-slate-800 shadow-lg">
+      <div className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-4 sm:px-8">
+        <h2 className="text-2xl font-semibold text-white">Upload License Documents</h2>
+      </div>
+      <div className="p-6 sm:p-8">
+      <p className="mb-6 text-sm text-gray-500 dark:text-slate-400">
+        Please upload your Health Canada License and CRA License to complete your account setup.
+      </p>
+
+      <div className="mb-6 space-y-6">
+        <FileDropZone
+          label="Health Canada License"
+          description="Your active Health Canada license for cannabis activities"
+          file={healthCanadaFile}
+          onFileChange={setHealthCanadaFile}
+          onRemove={() => setHealthCanadaFile(null)}
+        />
+        <FileDropZone
+          label="CRA License"
+          description="Your Canada Revenue Agency cannabis license"
+          file={craFile}
+          onFileChange={setCraFile}
+          onRemove={() => setCraFile(null)}
+        />
       </div>
 
       {error && (
@@ -322,7 +348,7 @@ function DocUploadStep({ onComplete }: { onComplete: () => void }) {
 
       <button
         onClick={handleSubmit}
-        disabled={!file || submitting}
+        disabled={!healthCanadaFile || !craFile || submitting}
         className="w-full rounded-lg bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-6 py-3 font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Uploading...' : 'Upload and Complete Setup'}

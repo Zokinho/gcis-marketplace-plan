@@ -96,7 +96,6 @@ const ALLOWED_ORIGINS = new Set(
     .split(',')
     .map((o) => o.trim()),
 );
-
 app.use((req, res, next) => {
   // Only check mutating methods
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
