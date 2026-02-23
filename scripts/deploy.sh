@@ -87,7 +87,7 @@ if [ -n "$CSS_FILE" ] && [ -n "$JS_FILE" ]; then
   echo "  Teal classes: $TEAL_COUNT references"
 
   # Verify Sentry DSN baked into client bundle
-  SENTRY_FOUND=$(docker exec gcis-client sh -c "grep -c 'ingest.us.sentry.io' /usr/share/nginx/html/assets/*.js 2>/dev/null" || echo "0")
+  SENTRY_FOUND=$(docker exec gcis-client sh -c "grep -l 'ingest.us.sentry.io' /usr/share/nginx/html/assets/*.js 2>/dev/null | wc -l" || echo "0")
   if [ "$SENTRY_FOUND" -gt 0 ]; then
     echo "  Frontend Sentry: OK (DSN baked in)"
   else
