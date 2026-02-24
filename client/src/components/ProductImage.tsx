@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { getFileUrl } from '../lib/api';
+import { getFileUrl, fetchZohoFileBlob } from '../lib/api';
 
-// In-memory cache for presigned URLs (50 min TTL out of 60 min server TTL)
+// In-memory cache for resolved URLs (50 min TTL)
 const urlCache = new Map<string, { url: string; expires: number }>();
 const CACHE_TTL_MS = 50 * 60 * 1000;
 
-function isLegacyOrProxyUrl(src: string): boolean {
-  return src.startsWith('/uploads/') || src.startsWith('/api/zoho-files/') || src.startsWith('http://') || src.startsWith('https://');
+function isDirectUrl(src: string): boolean {
+  return src.startsWith('/uploads/') || src.startsWith('http://') || src.startsWith('https://');
+}
+
+function isZohoProxy(src: string): boolean {
+  return src.startsWith('/api/zoho-files/');
 }
 
 async function resolveUrl(key: string): Promise<string> {
@@ -15,7 +19,14 @@ async function resolveUrl(key: string): Promise<string> {
     return cached.url;
   }
 
-  const url = await getFileUrl(key);
+  let url: string;
+  if (isZohoProxy(key)) {
+    // Fetch via authenticated API client → blob URL
+    url = await fetchZohoFileBlob(key);
+  } else {
+    // S3 presigned URL
+    url = await getFileUrl(key);
+  }
   urlCache.set(key, { url, expires: Date.now() + CACHE_TTL_MS });
   return url;
 }
@@ -40,13 +51,13 @@ export default function ProductImage({ src, alt, className = '', onClick }: Prod
   useEffect(() => {
     if (!src) return;
 
-    if (isLegacyOrProxyUrl(src)) {
+    if (isDirectUrl(src)) {
       setResolvedUrl(src);
       setLoading(false);
       return;
     }
 
-    // S3 key — resolve via presigned URL
+    // Zoho proxy or S3 key — resolve via authenticated fetch
     setLoading(true);
     resolveUrl(src)
       .then((url) => {

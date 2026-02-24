@@ -159,6 +159,11 @@ export async function getFileUrl(key: string): Promise<string> {
   return res.data.url;
 }
 
+export async function fetchZohoFileBlob(proxyPath: string): Promise<string> {
+  const res = await api.get(proxyPath, { responseType: 'blob' });
+  return URL.createObjectURL(res.data);
+}
+
 // ─── Bid API ───
 
 export type BidStatusType = 'PENDING' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'COUNTERED' | 'EXPIRED';
