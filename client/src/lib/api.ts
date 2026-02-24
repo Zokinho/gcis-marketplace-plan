@@ -160,7 +160,9 @@ export async function getFileUrl(key: string): Promise<string> {
 }
 
 export async function fetchZohoFileBlob(proxyPath: string): Promise<string> {
-  const res = await api.get(proxyPath, { responseType: 'blob' });
+  // Strip leading /api since the axios client already has baseURL: '/api'
+  const path = proxyPath.replace(/^\/api/, '');
+  const res = await api.get(path, { responseType: 'blob' });
   return URL.createObjectURL(res.data);
 }
 
