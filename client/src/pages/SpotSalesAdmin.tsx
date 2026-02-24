@@ -160,11 +160,29 @@ export default function SpotSalesAdmin() {
   );
 }
 
+type CreateMode = 'existing' | 'scratch';
+
 function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
+  const [mode, setMode] = useState<CreateMode>('existing');
+
+  // ── From-existing state ──
   const [products, setProducts] = useState<ProductCard[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
+
+  // ── From-scratch state ──
+  const [scratchName, setScratchName] = useState('');
+  const [scratchLP, setScratchLP] = useState('');
+  const [scratchCategory, setScratchCategory] = useState('');
+  const [scratchType, setScratchType] = useState('');
+  const [scratchOriginalPrice, setScratchOriginalPrice] = useState('');
+  const [scratchThc, setScratchThc] = useState('');
+  const [scratchCbd, setScratchCbd] = useState('');
+  const [scratchImages, setScratchImages] = useState<File[]>([]);
+  const [scratchCoaFiles, setScratchCoaFiles] = useState<File[]>([]);
+
+  // ── Shared state ──
   const [spotPrice, setSpotPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
@@ -186,18 +204,34 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
 
   const spotPriceNum = parseFloat(spotPrice);
   const quantityNum = quantity ? parseFloat(quantity) : undefined;
-  const originalPrice = selectedProduct?.pricePerUnit ?? 0;
+  const scratchOriginalPriceNum = parseFloat(scratchOriginalPrice);
+
+  const originalPrice = mode === 'existing'
+    ? (selectedProduct?.pricePerUnit ?? 0)
+    : (scratchOriginalPriceNum > 0 ? scratchOriginalPriceNum : 0);
+
   const discountPercent = originalPrice > 0 && spotPriceNum > 0
     ? Math.round(((originalPrice - spotPriceNum) / originalPrice) * 100)
     : 0;
 
-  const isValid =
+  const isValidExisting =
     selectedProductId &&
     spotPriceNum > 0 &&
     spotPriceNum < originalPrice &&
     expiresAt &&
     new Date(expiresAt) > new Date() &&
     (!quantityNum || quantityNum > 0);
+
+  const isValidScratch =
+    scratchName.trim() &&
+    scratchOriginalPriceNum > 0 &&
+    spotPriceNum > 0 &&
+    spotPriceNum < scratchOriginalPriceNum &&
+    expiresAt &&
+    new Date(expiresAt) > new Date() &&
+    (!quantityNum || quantityNum > 0);
+
+  const isValid = mode === 'existing' ? isValidExisting : isValidScratch;
 
   const filtered = products.filter((p) => {
     if (!search) return true;
@@ -207,7 +241,6 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
 
   const setQuickExpiry = (hours: number) => {
     const d = new Date(Date.now() + hours * 60 * 60 * 1000);
-    // Format as local datetime-local value
     const pad = (n: number) => String(n).padStart(2, '0');
     setExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
   };
@@ -217,12 +250,29 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
     setCreating(true);
     setError('');
     try {
-      await createSpotSale({
-        productId: selectedProductId,
-        spotPrice: spotPriceNum,
-        ...(quantityNum ? { quantity: quantityNum } : {}),
-        expiresAt: new Date(expiresAt).toISOString(),
-      });
+      if (mode === 'existing') {
+        await createSpotSale({
+          productId: selectedProductId,
+          spotPrice: spotPriceNum,
+          ...(quantityNum ? { quantity: quantityNum } : {}),
+          expiresAt: new Date(expiresAt).toISOString(),
+        });
+      } else {
+        await createSpotSale({
+          productName: scratchName.trim(),
+          originalPrice: scratchOriginalPriceNum,
+          spotPrice: spotPriceNum,
+          ...(scratchCategory ? { category: scratchCategory } : {}),
+          ...(scratchType ? { type: scratchType } : {}),
+          ...(scratchLP ? { licensedProducer: scratchLP } : {}),
+          ...(scratchThc ? { thcContent: parseFloat(scratchThc) } : {}),
+          ...(scratchCbd ? { cbdContent: parseFloat(scratchCbd) } : {}),
+          ...(quantityNum ? { quantity: quantityNum } : {}),
+          expiresAt: new Date(expiresAt).toISOString(),
+          ...(scratchImages.length > 0 ? { images: scratchImages } : {}),
+          ...(scratchCoaFiles.length > 0 ? { coaFiles: scratchCoaFiles } : {}),
+        });
+      }
       onCreated();
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to create clearance deal');
@@ -240,54 +290,195 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
         </div>
       )}
 
-      {/* Product picker */}
-      <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-muted">Product</label>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search products..."
-          className="mb-2 w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
-        />
-        <div className="flex items-center gap-2 px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-faint">
-          <span className="w-4 flex-shrink-0" />
-          <span className="min-w-0 flex-1">Product</span>
-          <span className="w-24 flex-shrink-0 text-right">Available</span>
-          <span className="w-24 flex-shrink-0 text-right">Upcoming</span>
-          <span className="w-20 flex-shrink-0 text-right">Price</span>
-        </div>
-        <div className="max-h-48 overflow-auto rounded-lg border border-subtle p-2">
-          {loadingProducts ? (
-            <p className="text-xs text-faint">Loading products...</p>
-          ) : (
-            filtered.map((p) => (
-              <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover-surface-muted">
-                <input
-                  type="radio"
-                  name="spotProduct"
-                  checked={selectedProductId === p.id}
-                  onChange={() => setSelectedProductId(p.id)}
-                  className="flex-shrink-0 border-default"
-                />
-                <span className="min-w-0 flex-1 truncate text-sm text-secondary">{p.name}</span>
-                <span className="w-24 flex-shrink-0 text-right text-xs tabular-nums text-brand-teal">
-                  {(p.gramsAvailable ?? 0) > 0 ? `${p.gramsAvailable?.toLocaleString()}g` : '—'}
-                </span>
-                <span className="w-24 flex-shrink-0 text-right text-xs tabular-nums text-amber-600">
-                  {(p.upcomingQty ?? 0) > 0 ? `${p.upcomingQty?.toLocaleString()}g` : '—'}
-                </span>
-                <span className="w-20 flex-shrink-0 text-right text-xs tabular-nums text-faint">
-                  ${p.pricePerUnit?.toFixed(2)}/g
-                </span>
-              </label>
-            ))
-          )}
-          {!loadingProducts && filtered.length === 0 && (
-            <p className="px-2 py-1 text-xs text-faint">No products with prices found</p>
-          )}
-        </div>
+      {/* Mode toggle */}
+      <div className="mb-4 flex gap-1 rounded-lg surface-muted p-1">
+        <button
+          type="button"
+          onClick={() => setMode('existing')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            mode === 'existing' ? 'bg-brand-teal text-white shadow-sm' : 'text-secondary hover-surface-muted'
+          }`}
+        >
+          From Existing
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('scratch')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            mode === 'scratch' ? 'bg-brand-teal text-white shadow-sm' : 'text-secondary hover-surface-muted'
+          }`}
+        >
+          From Scratch
+        </button>
       </div>
+
+      {mode === 'existing' ? (
+        /* ── Product picker (existing) ── */
+        <div className="mb-4">
+          <label className="mb-1 block text-xs font-medium text-muted">Product</label>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search products..."
+            className="mb-2 w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+          />
+          <div className="flex items-center gap-2 px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-faint">
+            <span className="w-4 flex-shrink-0" />
+            <span className="min-w-0 flex-1">Product</span>
+            <span className="w-24 flex-shrink-0 text-right">Available</span>
+            <span className="w-24 flex-shrink-0 text-right">Upcoming</span>
+            <span className="w-20 flex-shrink-0 text-right">Price</span>
+          </div>
+          <div className="max-h-48 overflow-auto rounded-lg border border-subtle p-2">
+            {loadingProducts ? (
+              <p className="text-xs text-faint">Loading products...</p>
+            ) : (
+              filtered.map((p) => (
+                <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover-surface-muted">
+                  <input
+                    type="radio"
+                    name="spotProduct"
+                    checked={selectedProductId === p.id}
+                    onChange={() => setSelectedProductId(p.id)}
+                    className="flex-shrink-0 border-default"
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm text-secondary">{p.name}</span>
+                  <span className="w-24 flex-shrink-0 text-right text-xs tabular-nums text-brand-teal">
+                    {(p.gramsAvailable ?? 0) > 0 ? `${p.gramsAvailable?.toLocaleString()}g` : '—'}
+                  </span>
+                  <span className="w-24 flex-shrink-0 text-right text-xs tabular-nums text-amber-600">
+                    {(p.upcomingQty ?? 0) > 0 ? `${p.upcomingQty?.toLocaleString()}g` : '—'}
+                  </span>
+                  <span className="w-20 flex-shrink-0 text-right text-xs tabular-nums text-faint">
+                    ${p.pricePerUnit?.toFixed(2)}/g
+                  </span>
+                </label>
+              ))
+            )}
+            {!loadingProducts && filtered.length === 0 && (
+              <p className="px-2 py-1 text-xs text-faint">No products with prices found</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* ── From-scratch product fields ── */
+        <div className="mb-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Product Name *</label>
+            <input
+              type="text"
+              value={scratchName}
+              onChange={(e) => setScratchName(e.target.value)}
+              placeholder="e.g., Purple Kush — Batch #47"
+              className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Licensed Producer</label>
+            <input
+              type="text"
+              value={scratchLP}
+              onChange={(e) => setScratchLP(e.target.value)}
+              placeholder="e.g., Aurora Cannabis"
+              className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">Category</label>
+              <input
+                type="text"
+                value={scratchCategory}
+                onChange={(e) => setScratchCategory(e.target.value)}
+                placeholder="e.g., Dried Flower"
+                className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">Type</label>
+              <select
+                value={scratchType}
+                onChange={(e) => setScratchType(e.target.value)}
+                className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+              >
+                <option value="">Select type...</option>
+                <option value="Sativa">Sativa</option>
+                <option value="Indica">Indica</option>
+                <option value="Hybrid">Hybrid</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Original Price ($/g) *</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={scratchOriginalPrice}
+              onChange={(e) => setScratchOriginalPrice(e.target.value)}
+              placeholder="e.g., 5.00"
+              className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">THC %</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={scratchThc}
+                onChange={(e) => setScratchThc(e.target.value)}
+                placeholder="e.g., 24.5"
+                className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">CBD %</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={scratchCbd}
+                onChange={(e) => setScratchCbd(e.target.value)}
+                placeholder="e.g., 0.5"
+                className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+              />
+            </div>
+          </div>
+          {/* Product images */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Product Images (up to 4)</label>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={(e) => setScratchImages(Array.from(e.target.files || []).slice(0, 4))}
+              className="w-full text-sm text-secondary file:mr-3 file:rounded-md file:border file:border-subtle file:bg-transparent file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-secondary"
+            />
+            {scratchImages.length > 0 && (
+              <p className="mt-1 text-xs text-faint">{scratchImages.length} image{scratchImages.length > 1 ? 's' : ''} selected</p>
+            )}
+          </div>
+          {/* CoA PDF files */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">CoA PDFs (up to 2)</label>
+            <input
+              type="file"
+              accept="application/pdf"
+              multiple
+              onChange={(e) => setScratchCoaFiles(Array.from(e.target.files || []).slice(0, 2))}
+              className="w-full text-sm text-secondary file:mr-3 file:rounded-md file:border file:border-subtle file:bg-transparent file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-secondary"
+            />
+            {scratchCoaFiles.length > 0 && (
+              <p className="mt-1 text-xs text-faint">{scratchCoaFiles.length} CoA{scratchCoaFiles.length > 1 ? 's' : ''} selected</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Clearance price + discount preview */}
       <div className="mb-4">
@@ -301,7 +492,7 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
           placeholder="e.g., 2.50"
           className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
         />
-        {selectedProduct && spotPriceNum > 0 && (
+        {originalPrice > 0 && spotPriceNum > 0 && (
           <p className={`mt-1 text-xs ${spotPriceNum < originalPrice ? 'text-brand-teal dark:text-brand-sage' : 'text-red-500'}`}>
             ${originalPrice.toFixed(2)} → ${spotPriceNum.toFixed(2)} — {spotPriceNum < originalPrice ? `${discountPercent}% off` : 'Must be less than original'}
           </p>
@@ -320,7 +511,7 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
           placeholder="Leave blank for full product quantity"
           className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
         />
-        {selectedProduct && quantityNum && (selectedProduct.gramsAvailable ?? 0) > 0 && (
+        {mode === 'existing' && selectedProduct && quantityNum && (selectedProduct.gramsAvailable ?? 0) > 0 && (
           <p className="mt-1 text-xs text-faint">
             Product has {selectedProduct.gramsAvailable?.toLocaleString()}g total — clearance deal for {quantityNum.toLocaleString()}g
           </p>

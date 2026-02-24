@@ -283,11 +283,22 @@ export const shortlistCheckSchema = z.object({
 // ─── Clearance schemas ───
 
 export const createSpotSaleSchema = z.object({
-  productId: z.string().min(1, 'productId is required'),
+  productId: z.string().min(1).optional(),
   spotPrice: z.coerce.number().positive('spotPrice must be positive'),
   quantity: z.coerce.number().positive('quantity must be positive').optional(),
   expiresAt: z.string().datetime('expiresAt must be a valid ISO datetime'),
-});
+  // From-scratch fields (used when productId is not provided)
+  productName: z.string().min(1).max(300).optional(),
+  originalPrice: z.coerce.number().positive().optional(),
+  category: z.string().max(100).optional(),
+  type: z.string().max(100).optional(),
+  licensedProducer: z.string().max(200).optional(),
+  thcContent: z.coerce.number().min(0).max(100).optional(),
+  cbdContent: z.coerce.number().min(0).max(100).optional(),
+}).refine(
+  (data) => data.productId || (data.productName && data.originalPrice),
+  { message: 'Either productId or (productName + originalPrice) must be provided' },
+);
 
 export const updateSpotSaleSchema = z.object({
   active: z.boolean().optional(),

@@ -4,7 +4,11 @@
  * Buyer: List active + unexpired clearance deals.
  */
 
+import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
 import { prisma } from '../index';
 import logger from '../utils/logger';
 import { logAudit, getRequestIp } from '../services/auditService';
@@ -22,13 +26,27 @@ import * as churnDetectionService from '../services/churnDetectionService';
 import * as marketContextService from '../services/marketContextService';
 import { createNotification } from '../services/notificationService';
 import { z } from 'zod';
-import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
+import { isS3Configured, uploadFile as s3Upload } from '../utils/s3';
 
 // ─── Admin router ───
 
 export const adminRouter = Router();
 
 const idParamsSchema = z.object({ id: z.string().min(1) });
+
+// ─── Multer config for clearance file uploads ───
+const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
+  const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
+  const allowedPdf = ['application/pdf'];
+  if (file.fieldname === 'coaFiles') {
+    cb(null, allowedPdf.includes(file.mimetype));
+  } else {
+    cb(null, allowedImages.includes(file.mimetype));
+  }
+};
+
+const upload = multer({ storage: multer.memoryStorage(), fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+const uploadsDir = path.join(__dirname, '../../../uploads');
 
 // Product fields to include in responses
 const productSelect = {
@@ -59,26 +77,129 @@ const productSelect = {
  * POST /api/spot-sales/admin
  * Create a new clearance deal.
  */
-adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: Response) => {
-  const { productId, spotPrice, quantity, expiresAt } = req.body;
+adminRouter.post(
+  '/',
+  upload.fields([
+    { name: 'images', maxCount: 4 },
+    { name: 'coaFiles', maxCount: 2 },
+  ]),
+  async (req: Request, res: Response) => {
+  // Multer parsed multipart — now validate body with Zod
+  const parsed = createSpotSaleSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const errors = parsed.error.issues.map((i) => ({
+      field: i.path.join('.'),
+      message: i.message,
+    }));
+    return res.status(400).json({ error: 'Validation failed', details: errors });
+  }
+
+  const { productId, spotPrice, quantity, expiresAt, productName, originalPrice: bodyOriginalPrice, category, type, licensedProducer, thcContent, cbdContent } = parsed.data;
   const adminId = req.user!.id;
+  const files = req.files as Record<string, Express.Multer.File[]> | undefined;
 
   try {
-    // Verify product exists and has a price
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-      select: { id: true, pricePerUnit: true, name: true },
-    });
+    let resolvedProductId: string;
+    let originalPrice: number;
 
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+    if (productId) {
+      // ── From existing product ──
+      const product = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { id: true, pricePerUnit: true, name: true },
+      });
+
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      if (!product.pricePerUnit || product.pricePerUnit <= 0) {
+        return res.status(400).json({ error: 'Product must have a valid price' });
+      }
+
+      resolvedProductId = product.id;
+      originalPrice = product.pricePerUnit;
+    } else {
+      // ── From scratch — create hidden product ──
+      originalPrice = bodyOriginalPrice!;
+
+      const newProduct = await prisma.product.create({
+        data: {
+          name: productName!,
+          pricePerUnit: originalPrice,
+          category: category || null,
+          type: type || null,
+          licensedProducer: licensedProducer || null,
+          thcMin: thcContent != null ? thcContent : null,
+          thcMax: thcContent != null ? thcContent : null,
+          cbdMin: cbdContent != null ? cbdContent : null,
+          cbdMax: cbdContent != null ? cbdContent : null,
+          isActive: false,
+          marketplaceVisible: false,
+          source: 'clearance',
+          sellerId: adminId,
+          zohoProductId: `clearance-${Date.now()}`,
+        },
+      });
+
+      resolvedProductId = newProduct.id;
+
+      // Upload images + CoA files for from-scratch products
+      const imageFiles = files?.images || [];
+      const coaFileList = files?.coaFiles || [];
+
+      if (imageFiles.length > 0 || coaFileList.length > 0) {
+        const imageUrls: string[] = [];
+        const coaUrls: string[] = [];
+
+        try {
+          const ext = (mimetype: string) => {
+            const map: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+            return map[mimetype] || 'bin';
+          };
+
+          if (isS3Configured) {
+            for (const f of imageFiles) {
+              const key = `products/${resolvedProductId}/images/${crypto.randomUUID()}.${ext(f.mimetype)}`;
+              await s3Upload(key, f.buffer, f.mimetype);
+              imageUrls.push(key);
+            }
+            for (const f of coaFileList) {
+              const key = `products/${resolvedProductId}/coa/${crypto.randomUUID()}.pdf`;
+              await s3Upload(key, f.buffer, f.mimetype);
+              coaUrls.push(key);
+            }
+          } else {
+            if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+            const safeName = (name: string) => name.replace(/[/\\]/g, '_');
+            for (const f of imageFiles) {
+              const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}-${safeName(f.originalname)}`;
+              fs.writeFileSync(path.join(uploadsDir, filename), f.buffer);
+              imageUrls.push(`/uploads/${filename}`);
+            }
+            for (const f of coaFileList) {
+              const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}-${safeName(f.originalname)}`;
+              fs.writeFileSync(path.join(uploadsDir, filename), f.buffer);
+              coaUrls.push(`/uploads/${filename}`);
+            }
+          }
+
+          if (imageUrls.length > 0 || coaUrls.length > 0) {
+            await prisma.product.update({
+              where: { id: resolvedProductId },
+              data: {
+                ...(imageUrls.length > 0 ? { imageUrls } : {}),
+                ...(coaUrls.length > 0 ? { coaUrls } : {}),
+              },
+            });
+          }
+        } catch (err) {
+          logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SPOT-SALES] File upload failed');
+        }
+      }
     }
 
-    if (!product.pricePerUnit || product.pricePerUnit <= 0) {
-      return res.status(400).json({ error: 'Product must have a valid price' });
-    }
-
-    if (spotPrice >= product.pricePerUnit) {
+    if (spotPrice >= originalPrice) {
       return res.status(400).json({ error: 'Clearance price must be less than the original price' });
     }
 
@@ -90,7 +211,7 @@ adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: 
     // Check no existing active clearance deal for this product
     const existing = await prisma.spotSale.findFirst({
       where: {
-        productId,
+        productId: resolvedProductId,
         active: true,
         expiresAt: { gt: new Date() },
       },
@@ -100,12 +221,11 @@ adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: 
       return res.status(409).json({ error: 'An active clearance deal already exists for this product' });
     }
 
-    const originalPrice = product.pricePerUnit;
     const discountPercent = ((originalPrice - spotPrice) / originalPrice) * 100;
 
     const spotSale = await prisma.spotSale.create({
       data: {
-        productId,
+        productId: resolvedProductId,
         originalPrice,
         spotPrice,
         discountPercent: Math.round(discountPercent * 10) / 10,
@@ -125,7 +245,7 @@ adminRouter.post('/', validate(createSpotSaleSchema), async (req: Request, res: 
       action: 'spot-sale.create',
       targetType: 'SpotSale',
       targetId: spotSale.id,
-      metadata: { productId, spotPrice, originalPrice, quantity, discountPercent: spotSale.discountPercent },
+      metadata: { productId: resolvedProductId, spotPrice, originalPrice, quantity, discountPercent: spotSale.discountPercent, fromScratch: !productId },
       ip: getRequestIp(req),
     });
 
@@ -445,11 +565,11 @@ buyerRouter.get('/', async (_req: Request, res: Response) => {
   try {
     const now = new Date();
 
+    // Clearance deals are admin-curated — show all active+unexpired regardless of product visibility
     const spotSales = await prisma.spotSale.findMany({
       where: {
         active: true,
         expiresAt: { gt: now },
-        product: { ...marketplaceVisibleWhere() },
       },
       include: {
         product: { select: productSelect },

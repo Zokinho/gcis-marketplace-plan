@@ -1021,12 +1021,44 @@ export async function fetchSpotSalesAdmin(params?: {
 }
 
 export async function createSpotSale(data: {
-  productId: string;
+  productId?: string;
   spotPrice: number;
   quantity?: number;
   expiresAt: string;
+  // From-scratch fields
+  productName?: string;
+  originalPrice?: number;
+  category?: string;
+  type?: string;
+  licensedProducer?: string;
+  thcContent?: number;
+  cbdContent?: number;
+  images?: File[];
+  coaFiles?: File[];
 }): Promise<{ spotSale: SpotSaleAdminRecord }> {
-  const res = await api.post('/spot-sales/admin', data);
+  const formData = new FormData();
+  // Append scalar fields
+  if (data.productId) formData.append('productId', data.productId);
+  formData.append('spotPrice', String(data.spotPrice));
+  if (data.quantity != null) formData.append('quantity', String(data.quantity));
+  formData.append('expiresAt', data.expiresAt);
+  if (data.productName) formData.append('productName', data.productName);
+  if (data.originalPrice != null) formData.append('originalPrice', String(data.originalPrice));
+  if (data.category) formData.append('category', data.category);
+  if (data.type) formData.append('type', data.type);
+  if (data.licensedProducer) formData.append('licensedProducer', data.licensedProducer);
+  if (data.thcContent != null) formData.append('thcContent', String(data.thcContent));
+  if (data.cbdContent != null) formData.append('cbdContent', String(data.cbdContent));
+  // Append files
+  if (data.images) {
+    for (const f of data.images) formData.append('images', f);
+  }
+  if (data.coaFiles) {
+    for (const f of data.coaFiles) formData.append('coaFiles', f);
+  }
+  const res = await api.post('/spot-sales/admin', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return res.data;
 }
 
