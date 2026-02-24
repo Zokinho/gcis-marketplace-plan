@@ -511,7 +511,7 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
           min="1"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          placeholder="Leave blank for full product quantity"
+          placeholder={mode === 'existing' ? 'Leave blank for full product quantity' : 'e.g., 5000'}
           className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
         />
         {mode === 'existing' && selectedProduct && quantityNum && (selectedProduct.gramsAvailable ?? 0) > 0 && (
