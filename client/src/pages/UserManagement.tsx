@@ -77,12 +77,15 @@ export default function UserManagement() {
   }
 
   async function handleResetPassword(userId: string, userName: string) {
-    if (!confirm(`Reset password for ${userName}? A temporary password will be generated.`)) return;
+    const customPassword = window.prompt(
+      `Set password for ${userName}.\nLeave blank to auto-generate a random password:`,
+    );
+    if (customPassword === null) return; // cancelled
     setActionLoading(userId);
     try {
-      const result = await adminResetPassword(userId);
+      const result = await adminResetPassword(userId, customPassword || undefined);
       window.prompt(
-        'Temporary password (copy it now — it will not be shown again):',
+        'Password set (copy it now — it will not be shown again):',
         result.temporaryPassword,
       );
     } catch (err) {

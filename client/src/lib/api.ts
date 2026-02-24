@@ -489,8 +489,8 @@ export async function demoteUser(userId: string): Promise<void> {
   await api.post(`/admin/users/${userId}/demote`);
 }
 
-export async function adminResetPassword(userId: string): Promise<{ message: string; temporaryPassword: string }> {
-  const res = await api.post(`/admin/users/${userId}/reset-password`);
+export async function adminResetPassword(userId: string, password?: string): Promise<{ message: string; temporaryPassword: string }> {
+  const res = await api.post(`/admin/users/${userId}/reset-password`, password ? { password } : {});
   return res.data;
 }
 

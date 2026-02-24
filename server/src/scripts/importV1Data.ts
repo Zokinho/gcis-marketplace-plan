@@ -94,6 +94,8 @@ async function importUsers(contacts: any[]): Promise<void> {
         mailingCountry: c.Mailing_Country || null,
         phone: c.Phone || null,
         approved: true,
+        eulaAcceptedAt: new Date(), // V1 users already accepted EULA
+        docUploaded: true,          // V1 users already uploaded licenses
         lastSyncedAt: new Date(),
       };
 
@@ -235,6 +237,8 @@ async function createPlaceholderSeller(zohoContactId: string): Promise<string | 
       mailingCountry: c.Mailing_Country || null,
       phone: c.Phone || null,
       approved: true,
+      eulaAcceptedAt: new Date(),
+      docUploaded: true,
       lastSyncedAt: new Date(),
     };
 

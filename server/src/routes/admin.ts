@@ -418,18 +418,19 @@ router.post('/users/:userId/demote', async (req: Request<{ userId: string }>, re
 
 /**
  * POST /api/admin/users/:userId/reset-password
- * Admin-initiated password reset — generates a 12-char temporary password.
+ * Admin-initiated password reset — generates a random password or uses an admin-specified one.
  * Clears refresh tokens to force re-login.
  */
 router.post('/users/:userId/reset-password', async (req: Request<{ userId: string }>, res: Response) => {
   const { userId } = req.params;
+  const { password } = req.body || {};
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  const tempPassword = crypto.randomBytes(9).toString('base64url');
+  const tempPassword = password || crypto.randomBytes(9).toString('base64url');
   const hashed = await hashPassword(tempPassword);
 
   await prisma.user.update({
