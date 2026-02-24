@@ -16,6 +16,7 @@ export function makeBuyer(overrides: Record<string, any> = {}) {
     isAdmin: false,
     eulaAcceptedAt: new Date('2025-06-01'),
     docUploaded: true,
+    mustChangePassword: false,
     notificationPrefs: null,
     ...overrides,
   };
@@ -35,6 +36,7 @@ export function makeSeller(overrides: Record<string, any> = {}) {
     isAdmin: false,
     eulaAcceptedAt: new Date('2025-06-01'),
     docUploaded: true,
+    mustChangePassword: false,
     notificationPrefs: null,
     ...overrides,
   };
@@ -54,6 +56,7 @@ export function makeAdmin(overrides: Record<string, any> = {}) {
     isAdmin: true,
     eulaAcceptedAt: new Date('2025-06-01'),
     docUploaded: true,
+    mustChangePassword: false,
     notificationPrefs: null,
     ...overrides,
   };
