@@ -296,8 +296,8 @@ export const createSpotSaleSchema = z.object({
   thcContent: z.coerce.number().min(0).max(100).optional(),
   cbdContent: z.coerce.number().min(0).max(100).optional(),
 }).refine(
-  (data) => data.productId || (data.productName && data.originalPrice),
-  { message: 'Either productId or (productName + originalPrice) must be provided' },
+  (data) => data.productId || data.productName,
+  { message: 'Either productId or productName must be provided' },
 );
 
 export const updateSpotSaleSchema = z.object({

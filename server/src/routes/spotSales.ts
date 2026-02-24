@@ -121,12 +121,13 @@ adminRouter.post(
       originalPrice = product.pricePerUnit;
     } else {
       // ── From scratch — create hidden product ──
-      originalPrice = bodyOriginalPrice!;
+      // originalPrice is optional; fall back to spotPrice (no discount shown)
+      originalPrice = bodyOriginalPrice && bodyOriginalPrice > 0 ? bodyOriginalPrice : spotPrice;
 
       const newProduct = await prisma.product.create({
         data: {
           name: productName!,
-          pricePerUnit: originalPrice,
+          pricePerUnit: bodyOriginalPrice && bodyOriginalPrice > 0 ? bodyOriginalPrice : spotPrice,
           category: category || null,
           type: type || null,
           licensedProducer: licensedProducer || null,
@@ -199,7 +200,12 @@ adminRouter.post(
       }
     }
 
-    if (spotPrice >= originalPrice) {
+    // For existing products, clearance price must be below original.
+    // For from-scratch without an original price, they may be equal (no discount).
+    if (productId && spotPrice >= originalPrice) {
+      return res.status(400).json({ error: 'Clearance price must be less than the original price' });
+    }
+    if (!productId && bodyOriginalPrice && bodyOriginalPrice > 0 && spotPrice >= bodyOriginalPrice) {
       return res.status(400).json({ error: 'Clearance price must be less than the original price' });
     }
 

@@ -224,9 +224,8 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
 
   const isValidScratch =
     scratchName.trim() &&
-    scratchOriginalPriceNum > 0 &&
     spotPriceNum > 0 &&
-    spotPriceNum < scratchOriginalPriceNum &&
+    (!scratchOriginalPriceNum || spotPriceNum < scratchOriginalPriceNum) &&
     expiresAt &&
     new Date(expiresAt) > new Date() &&
     (!quantityNum || quantityNum > 0);
@@ -260,7 +259,7 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
       } else {
         await createSpotSale({
           productName: scratchName.trim(),
-          originalPrice: scratchOriginalPriceNum,
+          ...(scratchOriginalPriceNum > 0 ? { originalPrice: scratchOriginalPriceNum } : {}),
           spotPrice: spotPriceNum,
           ...(scratchCategory ? { category: scratchCategory } : {}),
           ...(scratchType ? { type: scratchType } : {}),
@@ -409,18 +408,6 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
               </select>
             </div>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-muted">Original Price ($/g) *</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={scratchOriginalPrice}
-              onChange={(e) => setScratchOriginalPrice(e.target.value)}
-              placeholder="e.g., 5.00"
-              className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
-            />
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted">THC %</label>
@@ -480,24 +467,40 @@ function CreateSpotSaleForm({ onCreated, onCancel }: { onCreated: () => void; on
         </div>
       )}
 
-      {/* Clearance price + discount preview */}
-      <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-muted">Clearance Price ($/g)</label>
-        <input
-          type="number"
-          step="0.01"
-          min="0.01"
-          value={spotPrice}
-          onChange={(e) => setSpotPrice(e.target.value)}
-          placeholder="e.g., 2.50"
-          className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
-        />
-        {originalPrice > 0 && spotPriceNum > 0 && (
-          <p className={`mt-1 text-xs ${spotPriceNum < originalPrice ? 'text-brand-teal dark:text-brand-sage' : 'text-red-500'}`}>
-            ${originalPrice.toFixed(2)} → ${spotPriceNum.toFixed(2)} — {spotPriceNum < originalPrice ? `${discountPercent}% off` : 'Must be less than original'}
-          </p>
+      {/* Pricing — side-by-side for scratch, single for existing */}
+      <div className={`mb-4 ${mode === 'scratch' ? 'grid grid-cols-2 gap-3' : ''}`}>
+        {mode === 'scratch' && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Original Price ($/g)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={scratchOriginalPrice}
+              onChange={(e) => setScratchOriginalPrice(e.target.value)}
+              placeholder="Optional — for discount display"
+              className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+            />
+          </div>
         )}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Clearance Price ($/g) *</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={spotPrice}
+            onChange={(e) => setSpotPrice(e.target.value)}
+            placeholder="e.g., 2.50"
+            className="w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+          />
+        </div>
       </div>
+      {originalPrice > 0 && spotPriceNum > 0 && spotPriceNum < originalPrice && (
+        <p className="mb-4 -mt-3 text-xs text-brand-teal dark:text-brand-sage">
+          ${originalPrice.toFixed(2)} → ${spotPriceNum.toFixed(2)} — {discountPercent}% off
+        </p>
+      )}
 
       {/* Quantity */}
       <div className="mb-4">
