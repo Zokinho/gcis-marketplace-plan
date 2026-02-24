@@ -19,6 +19,7 @@ declare global {
         isAdmin: boolean;
         eulaAcceptedAt: Date | null;
         docUploaded: boolean;
+        mustChangePassword: boolean;
       };
     }
   }
@@ -71,6 +72,9 @@ export async function marketplaceAuth(req: Request, res: Response, next: NextFun
   }
   if (!user.docUploaded) {
     return res.status(403).json({ error: 'Document upload required', code: 'DOC_REQUIRED' });
+  }
+  if (user.mustChangePassword) {
+    return res.status(403).json({ error: 'Password change required', code: 'PASSWORD_CHANGE_REQUIRED' });
   }
 
   req.user = user;

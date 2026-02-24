@@ -96,6 +96,7 @@ async function importUsers(contacts: any[]): Promise<void> {
         approved: true,
         eulaAcceptedAt: new Date(), // V1 users already accepted EULA
         docUploaded: true,          // V1 users already uploaded licenses
+        mustChangePassword: true,   // Admin will set temp password; user must change it
         lastSyncedAt: new Date(),
       };
 
@@ -239,6 +240,7 @@ async function createPlaceholderSeller(zohoContactId: string): Promise<string | 
       approved: true,
       eulaAcceptedAt: new Date(),
       docUploaded: true,
+      mustChangePassword: true,
       lastSyncedAt: new Date(),
     };
 

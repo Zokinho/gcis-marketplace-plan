@@ -129,6 +129,7 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
       approved: user.approved,
       eulaAcceptedAt: user.eulaAcceptedAt,
       docUploaded: user.docUploaded,
+      mustChangePassword: user.mustChangePassword,
       isAdmin: isAdmin(user.email, user.isAdmin),
     },
     accessToken,
@@ -177,6 +178,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
       approved: user.approved,
       eulaAcceptedAt: user.eulaAcceptedAt,
       docUploaded: user.docUploaded,
+      mustChangePassword: user.mustChangePassword,
       isAdmin: isAdmin(user.email, user.isAdmin),
     },
     accessToken,
@@ -256,6 +258,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
       approved: user.approved,
       eulaAcceptedAt: user.eulaAcceptedAt,
       docUploaded: user.docUploaded,
+      mustChangePassword: user.mustChangePassword,
       isAdmin: isAdmin(user.email, user.isAdmin),
     },
   });

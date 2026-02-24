@@ -30,6 +30,7 @@ import SpotSalesAdmin from './pages/SpotSalesAdmin';
 import PendingProducts from './pages/PendingProducts';
 import Guide from './pages/Guide';
 import AccountSettings from './pages/AccountSettings';
+import ChangePassword from './pages/ChangePassword';
 import { ShortlistProvider } from './lib/useShortlist';
 
 /**
@@ -97,6 +98,8 @@ function MarketplaceGuard({ children }: { children: React.ReactNode }) {
     case 'EULA_REQUIRED':
     case 'DOC_REQUIRED':
       return <Navigate to="/onboarding" replace />;
+    case 'PASSWORD_CHANGE_REQUIRED':
+      return <Navigate to="/change-password" replace />;
     case 'ACTIVE':
       return <>{children}</>;
     default:
@@ -133,6 +136,7 @@ export default function App() {
         {/* Authenticated but pre-approval routes */}
         <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
         <Route path="/pending" element={<RequireAuth><PendingApproval /></RequireAuth>} />
+        <Route path="/change-password" element={<RequireAuth><ChangePassword /></RequireAuth>} />
 
         {/* Fully protected marketplace routes */}
         <Route path="/dashboard" element={<Navigate to="/marketplace" replace />} />

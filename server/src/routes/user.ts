@@ -14,10 +14,12 @@ function getUserStatusCode(user: {
   approved: boolean;
   eulaAcceptedAt: Date | null;
   docUploaded: boolean;
+  mustChangePassword: boolean;
 }): string {
   if (!user.eulaAcceptedAt) return 'EULA_REQUIRED';
   if (!user.docUploaded) return 'DOC_REQUIRED';
   if (!user.approved) return 'PENDING_APPROVAL';
+  if (user.mustChangePassword) return 'PASSWORD_CHANGE_REQUIRED';
   return 'ACTIVE';
 }
 
@@ -58,6 +60,7 @@ router.get('/status', async (req: Request, res: Response) => {
       approved: user.approved,
       eulaAcceptedAt: user.eulaAcceptedAt,
       docUploaded: user.docUploaded,
+      mustChangePassword: user.mustChangePassword,
       isAdmin: isAdmin(user.email, user.isAdmin),
     },
   });
@@ -95,6 +98,7 @@ router.post('/change-password', validate(changePasswordSchema), async (req: Requ
     where: { id: userId },
     data: {
       passwordHash: newHash,
+      mustChangePassword: false,
       refreshToken: null,
       refreshTokenExpiresAt: null,
     },

@@ -26,6 +26,7 @@ model User {
   isAdmin        Boolean   @default(false)
   eulaAcceptedAt DateTime?
   docUploaded    Boolean   @default(false)
+  mustChangePassword Boolean @default(false)
   mailingCountry String?
   phone          String?
   address        String?

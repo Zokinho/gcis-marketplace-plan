@@ -12,6 +12,7 @@ export interface AuthUser {
   approved: boolean;
   eulaAcceptedAt: string | null;
   docUploaded: boolean;
+  mustChangePassword: boolean;
   isAdmin: boolean;
 }
 

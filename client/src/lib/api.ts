@@ -10,7 +10,7 @@ const api = axios.create({
 // ─── User types ───
 
 export interface UserStatus {
-  status: 'NOT_FOUND' | 'PENDING_APPROVAL' | 'EULA_REQUIRED' | 'DOC_REQUIRED' | 'ACTIVE';
+  status: 'NOT_FOUND' | 'PENDING_APPROVAL' | 'EULA_REQUIRED' | 'DOC_REQUIRED' | 'PASSWORD_CHANGE_REQUIRED' | 'ACTIVE';
   message?: string;
   user?: {
     id: string;
@@ -22,6 +22,7 @@ export interface UserStatus {
     approved: boolean;
     eulaAcceptedAt: string | null;
     docUploaded: boolean;
+    mustChangePassword: boolean;
     isAdmin: boolean;
   };
 }

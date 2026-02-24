@@ -437,6 +437,7 @@ router.post('/users/:userId/reset-password', async (req: Request<{ userId: strin
     where: { id: userId },
     data: {
       passwordHash: hashed,
+      mustChangePassword: true,
       refreshToken: null,
       refreshTokenExpiresAt: null,
     },

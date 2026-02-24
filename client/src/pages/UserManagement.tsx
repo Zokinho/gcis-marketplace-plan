@@ -10,6 +10,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmReject, setConfirmReject] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   async function load() {
     setLoading(true);
@@ -118,6 +119,18 @@ export default function UserManagement() {
     );
   }
 
+  const filteredUsers = search.trim()
+    ? users.filter((u) => {
+        const q = search.toLowerCase();
+        return (
+          u.email.toLowerCase().includes(q) ||
+          (u.firstName && u.firstName.toLowerCase().includes(q)) ||
+          (u.lastName && u.lastName.toLowerCase().includes(q)) ||
+          (u.companyName && u.companyName.toLowerCase().includes(q))
+        );
+      })
+    : users;
+
   const tabs: { key: FilterTab; label: string }[] = [
     { key: 'pending', label: 'Pending Review' },
     { key: 'approved', label: 'Approved' },
@@ -131,30 +144,44 @@ export default function UserManagement() {
         <div className="mt-1 h-0.5 w-12 bg-brand-yellow rounded" />
       </div>
 
-      {/* Filter tabs */}
-      <div className="mb-6 flex gap-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setFilter(tab.key)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              filter === tab.key
-                ? 'bg-brand-teal text-white'
-                : 'surface-muted text-secondary hover:text-primary'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Filter tabs + search */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                filter === tab.key
+                  ? 'bg-brand-teal text-white'
+                  : 'surface-muted text-secondary hover:text-primary'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative">
+          <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search by name, email, company..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal sm:w-72"
+          />
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
         </div>
-      ) : users.length === 0 ? (
+      ) : filteredUsers.length === 0 ? (
         <div className="rounded-lg surface p-8 text-center text-muted shadow-sm">
-          No users found for this filter.
+          {search.trim() ? `No users matching "${search}"` : 'No users found for this filter.'}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg surface shadow-sm">
@@ -172,7 +199,7 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-default">
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:surface-muted transition">
                   <td className="px-4 py-3 font-medium text-primary">
                     {user.firstName || user.lastName
