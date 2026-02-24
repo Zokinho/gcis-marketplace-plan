@@ -19,7 +19,7 @@
 import path from 'path';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
-import { fetchAllContacts, fetchAllProducts, fetchProductFileUrls } from './zohoImportHelpers';
+import { fetchAllContacts, fetchAllProducts, fetchProductFileUrls, fetchContactById } from './zohoImportHelpers';
 
 // ─── Phase 0: Bootstrap ───
 
@@ -199,6 +199,70 @@ async function resolveSellerFromDb(zohoContactId: string): Promise<string | null
   return user?.id || null;
 }
 
+async function createPlaceholderSeller(zohoContactId: string): Promise<string | null> {
+  try {
+    log(`  Fetching Zoho contact ${zohoContactId} to create placeholder seller...`);
+    const c = await fetchContactById(zohoContactId);
+    if (!c) {
+      log(`  WARNING: Zoho contact ${zohoContactId} not found`);
+      return null;
+    }
+
+    const email = c.Email?.toLowerCase()?.trim();
+    if (!email) {
+      log(`  WARNING: Zoho contact ${zohoContactId} has no email`);
+      return null;
+    }
+
+    const contactType = Array.isArray(c.Contact_Type)
+      ? c.Contact_Type.join(';')
+      : (c.Contact_Type || 'Seller');
+
+    // Ensure contactType includes Seller
+    const types = contactType.split(';').map((t: string) => t.trim()).filter(Boolean);
+    if (!types.some((t: string) => t.toLowerCase().includes('seller'))) {
+      types.push('Seller');
+    }
+
+    const userData = {
+      zohoContactId: c.id,
+      email,
+      firstName: c.First_Name || null,
+      lastName: c.Last_Name || null,
+      companyName: c.Company || null,
+      title: c.Title || null,
+      contactType: types.join(';'),
+      mailingCountry: c.Mailing_Country || null,
+      phone: c.Phone || null,
+      approved: true,
+      lastSyncedAt: new Date(),
+    };
+
+    // Check if email already exists (could be registered under different zohoContactId)
+    const existingByEmail = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (existingByEmail) {
+      await prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: { zohoContactId: c.id },
+      });
+      log(`  Linked existing user ${email} to Zoho contact ${zohoContactId}`);
+      return existingByEmail.id;
+    }
+
+    const newUser = await prisma.user.create({ data: userData });
+    stats.usersCreated++;
+    log(`  Created placeholder seller: ${email} (${c.First_Name} ${c.Last_Name})`);
+    return newUser.id;
+  } catch (err: any) {
+    logError(`Failed to create placeholder seller for contact ${zohoContactId}`, err);
+    return null;
+  }
+}
+
 async function importProducts(products: any[]): Promise<void> {
   log(`Phase 3: Importing ${products.length} active products...`);
 
@@ -206,18 +270,26 @@ async function importProducts(products: any[]): Promise<void> {
     try {
       const zohoContactId = p.Contact_Name?.id;
 
-      // Resolve seller: check cache first, then DB
-      let sellerId = zohoContactId ? sellerCache.get(zohoContactId) : undefined;
-      if (!sellerId && zohoContactId && !DRY_RUN) {
+      if (!zohoContactId) {
+        stats.productsSkippedNoSeller++;
+        if (DRY_RUN) {
+          log(`  [DRY RUN] Would SKIP product "${p.Product_Name}" — no Contact_Name`);
+        }
+        continue;
+      }
+
+      // Resolve seller: cache → DB → create placeholder from Zoho
+      let sellerId = sellerCache.get(zohoContactId);
+      if (!sellerId && !DRY_RUN) {
         sellerId = (await resolveSellerFromDb(zohoContactId)) || undefined;
+        if (!sellerId) {
+          sellerId = (await createPlaceholderSeller(zohoContactId)) || undefined;
+        }
         if (sellerId) sellerCache.set(zohoContactId, sellerId);
       }
 
-      if (!sellerId) {
+      if (!sellerId && !DRY_RUN) {
         stats.productsSkippedNoSeller++;
-        if (DRY_RUN) {
-          log(`  [DRY RUN] Would SKIP product "${p.Product_Name}" — no seller (Contact_Name.id: ${zohoContactId || 'null'})`);
-        }
         continue;
       }
 
@@ -238,11 +310,11 @@ async function importProducts(products: any[]): Promise<void> {
         where: { zohoProductId: p.id },
         update: {
           ...fields,
-          sellerId,
+          sellerId: sellerId!,
         },
         create: {
           zohoProductId: p.id,
-          sellerId,
+          sellerId: sellerId!,
           ...fields,
           imageUrls: [],
           coaUrls: [],

@@ -85,6 +85,20 @@ export async function fetchAllProducts(): Promise<any[]> {
   return allProducts;
 }
 
+// ─── Fetch single contact by ID ───
+
+export async function fetchContactById(zohoContactId: string): Promise<any | null> {
+  try {
+    const response = await zohoRequest('GET', `/Contacts/${zohoContactId}`, {
+      params: { fields: CONTACT_FIELDS },
+    });
+    return response?.data?.[0] || null;
+  } catch (err: any) {
+    if (err?.response?.status === 204 || err?.response?.status === 404) return null;
+    throw err;
+  }
+}
+
 // ─── File URL helpers ───
 
 function extractFileUrls(fieldValue: any, zohoProductId: string): string[] {
