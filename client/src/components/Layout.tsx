@@ -38,6 +38,7 @@ function GuideNavLink({ onClick }: { onClick?: () => void }) {
 
 const ADMIN_LINKS = [
   { to: '/pending-products', label: 'Pending Products' },
+  { to: '/admin/bids', label: 'All Bids' },
   { to: '/intelligence', label: 'Intelligence' },
   { to: '/spot-sales/admin', label: 'Clearance' },
   { to: '/iso/admin', label: 'ISO Board' },

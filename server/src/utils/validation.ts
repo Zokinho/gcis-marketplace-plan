@@ -248,6 +248,13 @@ export const bidListQuerySchema = paginationQuery.extend({
   status: z.enum(['PENDING', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'COUNTERED', 'EXPIRED']).optional(),
 });
 
+export const adminBidsQuerySchema = paginationQuery.extend({
+  status: z.enum(['PENDING', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'COUNTERED', 'EXPIRED']).optional(),
+  sellerId: z.string().max(100).optional(),
+  buyerId: z.string().max(100).optional(),
+  productId: z.string().max(100).optional(),
+});
+
 // ─── Admin users query schema ───
 
 export const adminUsersQuerySchema = z.object({

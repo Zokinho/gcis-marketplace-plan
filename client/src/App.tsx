@@ -28,6 +28,7 @@ import IsoBoard from './pages/IsoBoard';
 import SpotSales from './pages/SpotSales';
 import SpotSalesAdmin from './pages/SpotSalesAdmin';
 import PendingProducts from './pages/PendingProducts';
+import AdminBids from './pages/AdminBids';
 import Guide from './pages/Guide';
 import AccountSettings from './pages/AccountSettings';
 import ChangePassword from './pages/ChangePassword';
@@ -215,6 +216,9 @@ export default function App() {
         } />
         <Route path="/pending-products" element={
           <RequireAuth><MarketplaceGuard><PendingProducts /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/admin/bids" element={
+          <RequireAuth><MarketplaceGuard><AdminBids /></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/users" element={
           <RequireAuth><MarketplaceGuard><UserManagement /></MarketplaceGuard></RequireAuth>

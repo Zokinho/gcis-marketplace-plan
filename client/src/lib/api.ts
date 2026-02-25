@@ -938,6 +938,50 @@ export async function fetchSellerBids(params?: { page?: number; limit?: number; 
   return res.data;
 }
 
+// ─── Admin Bids API ───
+
+export interface AdminBidRecord {
+  id: string;
+  pricePerUnit: number;
+  quantity: number;
+  totalValue: number;
+  proximityScore: number | null;
+  status: BidStatusType;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  product: {
+    id: string;
+    name: string;
+    category: string | null;
+    type: string | null;
+    pricePerUnit: number | null;
+    imageUrls: string[];
+    seller: { id: string; email: string; companyName: string | null; firstName: string | null; lastName: string | null };
+  };
+  buyer: { id: string; email: string; companyName: string | null; firstName: string | null; lastName: string | null };
+  transaction: { id: string; status: string; outcomeRecordedAt: string | null } | null;
+}
+
+export async function fetchAdminBids(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  sellerId?: string;
+  buyerId?: string;
+  productId?: string;
+}): Promise<{ bids: AdminBidRecord[]; pagination: Pagination }> {
+  const query: Record<string, string> = {};
+  if (params?.page) query.page = String(params.page);
+  if (params?.limit) query.limit = String(params.limit);
+  if (params?.status) query.status = params.status;
+  if (params?.sellerId) query.sellerId = params.sellerId;
+  if (params?.buyerId) query.buyerId = params.buyerId;
+  if (params?.productId) query.productId = params.productId;
+  const res = await api.get('/admin/bids', { params: query });
+  return res.data;
+}
+
 // ─── Shortlist Types ───
 
 export interface ShortlistItem extends ProductCard {

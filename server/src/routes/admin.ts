@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
-import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema } from '../utils/validation';
+import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema, adminBidsQuerySchema } from '../utils/validation';
 import { prisma } from '../index';
 import { runFullSync, syncProducts, syncContacts, syncProductsDelta } from '../services/zohoSync';
 import { getCoaClient } from '../services/coaClient';
@@ -515,6 +515,57 @@ router.post('/products/:productId/reject', async (req: Request<{ productId: stri
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'product.reject', targetType: 'Product', targetId: productId, metadata: { productName: product.name }, ip: getRequestIp(req) });
 
   res.json({ message: 'Product rejected and removed' });
+});
+
+// ─── All Bids (admin view) ───
+
+/**
+ * GET /api/admin/bids
+ * All bids across the platform — paginated, filterable by status/seller/buyer/product.
+ */
+router.get('/bids', validateQuery(adminBidsQuerySchema), async (req: Request, res: Response) => {
+  const { page, limit, status, sellerId, buyerId, productId } = req.query as any;
+
+  const where: Prisma.BidWhereInput = {};
+  if (status) where.status = status;
+  if (buyerId) where.buyerId = buyerId;
+  if (productId) where.productId = productId;
+  if (sellerId) where.product = { sellerId };
+
+  try {
+    const [bids, total] = await Promise.all([
+      prisma.bid.findMany({
+        where,
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              type: true,
+              pricePerUnit: true,
+              imageUrls: true,
+              seller: { select: { id: true, email: true, companyName: true, firstName: true, lastName: true } },
+            },
+          },
+          buyer: { select: { id: true, email: true, companyName: true, firstName: true, lastName: true } },
+          transaction: { select: { id: true, status: true, outcomeRecordedAt: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.bid.count({ where }),
+    ]);
+
+    res.json({
+      bids,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] Failed to fetch bids');
+    res.status(500).json({ error: 'Failed to fetch bids' });
+  }
 });
 
 // ─── Audit Log ───
