@@ -83,8 +83,32 @@ export default function CreateListing() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) {
-      setError('Product name is required');
+
+    // Required field validation
+    const missing: string[] = [];
+    if (!name.trim()) missing.push('Product Name');
+    if (!description.trim()) missing.push('Description');
+    if (!category) missing.push('Category');
+    if (!type) missing.push('Type');
+    if (!licensedProducer.trim()) missing.push('Licensed Producer');
+    if (!lineage.trim()) missing.push('Lineage');
+    if (!harvestDate) missing.push('Harvest Date');
+    if (certifications.length === 0) missing.push('Certification');
+    if (!thc) missing.push('THC %');
+    if (!cbd) missing.push('CBD %');
+    if (terpenes.length === 0) missing.push('Terpenes');
+    if (!totalTerpenePercent) missing.push('Dominant Terpene %');
+    if (!gramsAvailable) missing.push('Grams Available');
+    if (!upcomingQty) missing.push('Upcoming Qty');
+    if (!minQtyRequest) missing.push('Min Order Quantity');
+    if (!pricePerUnit) missing.push('Bid Minimum Per Gram');
+    if (!coverPhoto) missing.push('Cover Photo');
+    if (images.length === 0) missing.push('Product Images');
+    if (coaFiles.length === 0) missing.push('Certificate of Analysis');
+
+    if (missing.length > 0) {
+      setError(`Required fields missing: ${missing.join(', ')}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -152,7 +176,7 @@ export default function CreateListing() {
                 className="input-field"
               />
             </Field>
-            <Field label="Description">
+            <Field label="Description" required>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -162,13 +186,13 @@ export default function CreateListing() {
               />
             </Field>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Category">
+              <Field label="Category" required>
                 <select value={category} onChange={(e) => setCategory(e.target.value)} className="input-field">
                   <option value="">Select...</option>
                   {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </Field>
-              <Field label="Type">
+              <Field label="Type" required>
                 <select value={type} onChange={(e) => setType(e.target.value)} className="input-field">
                   <option value="">Select...</option>
                   {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -180,10 +204,10 @@ export default function CreateListing() {
           {/* Section 2: Origin & Production */}
           <Section title="Origin & Production">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Licensed Producer">
+              <Field label="Licensed Producer" required>
                 <input type="text" value={licensedProducer} onChange={(e) => setLicensedProducer(e.target.value)} className="input-field" />
               </Field>
-              <Field label="Lineage">
+              <Field label="Lineage" required>
                 <input type="text" value={lineage} onChange={(e) => setLineage(e.target.value)} className="input-field" />
               </Field>
             </div>
@@ -191,10 +215,10 @@ export default function CreateListing() {
               <Field label="Growth Medium">
                 <input type="text" value={growthMedium} onChange={(e) => setGrowthMedium(e.target.value)} className="input-field" />
               </Field>
-              <Field label="Harvest Date">
+              <Field label="Harvest Date" required>
                 <input type="date" value={harvestDate} onChange={(e) => setHarvestDate(e.target.value)} className="input-field" />
               </Field>
-              <Field label="Certification">
+              <Field label="Certification" required>
                 <div className="flex flex-wrap gap-1.5">
                   {CERTIFICATIONS.map((c) => (
                     <button
@@ -218,16 +242,16 @@ export default function CreateListing() {
           {/* Section 3: Potency & Terpenes */}
           <Section title="Potency & Terpenes">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="THC %">
+              <Field label="THC %" required>
                 <input type="number" step="0.01" min="0" max="100" value={thc} onChange={(e) => setThc(e.target.value)} placeholder="e.g. 24.5" className="input-field" />
               </Field>
-              <Field label="CBD %">
+              <Field label="CBD %" required>
                 <input type="number" step="0.01" min="0" max="100" value={cbd} onChange={(e) => setCbd(e.target.value)} placeholder="e.g. 0.5" className="input-field" />
               </Field>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TerpeneAutocomplete selected={terpenes} onChange={setTerpenes} />
-              <Field label="Dominant Terpene %">
+              <TerpeneAutocomplete selected={terpenes} onChange={setTerpenes} required />
+              <Field label="Dominant Terpene %" required>
                 <input type="number" step="0.01" min="0" max="100" value={totalTerpenePercent} onChange={(e) => setTotalTerpenePercent(e.target.value)} placeholder="e.g. 2.5" className="input-field" />
               </Field>
             </div>
@@ -236,25 +260,25 @@ export default function CreateListing() {
           {/* Section 4: Inventory & Pricing */}
           <Section title="Inventory & Pricing">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Grams Available">
+              <Field label="Grams Available" required>
                 <input type="number" step="1" min="0" value={gramsAvailable} onChange={(e) => setGramsAvailable(e.target.value)} className="input-field" />
               </Field>
-              <Field label="Upcoming Qty (3 months)">
+              <Field label="Upcoming Qty (3 months)" required>
                 <input type="number" step="1" min="0" value={upcomingQty} onChange={(e) => setUpcomingQty(e.target.value)} className="input-field" />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Min Order Quantity (g)">
+              <Field label="Min Order Quantity (g)" required>
                 <input type="number" step="1" min="0" value={minQtyRequest} onChange={(e) => setMinQtyRequest(e.target.value)} className="input-field" />
               </Field>
-              <Field label="Bid Minimum Per Gram (CAD)">
+              <Field label="Bid Minimum Per Gram (CAD)" required>
                 <input type="number" step="0.01" min="0" value={pricePerUnit} onChange={(e) => setPricePerUnit(e.target.value)} placeholder="e.g. 2.50" className="input-field" />
               </Field>
             </div>
           </Section>
 
           {/* Section 5: Bud Size Distribution */}
-          <Section title="Bud Size Distribution">
+          <Section title="Bud Size Distribution (Optional)">
             <div className="grid grid-cols-5 gap-3">
               <Field label="Popcorn 0-1cm">
                 <input type="number" step="0.1" min="0" max="100" value={budPopcorn} onChange={(e) => setBudPopcorn(e.target.value)} placeholder="%" className="input-field" />
@@ -281,7 +305,7 @@ export default function CreateListing() {
 
           {/* Section 6: Media */}
           <Section title="Media">
-            <Field label="Cover Photo">
+            <Field label="Cover Photo" required>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -296,7 +320,7 @@ export default function CreateListing() {
                 />
               )}
             </Field>
-            <Field label="Product Images (up to 10)">
+            <Field label="Product Images (up to 10)" required>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -320,7 +344,7 @@ export default function CreateListing() {
                 </div>
               )}
             </Field>
-            <Field label="Certificates of Analysis (up to 10 PDFs)">
+            <Field label="Certificates of Analysis (up to 10 PDFs)" required>
               <input
                 type="file"
                 accept="application/pdf"

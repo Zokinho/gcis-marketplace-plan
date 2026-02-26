@@ -4,9 +4,10 @@ import { TERPENE_LIST } from '../lib/terpenes';
 interface TerpeneAutocompleteProps {
   selected: string[];
   onChange: (terpenes: string[]) => void;
+  required?: boolean;
 }
 
-export default function TerpeneAutocomplete({ selected, onChange }: TerpeneAutocompleteProps) {
+export default function TerpeneAutocomplete({ selected, onChange, required }: TerpeneAutocompleteProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -56,7 +57,10 @@ export default function TerpeneAutocomplete({ selected, onChange }: TerpeneAutoc
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="mb-1 block text-xs font-medium text-muted">Terpene Profile</label>
+      <label className="mb-1 block text-xs font-medium text-secondary">
+        Terpene Profile
+        {required && <span className="ml-0.5 text-red-500">*</span>}
+      </label>
 
       {/* Selected chips */}
       {selected.length > 0 && (
