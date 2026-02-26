@@ -267,9 +267,22 @@ export async function updateMyListing(
     dominantTerpene?: string;
     totalTerpenePercent?: number;
     highestTerpenes?: string | null;
+    harvestDate?: string | null;
   },
 ): Promise<void> {
   await api.patch(`/my-listings/${id}`, updates);
+}
+
+export async function uploadListingImages(
+  id: string,
+  files: File[],
+): Promise<{ product: { id: string; imageUrls: string[] } }> {
+  const form = new FormData();
+  for (const file of files) {
+    form.append('images', file);
+  }
+  const res = await api.post(`/my-listings/${id}/images`, form);
+  return res.data;
 }
 
 export async function toggleListingActive(id: string): Promise<{ isActive: boolean }> {

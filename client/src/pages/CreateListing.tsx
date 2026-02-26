@@ -10,6 +10,7 @@ const CATEGORIES = [
   'Cannabis flowers (smalls only)',
   'Cannabis flowers (fresh frozen)',
   'Cannabis flowers (outdoor grown)',
+  'Cannabis flowers (outdoor fresh frozen)',
   'Milled Flower',
   'Cannabis trimmings',
   'Cannabis kief',
@@ -50,7 +51,6 @@ export default function CreateListing() {
   const [thc, setThc] = useState('');
   const [cbd, setCbd] = useState('');
   const [terpenes, setTerpenes] = useState<string[]>([]);
-  const [totalTerpenePercent, setTotalTerpenePercent] = useState('');
   const [terpenePercentages, setTerpenePercentages] = useState<Record<string, string>>({});
 
   function handleTerpenesChange(next: string[]) {
@@ -110,7 +110,6 @@ export default function CreateListing() {
     if (!thc) missing.push('THC %');
     if (!cbd) missing.push('CBD %');
     if (terpenes.length === 0) missing.push('Terpenes');
-    if (!totalTerpenePercent) missing.push('Dominant Terpene %');
     if (!gramsAvailable) missing.push('Grams Available');
     if (!upcomingQty) missing.push('Upcoming Qty');
     if (!minQtyRequest) missing.push('Min Order Quantity');
@@ -141,7 +140,6 @@ export default function CreateListing() {
     if (thc) formData.append('thc', thc);
     if (cbd) formData.append('cbd', cbd);
     if (terpenes.length > 0) formData.append('dominantTerpene', terpenes.join('; '));
-    if (totalTerpenePercent) formData.append('totalTerpenePercent', totalTerpenePercent);
 
     // Serialize per-terpene percentages into "Name: X%\nName: Y%" format
     const terpeneLines = terpenes
@@ -268,12 +266,7 @@ export default function CreateListing() {
                 <input type="number" step="0.01" min="0" max="100" value={cbd} onChange={(e) => setCbd(e.target.value)} placeholder="e.g. 0.5" className="input-field" />
               </Field>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} required />
-              <Field label="Dominant Terpene %" required>
-                <input type="number" step="0.01" min="0" max="100" value={totalTerpenePercent} onChange={(e) => setTotalTerpenePercent(e.target.value)} placeholder="e.g. 2.5" className="input-field" />
-              </Field>
-            </div>
+            <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} required />
             <TerpenePercentageTable
               terpenes={terpenes}
               percentages={terpenePercentages}

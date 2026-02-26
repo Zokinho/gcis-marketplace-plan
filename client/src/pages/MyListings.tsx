@@ -10,6 +10,7 @@ import {
   fetchMyListings,
   updateMyListing,
   toggleListingActive,
+  uploadListingImages,
   fetchSellerScores,
   type SellerListing,
   type SellerScoreRecord,
@@ -206,7 +207,11 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
   const [terpenes, setTerpenes] = useState<string[]>(
     listing.dominantTerpene ? listing.dominantTerpene.split(';').map((t) => t.trim()).filter(Boolean) : [],
   );
-  const [terpenePercent, setTerpenePercent] = useState(String(listing.totalTerpenePercent ?? ''));
+  const [harvestDate, setHarvestDate] = useState(
+    listing.harvestDate ? new Date(listing.harvestDate).toISOString().split('T')[0] : '',
+  );
+  const [newImages, setNewImages] = useState<File[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [terpenePercentages, setTerpenePercentages] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     if (listing.highestTerpenes) {
@@ -236,8 +241,9 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     setMinQty(String(listing.minQtyRequest ?? ''));
     setDesc(listing.description ?? '');
     setCert(listing.certification ?? '');
+    setHarvestDate(listing.harvestDate ? new Date(listing.harvestDate).toISOString().split('T')[0] : '');
+    setNewImages([]);
     setTerpenes(listing.dominantTerpene ? listing.dominantTerpene.split(';').map((t) => t.trim()).filter(Boolean) : []);
-    setTerpenePercent(String(listing.totalTerpenePercent ?? ''));
     const map: Record<string, string> = {};
     if (listing.highestTerpenes) {
       for (const line of listing.highestTerpenes.split('\n')) {
@@ -253,7 +259,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     setSaving(true);
     setEditError(null);
     try {
-      const updates: Record<string, number | string> = {};
+      const updates: Record<string, number | string | null> = {};
       const newPrice = parseFloat(price);
       const newGrams = parseFloat(grams);
       const newUpcoming = parseFloat(upcoming);
@@ -266,11 +272,14 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       if (desc.trim() !== (listing.description ?? '')) updates.description = desc.trim();
       if (cert !== (listing.certification ?? '')) updates.certification = cert;
 
+      // Harvest date diff
+      const existingHD = listing.harvestDate ? new Date(listing.harvestDate).toISOString().split('T')[0] : '';
+      if (harvestDate !== existingHD) {
+        updates.harvestDate = harvestDate || null;
+      }
+
       const terpeneStr = terpenes.join('; ');
       if (terpeneStr !== (listing.dominantTerpene ?? '')) updates.dominantTerpene = terpeneStr;
-
-      const newTerpPct = parseFloat(terpenePercent);
-      if (!isNaN(newTerpPct) && newTerpPct !== listing.totalTerpenePercent) updates.totalTerpenePercent = newTerpPct;
 
       // Serialize per-terpene percentages
       const terpeneLines = terpenes
@@ -278,18 +287,31 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
         .map((t) => `${t}: ${terpenePercentages[t]}%`);
       const newHighestTerpenes = terpeneLines.length > 0 ? terpeneLines.join('\n') : null;
       if (newHighestTerpenes !== (listing.highestTerpenes ?? null)) {
-        (updates as any).highestTerpenes = newHighestTerpenes;
+        updates.highestTerpenes = newHighestTerpenes;
       }
 
-      if (Object.keys(updates).length === 0) {
+      // Save field updates if any changed
+      if (Object.keys(updates).length > 0) {
+        await updateMyListing(listing.id, updates);
+      }
+
+      // Upload new images if any selected
+      if (newImages.length > 0) {
+        setUploadingImages(true);
+        await uploadListingImages(listing.id, newImages);
+        setNewImages([]);
+        setUploadingImages(false);
+      }
+
+      if (Object.keys(updates).length === 0 && newImages.length === 0) {
         setEditing(false);
         return;
       }
 
-      await updateMyListing(listing.id, updates);
       setEditing(false);
       onUpdate();
     } catch (err: any) {
+      setUploadingImages(false);
       setEditError(err?.response?.data?.error || 'Failed to save');
     } finally {
       setSaving(false);
@@ -410,7 +432,6 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                     {listing.licensedProducer && <Stat label="LP" value={listing.licensedProducer} />}
                     {listing.lineage && <Stat label="Lineage" value={listing.lineage} />}
                     {listing.dominantTerpene && <Stat label="Terpene Profile" value={listing.dominantTerpene} />}
-                    {listing.totalTerpenePercent != null && <Stat label="Dominant Terpene %" value={`${listing.totalTerpenePercent}%`} />}
                     {listing.highestTerpenes && <Stat label="Breakdown" value={listing.highestTerpenes.replace(/\n/g, ', ')} />}
                     {listing.certification && <Stat label="Cert" value={listing.certification} />}
                     {listing.minQtyRequest != null && <Stat label="Min QTY" value={`${listing.minQtyRequest.toLocaleString()}g`} />}
@@ -444,17 +465,13 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 <EditField label="Min QTY (g)" value={minQty} onChange={setMinQty} step="1" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted">Certification</label>
-                <select
-                  value={cert}
-                  onChange={(e) => setCert(e.target.value)}
+                <label className="mb-1 block text-xs font-medium text-muted">Harvest Date</label>
+                <input
+                  type="date"
+                  value={harvestDate}
+                  onChange={(e) => setHarvestDate(e.target.value)}
                   className="w-full input-field"
-                >
-                  <option value="">None</option>
-                  {['GACP', 'GMP1', 'GMP2', 'GPP', 'IMC-GAP'].map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">Description</label>
@@ -465,35 +482,53 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                   className="w-full input-field"
                 />
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} />
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted">Dominant Terpene %</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={terpenePercent}
-                    onChange={(e) => setTerpenePercent(e.target.value)}
-                    placeholder="e.g. 2.5"
-                    className="w-full input-field"
-                  />
-                </div>
-              </div>
+              <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} />
               <TerpenePercentageTable
                 terpenes={terpenes}
                 percentages={terpenePercentages}
                 onChange={setTerpenePercentages}
               />
+              {/* Image upload */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted">Photos</label>
+                {listing.imageUrls.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {listing.imageUrls.map((url, i) => (
+                      <div key={i} className="h-14 w-14 overflow-hidden rounded border border-default">
+                        <ProductImage src={url} alt={`Image ${i + 1}`} className="h-full w-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []).slice(0, 10);
+                    setNewImages(files);
+                  }}
+                  className="text-xs text-muted file:mr-2 file:rounded file:border-0 file:bg-brand-teal/10 file:px-3 file:py-1 file:text-xs file:font-medium file:text-brand-teal hover:file:bg-brand-teal/20"
+                />
+                {newImages.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {newImages.map((f, i) => (
+                      <div key={i} className="relative h-14 w-14 overflow-hidden rounded border border-brand-sage">
+                        <img src={URL.createObjectURL(f)} alt={f.name} className="h-full w-full object-cover" />
+                      </div>
+                    ))}
+                    <span className="self-center text-xs text-muted">{newImages.length} file{newImages.length !== 1 ? 's' : ''} selected</span>
+                  </div>
+                )}
+              </div>
               {editError && <p className="text-xs text-red-600">{editError}</p>}
               <div className="flex gap-2">
                 <button
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving || uploadingImages}
                   className="rounded-lg bg-brand-teal px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-teal/90 disabled:opacity-50"
                 >
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {uploadingImages ? 'Uploading images...' : saving ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
                   onClick={() => { setEditing(false); resetFields(); }}

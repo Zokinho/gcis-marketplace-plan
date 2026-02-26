@@ -50,8 +50,6 @@ export default function TerpeneAutocomplete({ selected, onChange, required }: Te
       addTerpene(suggestions[0]);
     } else if (e.key === 'Escape') {
       setOpen(false);
-    } else if (e.key === 'Backspace' && query === '' && selected.length > 0) {
-      removeTerpene(selected[selected.length - 1]);
     }
   }
 

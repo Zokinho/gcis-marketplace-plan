@@ -331,7 +331,7 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description, certification, dominantTerpene, totalTerpenePercent, highestTerpenes } = req.body;
+  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description, certification, dominantTerpene, totalTerpenePercent, highestTerpenes, harvestDate } = req.body;
 
   const updates: Record<string, number | string | null> = {};
   if (pricePerUnit !== undefined) updates.pricePerUnit = pricePerUnit;
@@ -344,8 +344,14 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
   if (totalTerpenePercent !== undefined) updates.totalTerpenePercent = totalTerpenePercent;
   if (highestTerpenes !== undefined) updates.highestTerpenes = highestTerpenes || null;
 
+  // harvestDate handled separately (Date type not compatible with pushProductUpdate signature)
+  const harvestDateValue = harvestDate !== undefined ? (harvestDate ? new Date(harvestDate) : null) : undefined;
+
   try {
     await pushProductUpdate(productId, updates);
+    if (harvestDateValue !== undefined) {
+      await prisma.product.update({ where: { id: productId }, data: { harvestDate: harvestDateValue } });
+    }
     const updated = await prisma.product.findUnique({ where: { id: productId } });
 
     // SHORTLIST_PRICE_DROP — notify shortlisters when seller lowers price
@@ -377,6 +383,81 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
     res.status(500).json({ error: 'Failed to update product' });
   }
 });
+
+/**
+ * POST /api/my-listings/:id/images
+ * Upload images to an existing listing (append mode).
+ */
+router.post(
+  '/:id/images',
+  writeLimiter,
+  upload.fields([{ name: 'images', maxCount: 10 }]),
+  async (req: Request<{ id: string }>, res: Response) => {
+    const sellerId = req.user!.id;
+    const productId = req.params.id;
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, sellerId: true, zohoProductId: true, imageUrls: true },
+    });
+
+    if (!product || product.sellerId !== sellerId) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const imageFiles = files?.images || [];
+
+    if (imageFiles.length === 0) {
+      return res.status(400).json({ error: 'No images provided' });
+    }
+
+    const ext = (mimetype: string) => {
+      const map: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+      return map[mimetype] || 'bin';
+    };
+
+    const newUrls: string[] = [];
+
+    try {
+      if (isS3Configured) {
+        for (const f of imageFiles) {
+          const key = `products/${productId}/images/${crypto.randomUUID()}.${ext(f.mimetype)}`;
+          await s3Upload(key, f.buffer, f.mimetype);
+          newUrls.push(key);
+        }
+      } else {
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+        const safeName = (name: string) => name.replace(/[/\\]/g, '_');
+        for (const f of imageFiles) {
+          const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}-${safeName(f.originalname)}`;
+          fs.writeFileSync(path.join(uploadsDir, filename), f.buffer);
+          newUrls.push(`/uploads/${filename}`);
+        }
+      }
+
+      const existingUrls = (product.imageUrls as string[]) || [];
+      const updated = await prisma.product.update({
+        where: { id: productId },
+        data: { imageUrls: [...existingUrls, ...newUrls] },
+        select: { id: true, imageUrls: true },
+      });
+
+      // Upload to Zoho — fire-and-forget
+      if (product.zohoProductId) {
+        const imageBuffers = imageFiles.map((f) => ({ buffer: f.buffer, originalname: f.originalname, mimetype: f.mimetype }));
+        uploadProductFiles(product.zohoProductId, imageBuffers, []).catch((err) => {
+          logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Zoho image upload failed (non-critical)');
+        });
+      }
+
+      res.json({ product: updated });
+    } catch (err) {
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Image upload failed');
+      res.status(500).json({ error: 'Failed to upload images' });
+    }
+  },
+);
 
 /**
  * PATCH /api/my-listings/:id/toggle-active

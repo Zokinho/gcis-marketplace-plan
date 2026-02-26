@@ -81,6 +81,7 @@ export const updateListingSchema = z.object({
   dominantTerpene: z.string().max(500).optional(),
   totalTerpenePercent: z.coerce.number().min(0).max(100).optional(),
   highestTerpenes: z.string().max(2000).nullable().optional(),
+  harvestDate: z.string().nullable().optional(),
 }).superRefine((data, ctx) => {
   if (Object.values(data).every((v) => v === undefined)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'At least one field must be provided' });
