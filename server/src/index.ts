@@ -315,11 +315,12 @@ async function mountRoutes() {
   // CoA upload — requires JWT auth + marketplace auth
   app.use('/api/coa', writeLimiter, requireAuth(), marketplaceAuth, coaRoutes);
 
+  // Public share endpoints — NO auth (token-based access)
+  // MUST be mounted before /api/shares to avoid being caught by the admin middleware
+  app.use('/api/shares/public', publicLimiter, publicShareRouter);
+
   // Shares admin — requires JWT auth + marketplace auth + admin check
   app.use('/api/shares', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, shareRoutes);
-
-  // Public share endpoints — NO auth (token-based access)
-  app.use('/api/shares/public', publicLimiter, publicShareRouter);
 
   // Notifications — requires JWT auth + marketplace auth
   app.use('/api/notifications', apiLimiter, requireAuth(), marketplaceAuth, notificationRoutes);
