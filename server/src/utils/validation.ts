@@ -80,6 +80,7 @@ export const updateListingSchema = z.object({
   certification: z.string().max(200).optional(),
   dominantTerpene: z.string().max(500).optional(),
   totalTerpenePercent: z.coerce.number().min(0).max(100).optional(),
+  highestTerpenes: z.string().max(2000).nullable().optional(),
 }).superRefine((data, ctx) => {
   if (Object.values(data).every((v) => v === undefined)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'At least one field must be provided' });
@@ -380,6 +381,7 @@ export const createListingSchema = z.object({
   budSizeMedium: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeMedium must be a number'),
   budSizeLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeLarge must be a number'),
   budSizeXLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeXLarge must be a number'),
+  highestTerpenes: z.string().max(2000).optional(),
 }).passthrough(); // Allow extra form fields (multer adds _fieldname etc.)
 
 // ─── ISO schemas ───

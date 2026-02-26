@@ -229,6 +229,7 @@ export interface SellerListing {
   lineage: string | null;
   dominantTerpene: string | null;
   totalTerpenePercent: number | null;
+  highestTerpenes: string | null;
   certification: string | null;
   harvestDate: string | null;
   isActive: boolean;
@@ -265,6 +266,7 @@ export async function updateMyListing(
     certification?: string;
     dominantTerpene?: string;
     totalTerpenePercent?: number;
+    highestTerpenes?: string | null;
   },
 ): Promise<void> {
   await api.patch(`/my-listings/${id}`, updates);

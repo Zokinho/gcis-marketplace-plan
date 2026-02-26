@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
+import TerpenePercentageTable from '../components/TerpenePercentageTable';
 import { createListing } from '../lib/api';
 
 const CATEGORIES = [
@@ -50,6 +51,18 @@ export default function CreateListing() {
   const [cbd, setCbd] = useState('');
   const [terpenes, setTerpenes] = useState<string[]>([]);
   const [totalTerpenePercent, setTotalTerpenePercent] = useState('');
+  const [terpenePercentages, setTerpenePercentages] = useState<Record<string, string>>({});
+
+  function handleTerpenesChange(next: string[]) {
+    setTerpenes(next);
+    setTerpenePercentages((prev) => {
+      const pruned: Record<string, string> = {};
+      for (const t of next) {
+        if (t in prev) pruned[t] = prev[t];
+      }
+      return pruned;
+    });
+  }
 
   // Inventory & pricing
   const [gramsAvailable, setGramsAvailable] = useState('');
@@ -129,6 +142,12 @@ export default function CreateListing() {
     if (cbd) formData.append('cbd', cbd);
     if (terpenes.length > 0) formData.append('dominantTerpene', terpenes.join('; '));
     if (totalTerpenePercent) formData.append('totalTerpenePercent', totalTerpenePercent);
+
+    // Serialize per-terpene percentages into "Name: X%\nName: Y%" format
+    const terpeneLines = terpenes
+      .filter((t) => terpenePercentages[t] && terpenePercentages[t].trim() !== '')
+      .map((t) => `${t}: ${terpenePercentages[t]}%`);
+    if (terpeneLines.length > 0) formData.append('highestTerpenes', terpeneLines.join('\n'));
     if (gramsAvailable) formData.append('gramsAvailable', gramsAvailable);
     if (upcomingQty) formData.append('upcomingQty', upcomingQty);
     if (minQtyRequest) formData.append('minQtyRequest', minQtyRequest);
@@ -250,11 +269,16 @@ export default function CreateListing() {
               </Field>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TerpeneAutocomplete selected={terpenes} onChange={setTerpenes} required />
+              <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} required />
               <Field label="Dominant Terpene %" required>
                 <input type="number" step="0.01" min="0" max="100" value={totalTerpenePercent} onChange={(e) => setTotalTerpenePercent(e.target.value)} placeholder="e.g. 2.5" className="input-field" />
               </Field>
             </div>
+            <TerpenePercentageTable
+              terpenes={terpenes}
+              percentages={terpenePercentages}
+              onChange={setTerpenePercentages}
+            />
           </Section>
 
           {/* Section 4: Inventory & Pricing */}

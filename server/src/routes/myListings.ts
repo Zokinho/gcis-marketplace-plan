@@ -64,6 +64,7 @@ router.post(
       thc, cbd, dominantTerpene, totalTerpenePercent,
       gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
       budSizePopcorn, budSizeSmall, budSizeMedium, budSizeLarge, budSizeXLarge,
+      highestTerpenes,
     } = parsed.data as Record<string, string>;
 
     // Collect all uploaded file buffers for processing after product creation
@@ -141,6 +142,7 @@ router.post(
           cbdMin: cbdVal != null && !isNaN(cbdVal) ? cbdVal : null,
           cbdMax: cbdVal != null && !isNaN(cbdVal) ? cbdVal : null,
           dominantTerpene: dominantTerpene?.trim() || null,
+          highestTerpenes: highestTerpenes?.trim() || null,
           totalTerpenePercent: parseFloat_(totalTerpenePercent) ?? null,
           gramsAvailable: parseFloat_(gramsAvailable) ?? null,
           upcomingQty: parseFloat_(upcomingQty) ?? null,
@@ -265,6 +267,7 @@ router.get('/', async (req: Request, res: Response) => {
       lineage: true,
       dominantTerpene: true,
       totalTerpenePercent: true,
+      highestTerpenes: true,
       certification: true,
       harvestDate: true,
       isActive: true,
@@ -328,7 +331,7 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description, certification, dominantTerpene, totalTerpenePercent } = req.body;
+  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description, certification, dominantTerpene, totalTerpenePercent, highestTerpenes } = req.body;
 
   const updates: Record<string, number | string | null> = {};
   if (pricePerUnit !== undefined) updates.pricePerUnit = pricePerUnit;
@@ -339,6 +342,7 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
   if (certification !== undefined) updates.certification = certification || null;
   if (dominantTerpene !== undefined) updates.dominantTerpene = dominantTerpene || null;
   if (totalTerpenePercent !== undefined) updates.totalTerpenePercent = totalTerpenePercent;
+  if (highestTerpenes !== undefined) updates.highestTerpenes = highestTerpenes || null;
 
   try {
     await pushProductUpdate(productId, updates);

@@ -15,6 +15,7 @@ import {
   type SellerScoreRecord,
 } from '../lib/api';
 import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
+import TerpenePercentageTable from '../components/TerpenePercentageTable';
 
 const TYPE_COLORS: Record<string, string> = {
   Sativa: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
@@ -206,6 +207,27 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     listing.dominantTerpene ? listing.dominantTerpene.split(';').map((t) => t.trim()).filter(Boolean) : [],
   );
   const [terpenePercent, setTerpenePercent] = useState(String(listing.totalTerpenePercent ?? ''));
+  const [terpenePercentages, setTerpenePercentages] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    if (listing.highestTerpenes) {
+      for (const line of listing.highestTerpenes.split('\n')) {
+        const match = line.match(/^(.+?):\s*([\d.]+)%?$/);
+        if (match) map[match[1].trim()] = match[2];
+      }
+    }
+    return map;
+  });
+
+  function handleTerpenesChange(next: string[]) {
+    setTerpenes(next);
+    setTerpenePercentages((prev) => {
+      const pruned: Record<string, string> = {};
+      for (const t of next) {
+        if (t in prev) pruned[t] = prev[t];
+      }
+      return pruned;
+    });
+  }
 
   function resetFields() {
     setPrice(String(listing.pricePerUnit ?? ''));
@@ -216,6 +238,14 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     setCert(listing.certification ?? '');
     setTerpenes(listing.dominantTerpene ? listing.dominantTerpene.split(';').map((t) => t.trim()).filter(Boolean) : []);
     setTerpenePercent(String(listing.totalTerpenePercent ?? ''));
+    const map: Record<string, string> = {};
+    if (listing.highestTerpenes) {
+      for (const line of listing.highestTerpenes.split('\n')) {
+        const match = line.match(/^(.+?):\s*([\d.]+)%?$/);
+        if (match) map[match[1].trim()] = match[2];
+      }
+    }
+    setTerpenePercentages(map);
     setEditError(null);
   }
 
@@ -241,6 +271,15 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
 
       const newTerpPct = parseFloat(terpenePercent);
       if (!isNaN(newTerpPct) && newTerpPct !== listing.totalTerpenePercent) updates.totalTerpenePercent = newTerpPct;
+
+      // Serialize per-terpene percentages
+      const terpeneLines = terpenes
+        .filter((t) => terpenePercentages[t] && terpenePercentages[t].trim() !== '')
+        .map((t) => `${t}: ${terpenePercentages[t]}%`);
+      const newHighestTerpenes = terpeneLines.length > 0 ? terpeneLines.join('\n') : null;
+      if (newHighestTerpenes !== (listing.highestTerpenes ?? null)) {
+        (updates as any).highestTerpenes = newHighestTerpenes;
+      }
 
       if (Object.keys(updates).length === 0) {
         setEditing(false);
@@ -372,6 +411,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                     {listing.lineage && <Stat label="Lineage" value={listing.lineage} />}
                     {listing.dominantTerpene && <Stat label="Terpene Profile" value={listing.dominantTerpene} />}
                     {listing.totalTerpenePercent != null && <Stat label="Dominant Terpene %" value={`${listing.totalTerpenePercent}%`} />}
+                    {listing.highestTerpenes && <Stat label="Breakdown" value={listing.highestTerpenes.replace(/\n/g, ', ')} />}
                     {listing.certification && <Stat label="Cert" value={listing.certification} />}
                     {listing.minQtyRequest != null && <Stat label="Min QTY" value={`${listing.minQtyRequest.toLocaleString()}g`} />}
                     {listing.harvestDate && (
@@ -426,7 +466,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <TerpeneAutocomplete selected={terpenes} onChange={setTerpenes} />
+                <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} />
                 <div>
                   <label className="mb-1 block text-xs font-medium text-muted">Dominant Terpene %</label>
                   <input
@@ -441,6 +481,11 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                   />
                 </div>
               </div>
+              <TerpenePercentageTable
+                terpenes={terpenes}
+                percentages={terpenePercentages}
+                onChange={setTerpenePercentages}
+              />
               {editError && <p className="text-xs text-red-600">{editError}</p>}
               <div className="flex gap-2">
                 <button
