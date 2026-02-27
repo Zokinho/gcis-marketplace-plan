@@ -83,7 +83,8 @@ docker compose $COMPOSE_FILES run --rm certbot certonly \
   --email "$EMAIL" \
   --agree-tos \
   --no-eff-email \
-  -d "$DOMAIN"
+  -d "$DOMAIN" \
+  -d "www.$DOMAIN"
 
 echo "  Certificate obtained successfully!"
 
@@ -100,8 +101,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Set FORCE_HTTPS=true in .env"
 echo "  2. Update FRONTEND_URL=https://$DOMAIN in .env"
-echo "  3. Update Clerk dashboard callback URLs to https://$DOMAIN"
-echo "  4. Restart: sudo docker compose $COMPOSE_FILES up -d"
+echo "  3. Restart: sudo docker compose $COMPOSE_FILES up -d"
 echo ""
 echo "Certificate auto-renewal is handled by the certbot container (every 12h)."
 echo ""
