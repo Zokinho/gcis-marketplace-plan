@@ -15,11 +15,11 @@ server {
     }
 }
 
-# HTTPS www → canonical redirect
+# HTTPS — redirect all non-canonical domains to canonical
 server {
-    listen 443 ssl;
+    listen 443 ssl default_server;
     http2 on;
-    server_name www.${SSL_DOMAIN};
+    server_name _;
     server_tokens off;
 
     ssl_certificate /etc/letsencrypt/live/${SSL_DOMAIN}/fullchain.pem;
