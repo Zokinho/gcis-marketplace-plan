@@ -247,12 +247,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(false)}
           />
           {/* Drawer */}
-          <div className="fixed right-0 top-0 z-50 flex h-full w-64 flex-col surface shadow-xl transition-transform sm:hidden">
-            <div className="flex items-center justify-between border-b border-default px-4 py-4">
-              <HarvexLogo size="sm" color={resolved === 'light' ? 'dark' : 'white'} showText={false} />
+          <div className="fixed right-0 top-0 z-50 flex h-full w-64 flex-col bg-brand-blue dark:bg-[#255564] shadow-xl transition-transform sm:hidden">
+            <div className="flex items-center justify-between border-b border-white/15 px-4 py-4">
+              <HarvexLogo size="sm" color="white" showText={false} />
               <button
                 onClick={() => setMobileOpen(false)}
-                className="rounded-lg p-1 text-muted hover-surface-muted"
+                className="rounded-lg p-1 text-white/70 hover:text-white"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />

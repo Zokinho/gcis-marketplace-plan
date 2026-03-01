@@ -452,7 +452,7 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
           data: {
             // Only let Zoho promote to approved, never demote — marketplace approval is authoritative
             approved: (c.Account_Confirmed === true) || existingUser.approved,
-            contactType: Array.isArray(c.Contact_Type) ? c.Contact_Type.join(';') : (c.Contact_Type || existingUser.contactType),
+            contactType: Array.isArray(c.Contact_Type) ? c.Contact_Type.join('; ') : (c.Contact_Type || existingUser.contactType),
             firstName: c.First_Name || existingUser.firstName,
             lastName: c.Last_Name || existingUser.lastName,
             companyName: c.Company || existingUser.companyName,

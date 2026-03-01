@@ -175,7 +175,7 @@ async function syncSingleContact(zohoContactId: string) {
         firstName: record.First_Name || user.firstName,
         lastName: record.Last_Name || user.lastName,
         companyName: record.Company || user.companyName,
-        contactType: record.Contact_Type || user.contactType,
+        contactType: Array.isArray(record.Contact_Type) ? record.Contact_Type.join('; ') : (record.Contact_Type || user.contactType),
         approved: record.Account_Confirmed ?? user.approved,
         mailingCountry: record.Mailing_Country || user.mailingCountry,
         phone: record.Phone || user.phone,
