@@ -47,6 +47,7 @@ app.use(helmet({
       connectSrc: [
         "'self'",
         "https://*.ingest.sentry.io",
+        "https://*.ingest.us.sentry.io",
         ...(s3Host ? [`https://${s3Host}`] : []),
         ...cspExtraConnectSrc,
       ],
