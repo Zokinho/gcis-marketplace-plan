@@ -87,7 +87,7 @@ export default function Marketplace() {
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="min-w-0 flex-1">
           {/* Sort bar + view toggle */}
-          <div className="mb-4 flex items-center justify-between rounded-lg border card-blue backdrop-blur-sm px-3 py-2 shadow-md sticky top-[4.5rem] z-20">
+          <div className="mb-4 relative flex items-center justify-between rounded-lg border card-blue backdrop-blur-sm px-3 py-2 shadow-md sticky top-[4.5rem] z-20">
             {/* View toggle */}
             <div className="flex rounded-lg border border-subtle p-0.5">
               {/* Large grid (2 cols) */}
@@ -122,9 +122,9 @@ export default function Marketplace() {
               </button>
             </div>
 
-            {/* Product count */}
+            {/* Product count — centered in the bar via absolute positioning */}
             {pagination && (
-              <span className="text-xs font-medium text-muted">
+              <span className="absolute left-1/2 -translate-x-1/2 text-xs font-medium text-muted pointer-events-none">
                 {pagination.total} product{pagination.total !== 1 ? 's' : ''}
               </span>
             )}
