@@ -124,14 +124,14 @@ export default function Marketplace() {
 
             {/* Product count */}
             {pagination && (
-              <span className="ml-[6.5rem] text-xs font-medium text-muted">
+              <span className="text-xs font-medium text-muted">
                 {pagination.total} product{pagination.total !== 1 ? 's' : ''}
               </span>
             )}
 
             {/* Sort */}
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-secondary">Sort by</label>
+              <label className="hidden text-xs font-medium text-secondary sm:inline">Sort by</label>
               <select
                 value={`${filters.sort || 'name'}_${filters.order || 'asc'}`}
                 onChange={(e) => {
