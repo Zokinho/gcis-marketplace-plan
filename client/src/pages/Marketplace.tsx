@@ -124,7 +124,7 @@ export default function Marketplace() {
 
             {/* Product count — centered in the bar via absolute positioning */}
             {pagination && (
-              <span className="absolute left-1/2 -translate-x-1/2 text-xs font-medium text-muted pointer-events-none">
+              <span className="absolute left-1/2 -translate-x-1/2 text-xs font-medium text-muted pointer-events-none hidden sm:inline">
                 {pagination.total} product{pagination.total !== 1 ? 's' : ''}
               </span>
             )}
