@@ -430,3 +430,7 @@ export const imageReorderSchema = z.object({
 export const rejectEditSchema = z.object({
   reason: z.string().max(1000).optional(),
 });
+
+export const shareAnalyticsParamsSchema = z.object({
+  id: z.string().min(1),
+});

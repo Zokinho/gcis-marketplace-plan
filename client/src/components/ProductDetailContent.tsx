@@ -3,6 +3,7 @@ import BidForm from './BidForm';
 import CoaUpload from './CoaUpload';
 import TestResultsDisplay from './TestResultsDisplay';
 import ShortlistButton from './ShortlistButton';
+import ShareButton from './ShareButton';
 import ProductImage from './ProductImage';
 import { fetchProductById, type ProductDetail as ProductDetailType } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
@@ -121,7 +122,10 @@ export default function ProductDetailContent({ productId }: { productId: string 
 
           <div className="mb-1 flex items-center justify-between gap-2">
             <h1 className="text-2xl font-bold text-primary">{product.name}</h1>
-            <ShortlistButton productId={product.id} size="sm" />
+            <div className="flex items-center gap-0.5">
+              <ShareButton productId={product.id} productName={product.name} sellerId={product.sellerId} size="sm" />
+              <ShortlistButton productId={product.id} size="sm" />
+            </div>
           </div>
           {/* Priced to Sell badge — hidden while Clearance is active */}
           {(product.seller as any)?.avgFulfillmentScore != null && (

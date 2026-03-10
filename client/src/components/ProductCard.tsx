@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { ProductCard as ProductCardType } from '../lib/api';
 import ShortlistButton from './ShortlistButton';
+import ShareButton from './ShareButton';
 import ProductImage from './ProductImage';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -56,7 +57,8 @@ export default function ProductCard({ product, large, onClick }: { product: Prod
               </span>
             ))}
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-0.5">
+            <ShareButton productId={product.id} productName={product.name} sellerId={product.sellerId} />
             <ShortlistButton productId={product.id} />
           </div>
         </div>

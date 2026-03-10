@@ -11,6 +11,12 @@ vi.mock('../services/coaClient', () => ({
   }),
 }));
 
+// Mock auditService for getRequestIp
+vi.mock('../services/auditService', () => ({
+  logAudit: vi.fn().mockResolvedValue(undefined),
+  getRequestIp: vi.fn().mockReturnValue('127.0.0.1'),
+}));
+
 // ─── Test fixtures ───
 
 const mockAdmin = {
@@ -392,5 +398,50 @@ describe('Public: GET /:token/products - Get share products', () => {
         },
       }),
     );
+  });
+
+  it('creates ShareView record for new visitor', async () => {
+    vi.mocked(prisma.curatedShare.findUnique).mockResolvedValue(mockShare as any);
+    vi.mocked(prisma.curatedShare.update).mockResolvedValue(mockShare as any);
+    vi.mocked(prisma.product.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.shareView.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.shareView.create).mockResolvedValue({} as any);
+
+    const app = createPublicApp(publicShareRouter);
+    await request(app).get('/valid-token-abc123/products');
+
+    // Wait for fire-and-forget async to complete
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(prisma.shareView.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          shareId: 'share-1',
+        }),
+      }),
+    );
+    expect(prisma.shareView.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          shareId: 'share-1',
+        }),
+      }),
+    );
+  });
+
+  it('skips ShareView creation for recent visitor (dedup)', async () => {
+    vi.mocked(prisma.curatedShare.findUnique).mockResolvedValue(mockShare as any);
+    vi.mocked(prisma.curatedShare.update).mockResolvedValue(mockShare as any);
+    vi.mocked(prisma.product.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.shareView.findFirst).mockResolvedValue({ id: 'existing' } as any);
+
+    const app = createPublicApp(publicShareRouter);
+    await request(app).get('/valid-token-abc123/products');
+
+    // Wait for fire-and-forget
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(prisma.shareView.findFirst).toHaveBeenCalled();
+    expect(prisma.shareView.create).not.toHaveBeenCalled();
   });
 });

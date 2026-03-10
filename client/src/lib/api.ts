@@ -51,6 +51,7 @@ export interface ProductCard {
   testResults: any | null;
   coaPdfUrl: string | null;
   source: string;
+  sellerId?: string;
   pricedToSell?: boolean;
 }
 
@@ -336,6 +337,18 @@ export async function fetchSellerShares(): Promise<{ shares: SellerShare[] }> {
 
 export async function deleteSellerShare(id: string): Promise<void> {
   await api.delete(`/my-listings/shares/${id}`);
+}
+
+export interface ShareAnalytics {
+  totalViews: number;
+  uniqueVisitors: number;
+  dailyViews: { date: string; views: number }[];
+  topProducts: { productId: string; productName: string; views: number }[];
+}
+
+export async function fetchShareAnalytics(shareId: string): Promise<ShareAnalytics> {
+  const res = await api.get(`/my-listings/shares/${shareId}/analytics`);
+  return res.data;
 }
 
 // ─── CoA Types ───

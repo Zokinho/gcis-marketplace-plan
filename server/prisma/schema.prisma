@@ -500,6 +500,20 @@ model CuratedShare {
   useCount    Int       @default(0)
   createdById String?
   createdBy   User?     @relation(fields: [createdById], references: [id])
+  views       ShareView[]
+}
+
+model ShareView {
+  id        String       @id @default(cuid())
+  shareId   String
+  share     CuratedShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  productId String?
+  ipHash    String
+  userAgent String?
+  viewedAt  DateTime     @default(now())
+
+  @@index([shareId])
+  @@index([shareId, viewedAt])
 }
 
 // ─── ISO Requests (buyer "In Search Of" posts) ───

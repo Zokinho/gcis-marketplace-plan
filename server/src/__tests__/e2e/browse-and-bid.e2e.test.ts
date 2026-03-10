@@ -87,8 +87,8 @@ describe('E2E: Browse → Bid flow', () => {
     expect(res.status).toBe(200);
     expect(res.body.product.id).toBe('prod-1');
     expect(res.body.product.name).toBe('Blue Dream');
-    // sellerId stripped from buyer response
-    expect(res.body.product.sellerId).toBeUndefined();
+    // sellerId is now included for ShareButton ownership check
+    expect(res.body.product.sellerId).toBe('seller-1');
   });
 
   it('buyer places a bid → 201, bid appears in buyer history', async () => {

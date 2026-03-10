@@ -571,8 +571,8 @@ describe('GET /products/:id - Product detail', () => {
     expect(res.body.product).toBeDefined();
     expect(res.body.product.id).toBe('product-1');
     expect(res.body.product.name).toBe('Blue Dream');
-    // sellerId should be stripped from the response
-    expect(res.body.product.sellerId).toBeUndefined();
+    // sellerId is now included for ShareButton ownership check
+    expect(res.body.product.sellerId).toBe('seller-1');
     expect(prisma.product.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'product-1' },
@@ -684,8 +684,9 @@ describe('GET /products/:id - Product detail', () => {
     const res = await request(app).get('/products/product-1');
 
     expect(res.status).toBe(200);
-    expect(res.body.product.sellerId).toBeUndefined();
-    // But other fields should still be present
+    // sellerId is now included for ShareButton ownership check
+    expect(res.body.product.sellerId).toBe('seller-1');
+    // Other fields should still be present
     expect(res.body.product.id).toBe('product-1');
     expect(res.body.product.name).toBe('Blue Dream');
   });

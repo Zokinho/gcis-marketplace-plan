@@ -5,6 +5,8 @@ import { prisma } from '../index';
 import { getCoaClient } from '../services/coaClient';
 import { validate, createShareSchema, updateShareSchema } from '../utils/validation';
 import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
+import { getRequestIp } from '../services/auditService';
+import { isS3Configured, getSignedFileUrl } from '../utils/s3';
 
 const router = Router();
 
@@ -152,7 +154,7 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
     return res.status(410).json({ error: 'Share link has expired' });
   }
 
-  // Track usage
+  // Track usage (simple counter)
   await prisma.curatedShare.update({
     where: { id: share.id },
     data: {
@@ -160,6 +162,26 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
       useCount: { increment: 1 },
     },
   });
+
+  // Fire-and-forget: detailed view tracking with 5-minute dedup
+  const rawIp = getRequestIp(req) || 'unknown';
+  const ipHash = crypto.createHash('sha256').update(rawIp).digest('hex');
+  const userAgent = (req.headers['user-agent'] || '').slice(0, 512) || null;
+  (async () => {
+    try {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const recent = await prisma.shareView.findFirst({
+        where: { shareId: share.id, ipHash, viewedAt: { gte: fiveMinAgo } },
+      });
+      if (!recent) {
+        await prisma.shareView.create({
+          data: { shareId: share.id, ipHash, userAgent },
+        });
+      }
+    } catch (err) {
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SHARES] View tracking error');
+    }
+  })();
 
   const products = await prisma.product.findMany({
     where: {
@@ -208,7 +230,31 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
     },
   });
 
-  res.json({ label: share.label, products });
+  // Resolve S3 keys to presigned URLs so public viewers can see images
+  let resolvedProducts = products;
+  if (isS3Configured) {
+    resolvedProducts = await Promise.all(
+      products.map(async (p) => {
+        const resolvedImageUrls = await Promise.all(
+          (p.imageUrls || []).map(async (url) => {
+            // S3 keys don't start with http or /uploads
+            if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/uploads/') || url.startsWith('/api/')) {
+              return url;
+            }
+            try {
+              const signed = await getSignedFileUrl(url);
+              return signed || url;
+            } catch {
+              return url;
+            }
+          }),
+        );
+        return { ...p, imageUrls: resolvedImageUrls };
+      }),
+    );
+  }
+
+  res.json({ label: share.label, products: resolvedProducts });
 });
 
 /**

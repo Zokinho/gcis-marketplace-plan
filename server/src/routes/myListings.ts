@@ -5,7 +5,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
-import { validate, updateListingSchema, createSellerShareSchema, createListingSchema, imageReorderSchema } from '../utils/validation';
+import { validate, validateParams, updateListingSchema, createSellerShareSchema, createListingSchema, imageReorderSchema, shareAnalyticsParamsSchema } from '../utils/validation';
 import { prisma } from '../index';
 import { pushProductUpdate, createZohoProduct, createProductReviewTask, uploadProductFiles } from '../services/zohoApi';
 import { zohoRequest } from '../services/zohoAuth';
@@ -618,6 +618,75 @@ router.get('/shares', async (req: Request, res: Response) => {
   }));
 
   res.json({ shares: sharesWithUrl });
+});
+
+/**
+ * GET /api/my-listings/shares/:id/analytics
+ * View analytics for a share link (views, unique visitors, daily breakdown, top products).
+ */
+router.get('/shares/:id/analytics', validateParams(shareAnalyticsParamsSchema), async (req: Request<{ id: string }>, res: Response) => {
+  const sellerId = req.user!.id;
+
+  const share = await prisma.curatedShare.findUnique({ where: { id: req.params.id } });
+  if (!share || share.createdById !== sellerId) {
+    return res.status(404).json({ error: 'Share not found' });
+  }
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 1000);
+
+  const [totalViews, uniqueVisitorGroups, dailyViews, productViews] = await Promise.all([
+    prisma.shareView.count({ where: { shareId: share.id } }),
+    prisma.shareView.groupBy({ by: ['ipHash'], where: { shareId: share.id } }),
+    prisma.shareView.groupBy({
+      by: ['viewedAt'],
+      where: { shareId: share.id, viewedAt: { gte: thirtyDaysAgo } },
+      _count: true,
+    }),
+    prisma.shareView.groupBy({
+      by: ['productId'],
+      where: { shareId: share.id, productId: { not: null } },
+      _count: true,
+      orderBy: { _count: { productId: 'desc' } },
+      take: 5,
+    }),
+  ]);
+
+  // Aggregate daily views by date string
+  const dailyMap = new Map<string, number>();
+  for (const row of dailyViews) {
+    const dateStr = new Date(row.viewedAt).toISOString().split('T')[0];
+    dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + row._count);
+  }
+  const dailyViewsArray = Array.from(dailyMap.entries())
+    .map(([date, views]) => ({ date, views }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Get product names for top products
+  const topProductIds = productViews
+    .filter((pv) => pv.productId != null)
+    .map((pv) => pv.productId as string);
+  const products = topProductIds.length > 0
+    ? await prisma.product.findMany({
+        where: { id: { in: topProductIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const nameMap = new Map(products.map((p) => [p.id, p.name]));
+
+  const topProducts = productViews
+    .filter((pv) => pv.productId != null)
+    .map((pv) => ({
+      productId: pv.productId as string,
+      productName: nameMap.get(pv.productId as string) || 'Unknown',
+      views: pv._count,
+    }));
+
+  res.json({
+    totalViews,
+    uniqueVisitors: uniqueVisitorGroups.length,
+    dailyViews: dailyViewsArray,
+    topProducts,
+  });
 });
 
 /**

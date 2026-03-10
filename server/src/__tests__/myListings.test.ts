@@ -665,3 +665,81 @@ describe('DELETE /shares/:id - Deactivate seller share', () => {
     expect(prisma.curatedShare.update).not.toHaveBeenCalled();
   });
 });
+
+// ─── Share Analytics Tests ───
+
+describe('GET /shares/:id/analytics - Share analytics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns analytics for own share', async () => {
+    vi.mocked(prisma.curatedShare.findUnique).mockResolvedValue(mockShare as any);
+    vi.mocked(prisma.shareView.count).mockResolvedValue(15);
+    vi.mocked(prisma.shareView.groupBy)
+      .mockResolvedValueOnce([{ ipHash: 'a' }, { ipHash: 'b' }, { ipHash: 'c' }] as any) // uniqueVisitors
+      .mockResolvedValueOnce([ // dailyViews
+        { viewedAt: new Date('2026-03-08'), _count: 5 },
+        { viewedAt: new Date('2026-03-09'), _count: 10 },
+      ] as any)
+      .mockResolvedValueOnce([ // productViews
+        { productId: 'product-1', _count: 8 },
+        { productId: 'product-2', _count: 5 },
+      ] as any);
+    vi.mocked(prisma.product.findMany).mockResolvedValue([
+      { id: 'product-1', name: 'Test Strain' },
+      { id: 'product-2', name: 'Another Strain' },
+    ] as any);
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app).get('/shares/share-1/analytics');
+
+    expect(res.status).toBe(200);
+    expect(res.body.totalViews).toBe(15);
+    expect(res.body.uniqueVisitors).toBe(3);
+    expect(res.body.dailyViews).toHaveLength(2);
+    expect(res.body.topProducts).toHaveLength(2);
+    expect(res.body.topProducts[0].productName).toBe('Test Strain');
+  });
+
+  it('returns 404 for nonexistent share', async () => {
+    vi.mocked(prisma.curatedShare.findUnique).mockResolvedValue(null);
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app).get('/shares/nonexistent/analytics');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Share not found');
+  });
+
+  it('returns 404 when share belongs to another seller', async () => {
+    vi.mocked(prisma.curatedShare.findUnique).mockResolvedValue({
+      ...mockShare,
+      createdById: 'other-seller',
+    } as any);
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app).get('/shares/share-1/analytics');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Share not found');
+  });
+
+  it('returns empty analytics for new share', async () => {
+    vi.mocked(prisma.curatedShare.findUnique).mockResolvedValue(mockShare as any);
+    vi.mocked(prisma.shareView.count).mockResolvedValue(0);
+    vi.mocked(prisma.shareView.groupBy)
+      .mockResolvedValueOnce([]) // uniqueVisitors
+      .mockResolvedValueOnce([]) // dailyViews
+      .mockResolvedValueOnce([]); // productViews
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app).get('/shares/share-1/analytics');
+
+    expect(res.status).toBe(200);
+    expect(res.body.totalViews).toBe(0);
+    expect(res.body.uniqueVisitors).toBe(0);
+    expect(res.body.dailyViews).toHaveLength(0);
+    expect(res.body.topProducts).toHaveLength(0);
+  });
+});

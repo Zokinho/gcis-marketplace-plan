@@ -99,6 +99,13 @@ vi.mock('../index', () => ({
       findMany: vi.fn(),
       create: vi.fn(),
     },
+    shareView: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      groupBy: vi.fn(),
+    },
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
   },

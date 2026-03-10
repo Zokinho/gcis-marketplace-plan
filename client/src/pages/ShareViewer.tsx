@@ -85,8 +85,22 @@ export default function ShareViewer() {
               <Link
                 key={product.id}
                 to={`/share/${token}/product/${product.id}`}
-                className="group rounded-lg border border-subtle surface p-5 transition hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-sage/60"
+                className="group flex flex-col overflow-hidden rounded-lg border border-subtle surface transition hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-sage/60"
               >
+                {/* Image */}
+                {product.imageUrls?.[0] ? (
+                  <div className="h-40 bg-brand-gray/20 dark:bg-slate-700/40">
+                    <img src={product.imageUrls[0]} alt={product.name} className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="flex h-40 items-center justify-center bg-brand-gray/20 dark:bg-slate-700/40">
+                    <svg className="h-10 w-10 text-brand-teal/20 dark:text-brand-sage/30" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
+                  </div>
+                )}
+
+                <div className="p-5">
                 {/* Badges */}
                 <div className="mb-3 flex flex-wrap gap-1.5">
                   {product.category && (
@@ -128,6 +142,7 @@ export default function ShareViewer() {
                       <span className="font-medium text-secondary">{product.gramsAvailable.toLocaleString()}g</span>
                     </div>
                   )}
+                </div>
                 </div>
               </Link>
             ))}

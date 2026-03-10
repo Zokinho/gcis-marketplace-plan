@@ -3,8 +3,10 @@ import {
   createSellerShare,
   fetchSellerShares,
   deleteSellerShare,
+  fetchShareAnalytics,
   type SellerListing,
   type SellerShare,
+  type ShareAnalytics,
 } from '../lib/api';
 
 interface Props {
@@ -26,6 +28,11 @@ export default function ShareModal({ listings, onClose }: Props) {
   const [shares, setShares] = useState<SellerShare[]>([]);
   const [loadingShares, setLoadingShares] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Analytics state
+  const [expandedAnalytics, setExpandedAnalytics] = useState<string | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<Record<string, ShareAnalytics>>({});
+  const [loadingAnalytics, setLoadingAnalytics] = useState<string | null>(null);
 
   const activeListings = listings.filter((l) => l.isActive);
 
@@ -91,6 +98,25 @@ export default function ShareModal({ listings, onClose }: Props) {
       // Ignore
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function toggleAnalytics(shareId: string) {
+    if (expandedAnalytics === shareId) {
+      setExpandedAnalytics(null);
+      return;
+    }
+    setExpandedAnalytics(shareId);
+    if (!analyticsData[shareId]) {
+      setLoadingAnalytics(shareId);
+      try {
+        const data = await fetchShareAnalytics(shareId);
+        setAnalyticsData((prev) => ({ ...prev, [shareId]: data }));
+      } catch {
+        // Ignore — panel will show empty
+      } finally {
+        setLoadingAnalytics(null);
+      }
     }
   }
 
@@ -280,12 +306,33 @@ export default function ShareModal({ listings, onClose }: Props) {
                           Copy URL
                         </button>
                         <button
+                          onClick={() => toggleAnalytics(share.id)}
+                          className="rounded-md border border-subtle px-2 py-1 text-xs font-medium text-brand-teal hover-surface-muted"
+                        >
+                          {expandedAnalytics === share.id ? 'Hide' : 'Analytics'}
+                        </button>
+                        <button
                           onClick={() => handleDelete(share.id)}
                           disabled={deletingId === share.id}
                           className="rounded-md border border-brand-coral/40 px-2 py-1 text-xs font-medium text-brand-coral hover:bg-brand-coral/5 disabled:opacity-50"
                         >
                           {deletingId === share.id ? '...' : 'Revoke'}
                         </button>
+                      </div>
+                    )}
+
+                    {/* Analytics Panel */}
+                    {expandedAnalytics === share.id && (
+                      <div className="mt-3 border-t border-subtle pt-3">
+                        {loadingAnalytics === share.id ? (
+                          <div className="flex items-center justify-center py-4">
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-blue border-t-transparent" />
+                          </div>
+                        ) : analyticsData[share.id] ? (
+                          <AnalyticsPanel data={analyticsData[share.id]} />
+                        ) : (
+                          <p className="text-xs text-faint py-2">No analytics data</p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -295,6 +342,66 @@ export default function ShareModal({ listings, onClose }: Props) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function AnalyticsPanel({ data }: { data: ShareAnalytics }) {
+  const maxDailyViews = Math.max(1, ...data.dailyViews.map((d) => d.views));
+
+  return (
+    <div className="space-y-3">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg surface-muted px-3 py-2 text-center">
+          <p className="text-lg font-bold text-primary">{data.totalViews}</p>
+          <p className="text-[10px] text-muted">Total Views</p>
+        </div>
+        <div className="rounded-lg surface-muted px-3 py-2 text-center">
+          <p className="text-lg font-bold text-primary">{data.uniqueVisitors}</p>
+          <p className="text-[10px] text-muted">Unique Visitors</p>
+        </div>
+      </div>
+
+      {/* Daily views chart (CSS bars) */}
+      {data.dailyViews.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[10px] font-medium text-muted">Daily Views (last 30 days)</p>
+          <div className="flex items-end gap-px" style={{ height: '48px' }}>
+            {data.dailyViews.map((d) => (
+              <div
+                key={d.date}
+                className="flex-1 rounded-t-sm bg-brand-blue/70 transition-all hover:bg-brand-blue"
+                style={{ height: `${Math.max(2, (d.views / maxDailyViews) * 100)}%` }}
+                title={`${d.date}: ${d.views} view${d.views !== 1 ? 's' : ''}`}
+              />
+            ))}
+          </div>
+          <div className="mt-0.5 flex justify-between text-[9px] text-faint">
+            <span>{data.dailyViews[0]?.date.slice(5)}</span>
+            <span>{data.dailyViews[data.dailyViews.length - 1]?.date.slice(5)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Top products */}
+      {data.topProducts.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[10px] font-medium text-muted">Top Products</p>
+          <div className="space-y-1">
+            {data.topProducts.map((p) => (
+              <div key={p.productId} className="flex items-center justify-between text-xs">
+                <span className="truncate text-secondary">{p.productName}</span>
+                <span className="ml-2 flex-shrink-0 font-medium text-primary">{p.views}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.totalViews === 0 && (
+        <p className="text-center text-xs text-faint py-1">No views yet</p>
+      )}
     </div>
   );
 }

@@ -183,6 +183,7 @@ router.get('/products', validateQuery(marketplaceQuerySchema), async (req: Reque
         isActive: true,
         marketplaceVisible: true,
         matchCount: true,
+        sellerId: true,
       },
     }),
     prisma.product.count({ where }),
@@ -312,7 +313,7 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
   const isAdminEmail = req.user?.email ? adminEmails.includes(req.user.email.toLowerCase()) : false;
   const canViewCoa = isOwner || isSeller || isAdminEmail;
 
-  const { sellerId, ...productData } = product;
+  const productData = { ...product };
 
   if (!canViewCoa) {
     productData.coaUrls = [];
