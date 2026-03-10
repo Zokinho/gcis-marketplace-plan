@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import BidForm from './BidForm';
-import CoaUpload from './CoaUpload';
 import TestResultsDisplay from './TestResultsDisplay';
 import ShortlistButton from './ShortlistButton';
 import ShareButton from './ShareButton';
 import ProductImage from './ProductImage';
-import { fetchProductById, type ProductDetail as ProductDetailType } from '../lib/api';
+import { fetchProductById, fetchZohoFileBlob, type ProductDetail as ProductDetailType } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -30,7 +29,6 @@ export default function ProductDetailContent({ productId }: { productId: string 
   const [selectedImage, setSelectedImage] = useState(0);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
   const { data: userStatus } = useUserStatus();
-  const isSeller = userStatus?.user?.contactType?.includes('Seller') ?? false;
   const isAdmin = userStatus?.user?.isAdmin ?? false;
 
   useEffect(() => {
@@ -279,18 +277,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
             <h2 className="mb-3 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Certificates of Analysis</h2>
             <div className="flex flex-wrap gap-2">
               {product.coaUrls.map((url, i) => (
-                <a
-                  key={i}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal dark:text-brand-sage transition hover:bg-brand-sage/10"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                  </svg>
-                  CoA {i + 1}
-                </a>
+                <CoaDownloadButton key={i} url={url} label={`CoA ${i + 1}`} />
               ))}
             </div>
           </div>
@@ -301,17 +288,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
           <div className="rounded-lg border card-blue shadow-md p-6">
             <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">CoA Data</h2>
             {product.coaPdfUrl && (
-              <a
-                href={product.coaPdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mb-4 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal dark:text-brand-sage transition hover:bg-brand-sage/10"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                </svg>
-                Download CoA PDF
-              </a>
+              <CoaDownloadButton url={product.coaPdfUrl} label="Download CoA PDF" className="mb-4" />
             )}
             <TestResultsDisplay
               testResults={product.testResults}
@@ -331,17 +308,6 @@ export default function ProductDetailContent({ productId }: { productId: string 
               </svg>
               <p className="text-sm">Certificate of Analysis documents are available to product owners and administrators.</p>
             </div>
-          </div>
-        )}
-
-        {/* CoA Upload for sellers viewing their own product */}
-        {canViewCoa && isSeller && !product.testResults && (
-          <div className="rounded-lg border card-blue shadow-md p-6">
-            <h2 className="mb-4 border-l-2 border-brand-sage pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Upload CoA</h2>
-            <p className="mb-4 text-sm text-muted">
-              Upload a Certificate of Analysis PDF to auto-fill test results for this product.
-            </p>
-            <CoaUpload onProductCreated={() => window.location.reload()} />
           </div>
         )}
       </div>
@@ -365,6 +331,47 @@ function Spec({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-medium text-faint">{label}</p>
       <p className="text-sm font-semibold text-primary">{value}</p>
     </div>
+  );
+}
+
+function CoaDownloadButton({ url, label, className = '' }: { url: string; label: string; className?: string }) {
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleClick() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      // Direct URLs (http/https) can be opened directly
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        window.open(url, '_blank');
+        return;
+      }
+      // Zoho proxy and other /api/ paths need authenticated fetch
+      const blobUrl = await fetchZohoFileBlob(url);
+      window.open(blobUrl, '_blank');
+    } catch {
+      // Fallback: try opening directly (will fail with auth error but better than nothing)
+      window.open(url, '_blank');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={downloading}
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal dark:text-brand-sage transition hover:bg-brand-sage/10 disabled:opacity-50 ${className}`}
+    >
+      {downloading ? (
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-teal border-t-transparent" />
+      ) : (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+      )}
+      {label}
+    </button>
   );
 }
 
