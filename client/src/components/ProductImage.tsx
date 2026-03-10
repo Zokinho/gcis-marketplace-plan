@@ -6,7 +6,7 @@ const urlCache = new Map<string, { url: string; expires: number }>();
 const CACHE_TTL_MS = 50 * 60 * 1000;
 
 function isDirectUrl(src: string): boolean {
-  return src.startsWith('/uploads/') || src.startsWith('http://') || src.startsWith('https://');
+  return src.startsWith('/uploads/') || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/api/shares/public/');
 }
 
 function isZohoProxy(src: string): boolean {

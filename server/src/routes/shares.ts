@@ -230,31 +230,108 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
     },
   });
 
-  // Resolve S3 keys to presigned URLs so public viewers can see images
-  let resolvedProducts = products;
-  if (isS3Configured) {
-    resolvedProducts = await Promise.all(
-      products.map(async (p) => {
-        const resolvedImageUrls = await Promise.all(
-          (p.imageUrls || []).map(async (url) => {
-            // S3 keys don't start with http or /uploads
-            if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/uploads/') || url.startsWith('/api/')) {
-              return url;
+  // Resolve image URLs for public viewers (no auth token available)
+  // - S3 keys → presigned URLs
+  // - /api/zoho-files/X/Y → public share file proxy URL
+  const resolvedProducts = await Promise.all(
+    products.map(async (p) => {
+      const resolvedImageUrls = await Promise.all(
+        (p.imageUrls || []).map(async (url) => {
+          // Rewrite Zoho file proxy URLs to share-scoped public proxy
+          if (url.startsWith('/api/zoho-files/')) {
+            const segments = url.replace('/api/zoho-files/', '').split('/');
+            if (segments.length >= 2) {
+              return `/api/shares/public/${req.params.token}/file/${segments[0]}/${segments[1]}`;
             }
+            return url;
+          }
+          // Full URLs and legacy upload paths work as-is
+          if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/uploads/')) {
+            return url;
+          }
+          // S3 keys → presigned URLs
+          if (isS3Configured) {
             try {
               const signed = await getSignedFileUrl(url);
               return signed || url;
             } catch {
               return url;
             }
-          }),
-        );
-        return { ...p, imageUrls: resolvedImageUrls };
-      }),
-    );
-  }
+          }
+          return url;
+        }),
+      );
+      return { ...p, imageUrls: resolvedImageUrls };
+    }),
+  );
 
   res.json({ label: share.label, products: resolvedProducts });
+});
+
+/**
+ * GET /api/shares/public/:token/file/:zohoProductId/:fileId
+ * Proxy Zoho file download for a product in a share (images, CoA docs).
+ * Scoped to products in the share — share token acts as access control.
+ */
+const shareFileCache = new Map<string, { data: Buffer; contentType: string; expires: number }>();
+
+publicShareRouter.get('/:token/file/:zohoProductId/:fileId', async (req: Request<{ token: string; zohoProductId: string; fileId: string }>, res: Response) => {
+  const { token, zohoProductId, fileId } = req.params;
+
+  const share = await prisma.curatedShare.findUnique({
+    where: { token },
+  });
+
+  if (!share || !share.active) {
+    return res.status(404).json({ error: 'Invalid share link' });
+  }
+
+  if (share.expiresAt && share.expiresAt < new Date()) {
+    return res.status(410).json({ error: 'Share link has expired' });
+  }
+
+  // Verify product is in this share (look up by zohoProductId)
+  const product = await prisma.product.findUnique({
+    where: { zohoProductId },
+    select: { id: true },
+  });
+
+  if (!product || !share.productIds.includes(product.id)) {
+    return res.status(403).json({ error: 'File not in this share' });
+  }
+
+  const cacheKey = `${zohoProductId}:${fileId}`;
+
+  // Check in-memory cache (1 hour TTL)
+  const cached = shareFileCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) {
+    res.set('Content-Type', cached.contentType);
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.send(cached.data);
+  }
+
+  try {
+    const { downloadZohoFile } = await import('../services/zohoApi');
+    const { data, contentType } = await downloadZohoFile(zohoProductId, fileId);
+
+    // Cache for 1 hour
+    shareFileCache.set(cacheKey, { data, contentType, expires: Date.now() + 3600_000 });
+
+    // Evict expired entries if cache grows
+    if (shareFileCache.size > 200) {
+      const now = Date.now();
+      for (const [k, v] of shareFileCache) {
+        if (v.expires < now) shareFileCache.delete(k);
+      }
+    }
+
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(data);
+  } catch (err: any) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SHARES] File proxy failed');
+    res.status(502).json({ error: 'File service unavailable' });
+  }
 });
 
 /**
