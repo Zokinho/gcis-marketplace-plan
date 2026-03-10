@@ -85,6 +85,9 @@ model Product {
   isActive             Boolean @default(false) // Product_Active
   marketplaceVisible   Boolean @default(false) // Independent marketplace visibility
   requestPending       Boolean @default(false) // Request_pending
+  editPending          Boolean @default(false) // Seller edit awaiting admin approval
+  pendingEdits         Json?                   // Proposed changes (fields + images)
+  imageSource          String  @default("zoho") // "zoho" | "manual" — protects manual images from sync overwrite
 
   // Seller link
   sellerId String
@@ -153,6 +156,7 @@ model Product {
   @@index([category])
   @@index([isActive])
   @@index([marketplaceVisible])
+  @@index([editPending])
 }
 
 // ─── Bids ───
@@ -368,6 +372,7 @@ enum NotificationType {
   BID_REJECTED
   BID_COUNTERED
   BID_OUTCOME
+  PRODUCT_APPROVED
   PRODUCT_NEW
   PRODUCT_PRICE
   PRODUCT_STOCK
@@ -377,6 +382,8 @@ enum NotificationType {
   SHORTLIST_PRICE_DROP
   ISO_MATCH_FOUND
   ISO_SELLER_RESPONSE
+  EDIT_APPROVED
+  EDIT_REJECTED
   SYSTEM_ANNOUNCEMENT
 }
 

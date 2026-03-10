@@ -153,20 +153,22 @@ describe('GET / - List seller listings', () => {
   });
 });
 
-describe('PATCH /:id - Update listing', () => {
+describe('PATCH /:id - Submit edit for approval', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (prisma.bid as any).groupBy = vi.fn();
   });
 
-  it('updates price successfully', async () => {
-    vi.mocked(prisma.product.findUnique)
-      .mockResolvedValueOnce({
-        id: 'product-1',
-        sellerId: 'seller-1',
-        zohoProductId: 'zoho-prod-1',
-      } as any)
-      .mockResolvedValueOnce({ ...mockProduct, pricePerUnit: 6.5 } as any);
+  it('stores price change in pendingEdits (not live product)', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'product-1',
+      sellerId: 'seller-1',
+      zohoProductId: 'zoho-prod-1',
+      pricePerUnit: 5.0,
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
 
     const app = createTestApp(myListingsRouter);
     const res = await request(app)
@@ -174,26 +176,30 @@ describe('PATCH /:id - Update listing', () => {
       .send({ pricePerUnit: 6.5 });
 
     expect(res.status).toBe(200);
-    expect(res.body.message).toBe('Product updated');
-    expect(res.body.product.pricePerUnit).toBe(6.5);
+    expect(res.body.message).toBe('Edit submitted for approval');
+    expect(res.body.editPending).toBe(true);
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: {
+        editPending: true,
+        pendingEdits: { pricePerUnit: 6.5 },
+      },
+    });
+    // Should NOT push to Zoho
     const { pushProductUpdate } = await import('../services/zohoApi');
-    expect(pushProductUpdate).toHaveBeenCalledWith('product-1', { pricePerUnit: 6.5 });
+    expect(pushProductUpdate).not.toHaveBeenCalled();
   });
 
-  it('updates multiple fields at once', async () => {
-    vi.mocked(prisma.product.findUnique)
-      .mockResolvedValueOnce({
-        id: 'product-1',
-        sellerId: 'seller-1',
-        zohoProductId: 'zoho-prod-1',
-      } as any)
-      .mockResolvedValueOnce({
-        ...mockProduct,
-        pricePerUnit: 7.0,
-        gramsAvailable: 3000,
-        upcomingQty: 500,
-        description: 'Updated desc',
-      } as any);
+  it('stores multiple field changes in pendingEdits', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'product-1',
+      sellerId: 'seller-1',
+      zohoProductId: 'zoho-prod-1',
+      pricePerUnit: 5.0,
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
 
     const app = createTestApp(myListingsRouter);
     const res = await request(app)
@@ -206,16 +212,44 @@ describe('PATCH /:id - Update listing', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.product.pricePerUnit).toBe(7.0);
-    expect(res.body.product.gramsAvailable).toBe(3000);
-    expect(res.body.product.upcomingQty).toBe(500);
-    expect(res.body.product.description).toBe('Updated desc');
-    const { pushProductUpdate } = await import('../services/zohoApi');
-    expect(pushProductUpdate).toHaveBeenCalledWith('product-1', {
-      pricePerUnit: 7.0,
-      gramsAvailable: 3000,
-      upcomingQty: 500,
-      description: 'Updated desc',
+    expect(res.body.editPending).toBe(true);
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: {
+        editPending: true,
+        pendingEdits: {
+          pricePerUnit: 7.0,
+          gramsAvailable: 3000,
+          upcomingQty: 500,
+          description: 'Updated desc',
+        },
+      },
+    });
+  });
+
+  it('merges with existing pendingEdits when edit already pending', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'product-1',
+      sellerId: 'seller-1',
+      zohoProductId: 'zoho-prod-1',
+      pricePerUnit: 5.0,
+      editPending: true,
+      pendingEdits: { gramsAvailable: 3000 },
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app)
+      .patch('/product-1')
+      .send({ pricePerUnit: 6.5 });
+
+    expect(res.status).toBe(200);
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: {
+        editPending: true,
+        pendingEdits: { gramsAvailable: 3000, pricePerUnit: 6.5 },
+      },
     });
   });
 
@@ -256,6 +290,85 @@ describe('PATCH /:id - Update listing', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Validation failed');
     expect(res.body.details).toBeDefined();
+  });
+});
+
+describe('PATCH /:id/images/reorder - Submit image reorder for approval', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (prisma.bid as any).groupBy = vi.fn();
+  });
+
+  it('stores reordered image URLs in pendingEdits', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'product-1',
+      sellerId: 'seller-1',
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app)
+      .patch('/product-1/images/reorder')
+      .send({ imageUrls: ['img2.jpg', 'img1.jpg'] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Image reorder submitted for approval');
+    expect(res.body.editPending).toBe(true);
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: {
+        editPending: true,
+        pendingEdits: { imageUrls: ['img2.jpg', 'img1.jpg'] },
+      },
+    });
+  });
+
+  it('merges reorder with existing pendingEdits', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'product-1',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 6.5 },
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app)
+      .patch('/product-1/images/reorder')
+      .send({ imageUrls: ['img2.jpg'] });
+
+    expect(res.status).toBe(200);
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: {
+        editPending: true,
+        pendingEdits: { pricePerUnit: 6.5, imageUrls: ['img2.jpg'] },
+      },
+    });
+  });
+
+  it('returns 404 when product not found', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue(null);
+
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app)
+      .patch('/nonexistent/images/reorder')
+      .send({ imageUrls: ['img1.jpg'] });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Product not found');
+  });
+
+  it('returns 400 when imageUrls not provided', async () => {
+    const app = createTestApp(myListingsRouter);
+    const res = await request(app)
+      .patch('/product-1/images/reorder')
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Validation failed');
   });
 });
 

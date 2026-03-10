@@ -8,6 +8,7 @@ export const DEFAULT_NOTIFICATION_PREFS: Record<string, boolean> = {
   BID_REJECTED: true,
   BID_COUNTERED: true,
   BID_OUTCOME: true,
+  PRODUCT_APPROVED: true,
   PRODUCT_NEW: true,
   PRODUCT_PRICE: true,
   PRODUCT_STOCK: false,
@@ -17,6 +18,8 @@ export const DEFAULT_NOTIFICATION_PREFS: Record<string, boolean> = {
   SHORTLIST_PRICE_DROP: true,
   ISO_MATCH_FOUND: true,
   ISO_SELLER_RESPONSE: true,
+  EDIT_APPROVED: true,
+  EDIT_REJECTED: true,
   SYSTEM_ANNOUNCEMENT: true,
 };
 

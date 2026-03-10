@@ -4,7 +4,8 @@ import fs from 'fs';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import logger from '../utils/logger';
-import { validate, updateListingSchema, createSellerShareSchema, createListingSchema } from '../utils/validation';
+import { Prisma } from '@prisma/client';
+import { validate, updateListingSchema, createSellerShareSchema, createListingSchema, imageReorderSchema } from '../utils/validation';
 import { prisma } from '../index';
 import { pushProductUpdate, createZohoProduct, createProductReviewTask, uploadProductFiles } from '../services/zohoApi';
 import { zohoRequest } from '../services/zohoAuth';
@@ -156,6 +157,7 @@ router.post(
           imageUrls,
           coaUrls,
           source: 'manual',
+          imageSource: 'manual', // New listings always have marketplace-uploaded images
           isActive: false,
           marketplaceVisible: false,
           requestPending: true,
@@ -273,6 +275,9 @@ router.get('/', async (req: Request, res: Response) => {
       isActive: true,
       marketplaceVisible: true,
       requestPending: true,
+      editPending: true,
+      pendingEdits: true,
+      imageSource: true,
       pricePerUnit: true,
       gramsAvailable: true,
       upcomingQty: true,
@@ -314,8 +319,8 @@ router.get('/', async (req: Request, res: Response) => {
 
 /**
  * PATCH /api/my-listings/:id
- * Update seller-editable fields: pricePerUnit, gramsAvailable, upcomingQty.
- * Changes sync back to Zoho.
+ * Submit seller-editable field changes for admin approval.
+ * Changes stored in pendingEdits JSON — live product unchanged until approved.
  */
 router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Request<{ id: string }>, res: Response) => {
   const sellerId = req.user!.id;
@@ -324,7 +329,7 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
   // Verify ownership
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { id: true, name: true, sellerId: true, zohoProductId: true, pricePerUnit: true },
+    select: { id: true, name: true, sellerId: true, zohoProductId: true, pricePerUnit: true, editPending: true, pendingEdits: true },
   });
 
   if (!product || product.sellerId !== sellerId) {
@@ -333,60 +338,42 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
 
   const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description, certification, dominantTerpene, totalTerpenePercent, highestTerpenes, harvestDate } = req.body;
 
-  const updates: Record<string, number | string | null> = {};
-  if (pricePerUnit !== undefined) updates.pricePerUnit = pricePerUnit;
-  if (gramsAvailable !== undefined) updates.gramsAvailable = gramsAvailable;
-  if (upcomingQty !== undefined) updates.upcomingQty = upcomingQty;
-  if (minQtyRequest !== undefined) updates.minQtyRequest = minQtyRequest;
-  if (description !== undefined) updates.description = description.trim();
-  if (certification !== undefined) updates.certification = certification || null;
-  if (dominantTerpene !== undefined) updates.dominantTerpene = dominantTerpene || null;
-  if (totalTerpenePercent !== undefined) updates.totalTerpenePercent = totalTerpenePercent;
-  if (highestTerpenes !== undefined) updates.highestTerpenes = highestTerpenes || null;
-
-  // harvestDate handled separately (Date type not compatible with pushProductUpdate signature)
-  const harvestDateValue = harvestDate !== undefined ? (harvestDate ? new Date(harvestDate) : null) : undefined;
+  const newChanges: Record<string, any> = {};
+  if (pricePerUnit !== undefined) newChanges.pricePerUnit = pricePerUnit;
+  if (gramsAvailable !== undefined) newChanges.gramsAvailable = gramsAvailable;
+  if (upcomingQty !== undefined) newChanges.upcomingQty = upcomingQty;
+  if (minQtyRequest !== undefined) newChanges.minQtyRequest = minQtyRequest;
+  if (description !== undefined) newChanges.description = description.trim();
+  if (certification !== undefined) newChanges.certification = certification || null;
+  if (dominantTerpene !== undefined) newChanges.dominantTerpene = dominantTerpene || null;
+  if (totalTerpenePercent !== undefined) newChanges.totalTerpenePercent = totalTerpenePercent;
+  if (highestTerpenes !== undefined) newChanges.highestTerpenes = highestTerpenes || null;
+  if (harvestDate !== undefined) newChanges.harvestDate = harvestDate || null;
 
   try {
-    await pushProductUpdate(productId, updates);
-    if (harvestDateValue !== undefined) {
-      await prisma.product.update({ where: { id: productId }, data: { harvestDate: harvestDateValue } });
-    }
-    const updated = await prisma.product.findUnique({ where: { id: productId } });
+    // Merge with existing pendingEdits if already pending
+    const existingPending = (product.pendingEdits as Record<string, any>) || {};
+    const mergedEdits = { ...existingPending, ...newChanges };
 
-    // SHORTLIST_PRICE_DROP — notify shortlisters when seller lowers price
-    if (pricePerUnit !== undefined && product.pricePerUnit != null && pricePerUnit < product.pricePerUnit) {
-      try {
-        const shortlisters = await prisma.shortlistItem.findMany({
-          where: { productId },
-          select: { buyerId: true },
-        });
-        if (shortlisters.length > 0) {
-          createNotificationBatch(
-            shortlisters.map((s) => ({
-              userId: s.buyerId,
-              type: 'SHORTLIST_PRICE_DROP' as const,
-              title: 'Price drop on shortlisted product',
-              body: `${product.name} price dropped to $${pricePerUnit.toFixed(2)}/g`,
-              data: { productId },
-            })),
-          );
-        }
-      } catch (e) {
-        logger.error({ err: e }, '[MY-LISTINGS] SHORTLIST_PRICE_DROP notification error');
-      }
-    }
+    await prisma.product.update({
+      where: { id: productId },
+      data: {
+        editPending: true,
+        pendingEdits: mergedEdits as Prisma.InputJsonValue,
+      },
+    });
 
-    res.json({ message: 'Product updated', product: updated });
+    res.json({ message: 'Edit submitted for approval', editPending: true });
   } catch (err: any) {
-    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Update failed');
-    res.status(500).json({ error: 'Failed to update product' });
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Edit submission failed');
+    res.status(500).json({ error: 'Failed to submit edit' });
   }
 });
 
 /**
  * POST /api/my-listings/:id/images
- * Upload images to an existing listing (append mode).
+ * Upload images to S3 and store URLs in pendingEdits for admin approval.
+ * Sets imageSource to 'manual' to protect from Zoho sync overwrite.
  */
 router.post(
   '/:id/images',
@@ -398,7 +385,7 @@ router.post(
 
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      select: { id: true, sellerId: true, zohoProductId: true, imageUrls: true },
+      select: { id: true, sellerId: true, zohoProductId: true, imageUrls: true, editPending: true, pendingEdits: true },
     });
 
     if (!product || product.sellerId !== sellerId) {
@@ -436,28 +423,72 @@ router.post(
         }
       }
 
-      const existingUrls = (product.imageUrls as string[]) || [];
-      const updated = await prisma.product.update({
+      // Store new image URLs in pendingEdits, merge with existing
+      const existingPending = (product.pendingEdits as Record<string, any>) || {};
+      const existingNewImageUrls: string[] = existingPending.newImageUrls || [];
+      const mergedEdits = {
+        ...existingPending,
+        newImageUrls: [...existingNewImageUrls, ...newUrls],
+      };
+
+      await prisma.product.update({
         where: { id: productId },
-        data: { imageUrls: [...existingUrls, ...newUrls] },
-        select: { id: true, imageUrls: true },
+        data: {
+          editPending: true,
+          pendingEdits: mergedEdits as Prisma.InputJsonValue,
+          imageSource: 'manual', // Protect from Zoho sync overwrite
+        },
       });
 
-      // Upload to Zoho — fire-and-forget
-      if (product.zohoProductId) {
-        const imageBuffers = imageFiles.map((f) => ({ buffer: f.buffer, originalname: f.originalname, mimetype: f.mimetype }));
-        uploadProductFiles(product.zohoProductId, imageBuffers, []).catch((err) => {
-          logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Zoho image upload failed (non-critical)');
-        });
-      }
-
-      res.json({ product: updated });
+      res.json({ message: 'Images uploaded and pending approval', editPending: true, newImageUrls: newUrls });
     } catch (err) {
       logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Image upload failed');
       res.status(500).json({ error: 'Failed to upload images' });
     }
   },
 );
+
+/**
+ * PATCH /api/my-listings/:id/images/reorder
+ * Submit an image reorder/removal for admin approval.
+ * Accepts the desired ordered array of URLs (omit removed images).
+ */
+router.patch('/:id/images/reorder', writeLimiter, validate(imageReorderSchema), async (req: Request<{ id: string }>, res: Response) => {
+  const sellerId = req.user!.id;
+  const productId = req.params.id;
+
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { id: true, sellerId: true, editPending: true, pendingEdits: true },
+  });
+
+  if (!product || product.sellerId !== sellerId) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+
+  const { imageUrls } = req.body;
+
+  try {
+    const existingPending = (product.pendingEdits as Record<string, any>) || {};
+    const mergedEdits = {
+      ...existingPending,
+      imageUrls, // Full replacement array
+    };
+
+    await prisma.product.update({
+      where: { id: productId },
+      data: {
+        editPending: true,
+        pendingEdits: mergedEdits as Prisma.InputJsonValue,
+      },
+    });
+
+    res.json({ message: 'Image reorder submitted for approval', editPending: true });
+  } catch (err: any) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Image reorder failed');
+    res.status(500).json({ error: 'Failed to submit reorder' });
+  }
+});
 
 /**
  * PATCH /api/my-listings/:id/toggle-active

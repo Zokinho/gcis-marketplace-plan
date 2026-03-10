@@ -17,6 +17,19 @@ vi.mock('../services/auditService', () => ({
   getRequestIp: vi.fn().mockReturnValue('127.0.0.1'),
 }));
 
+vi.mock('../services/notificationService', () => ({
+  createNotification: vi.fn(),
+  createNotificationBatch: vi.fn(),
+}));
+
+vi.mock('../services/zohoApi', () => ({
+  pushProductUpdate: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../utils/s3', () => ({
+  deleteFile: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../services/coaClient', () => ({
   getCoaClient: vi.fn().mockReturnValue({
     getProductDetail: vi.fn().mockResolvedValue(null),
@@ -210,6 +223,7 @@ describe('GET /users', () => {
         where: {
           approved: false,
           OR: [
+            { eulaAcceptedAt: { not: null } },
             { docUploaded: true },
             { zohoContactId: { not: null } },
           ],
@@ -414,5 +428,378 @@ describe('GET /coa-email-queue', () => {
     expect(res.body.queue[0].suggestedSeller).toBeNull();
     // user.findUnique should not be called since suggestedSellerId is null
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /pending-products', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('includes both requestPending and editPending products', async () => {
+    vi.mocked(prisma.product.findMany).mockResolvedValue([]);
+
+    const app = createTestApp(adminRouter);
+    await request(app).get('/pending-products');
+
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { OR: [{ requestPending: true }, { editPending: true }] },
+      }),
+    );
+  });
+
+  it('returns products with seller info', async () => {
+    const products = [
+      {
+        id: 'p-1',
+        name: 'New Strain',
+        requestPending: true,
+        editPending: false,
+        pendingEdits: null,
+        seller: { id: 'seller-1', email: 'seller@example.com', companyName: 'Seller Corp', firstName: 'John', lastName: 'Seller' },
+        createdAt: new Date(),
+      },
+      {
+        id: 'p-2',
+        name: 'Edited Strain',
+        requestPending: false,
+        editPending: true,
+        pendingEdits: { pricePerUnit: 6.0 },
+        seller: { id: 'seller-1', email: 'seller@example.com', companyName: 'Seller Corp', firstName: 'John', lastName: 'Seller' },
+        createdAt: new Date(),
+      },
+    ];
+    vi.mocked(prisma.product.findMany).mockResolvedValue(products as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app).get('/pending-products');
+
+    expect(res.status).toBe(200);
+    expect(res.body.products).toHaveLength(2);
+    expect(res.body.products[0].requestPending).toBe(true);
+    expect(res.body.products[1].editPending).toBe(true);
+    expect(res.body.products[1].pendingEdits).toEqual({ pricePerUnit: 6.0 });
+  });
+});
+
+describe('POST /products/:productId/approve-edit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('merges field changes into live product and clears pending state', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 6.5, description: 'New desc' },
+      pricePerUnit: 5.0,
+      imageUrls: ['img1.jpg'],
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      editPending: false,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app).post('/products/product-1/approve-edit');
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Edit approved');
+    expect(res.body.product.editPending).toBe(false);
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: expect.objectContaining({
+        pricePerUnit: 6.5,
+        description: 'New desc',
+        editPending: false,
+        pendingEdits: expect.anything(), // Prisma.JsonNull
+      }),
+    });
+  });
+
+  it('pushes field changes to Zoho after approval', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 6.5 },
+      pricePerUnit: 5.0,
+      imageUrls: [],
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      editPending: false,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    await request(app).post('/products/product-1/approve-edit');
+
+    const { pushProductUpdate } = await import('../services/zohoApi');
+    expect(pushProductUpdate).toHaveBeenCalledWith('product-1', { pricePerUnit: 6.5 });
+  });
+
+  it('handles image changes (reorder + new images)', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: {
+        imageUrls: ['img2.jpg', 'img1.jpg'],
+        newImageUrls: ['img3.jpg'],
+      },
+      pricePerUnit: 5.0,
+      imageUrls: ['img1.jpg', 'img2.jpg'],
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      editPending: false,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    await request(app).post('/products/product-1/approve-edit');
+
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: expect.objectContaining({
+        imageUrls: ['img2.jpg', 'img1.jpg', 'img3.jpg'],
+        editPending: false,
+      }),
+    });
+  });
+
+  it('sends EDIT_APPROVED notification to seller', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 6.5 },
+      pricePerUnit: 5.0,
+      imageUrls: [],
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      editPending: false,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    await request(app).post('/products/product-1/approve-edit');
+
+    const { createNotification } = await import('../services/notificationService');
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'seller-1',
+        type: 'EDIT_APPROVED',
+      }),
+    );
+  });
+
+  it('fires SHORTLIST_PRICE_DROP when price decreased', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 4.0 },
+      pricePerUnit: 5.0,
+      imageUrls: [],
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      editPending: false,
+    } as any);
+    vi.mocked(prisma.shortlistItem.findMany).mockResolvedValue([
+      { buyerId: 'buyer-1' },
+      { buyerId: 'buyer-2' },
+    ] as any);
+
+    const app = createTestApp(adminRouter);
+    await request(app).post('/products/product-1/approve-edit');
+
+    const { createNotificationBatch } = await import('../services/notificationService');
+    expect(createNotificationBatch).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ userId: 'buyer-1', type: 'SHORTLIST_PRICE_DROP' }),
+        expect.objectContaining({ userId: 'buyer-2', type: 'SHORTLIST_PRICE_DROP' }),
+      ]),
+    );
+  });
+
+  it('returns 400 when no edit is pending', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app).post('/products/product-1/approve-edit');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('No pending edit to approve');
+  });
+
+  it('returns 404 when product not found', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue(null);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app).post('/products/nonexistent/approve-edit');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Product not found');
+  });
+
+  it('logs audit for edit approval', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 6.5 },
+      pricePerUnit: 5.0,
+      imageUrls: [],
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      editPending: false,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    await request(app).post('/products/product-1/approve-edit');
+
+    const { logAudit } = await import('../services/auditService');
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'product.approve-edit',
+        targetId: 'product-1',
+      }),
+    );
+  });
+});
+
+describe('POST /products/:productId/reject-edit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('clears pending state and sends EDIT_REJECTED notification', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 6.5 },
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/products/product-1/reject-edit')
+      .send({ reason: 'Price too high' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Edit rejected');
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-1' },
+      data: expect.objectContaining({
+        editPending: false,
+        pendingEdits: expect.anything(), // Prisma.JsonNull
+      }),
+    });
+
+    const { createNotification } = await import('../services/notificationService');
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'seller-1',
+        type: 'EDIT_REJECTED',
+      }),
+    );
+  });
+
+  it('cleans up S3 files from newImageUrls on rejection', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: {
+        newImageUrls: ['products/product-1/images/abc.jpg', 'products/product-1/images/def.jpg'],
+      },
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    await request(app)
+      .post('/products/product-1/reject-edit')
+      .send({});
+
+    const { deleteFile } = await import('../utils/s3');
+    expect(deleteFile).toHaveBeenCalledTimes(2);
+    expect(deleteFile).toHaveBeenCalledWith('products/product-1/images/abc.jpg');
+    expect(deleteFile).toHaveBeenCalledWith('products/product-1/images/def.jpg');
+  });
+
+  it('returns 400 when no edit is pending', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/products/product-1/reject-edit')
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('No pending edit to reject');
+  });
+
+  it('returns 404 when product not found', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue(null);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/products/nonexistent/reject-edit')
+      .send({});
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Product not found');
+  });
+
+  it('logs audit for edit rejection', async () => {
+    vi.mocked(prisma.product.findUnique).mockResolvedValue({
+      id: 'product-1',
+      name: 'Test Strain',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 6.5 },
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    await request(app)
+      .post('/products/product-1/reject-edit')
+      .send({ reason: 'Not acceptable' });
+
+    const { logAudit } = await import('../services/auditService');
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'product.reject-edit',
+        targetId: 'product-1',
+        metadata: expect.objectContaining({ reason: 'Not acceptable' }),
+      }),
+    );
   });
 });

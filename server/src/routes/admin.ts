@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
-import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema, adminBidsQuerySchema } from '../utils/validation';
+import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema, adminBidsQuerySchema, rejectEditSchema } from '../utils/validation';
 import { prisma } from '../index';
 import { runFullSync, syncProducts, syncContacts, syncProductsDelta } from '../services/zohoSync';
 import { getCoaClient } from '../services/coaClient';
@@ -10,8 +10,12 @@ import { mapCoaToProductFields } from '../utils/coaMapper';
 import { detectSeller } from '../services/sellerDetection';
 import { pollEmailIngestions } from '../services/coaEmailSync';
 import { logAudit, getRequestIp } from '../services/auditService';
+import { createNotification } from '../services/notificationService';
 import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 import { hashPassword } from '../utils/auth';
+import { pushProductUpdate } from '../services/zohoApi';
+import { createNotificationBatch } from '../services/notificationService';
+import { deleteFile as s3Delete } from '../utils/s3';
 
 const router = Router();
 
@@ -253,6 +257,7 @@ router.get('/users', validateQuery(adminUsersQuerySchema), async (req: Request, 
     where = {
       approved: false,
       OR: [
+        { eulaAcceptedAt: { not: null } },
         { docUploaded: true },
         { zohoContactId: { not: null } },
       ],
@@ -453,11 +458,11 @@ router.post('/users/:userId/reset-password', async (req: Request<{ userId: strin
 
 /**
  * GET /api/admin/pending-products
- * List products with requestPending = true, for admin approval.
+ * List products with requestPending = true OR editPending = true, for admin approval.
  */
 router.get('/pending-products', async (_req: Request, res: Response) => {
   const products = await prisma.product.findMany({
-    where: { requestPending: true },
+    where: { OR: [{ requestPending: true }, { editPending: true }] },
     include: {
       seller: { select: { id: true, email: true, companyName: true, firstName: true, lastName: true } },
     },
@@ -491,6 +496,16 @@ router.post('/products/:productId/approve', async (req: Request<{ productId: str
   logger.info({ productId, productName: updated.name, approvedBy: req.user?.email }, '[ADMIN] Product approved');
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'product.approve', targetType: 'Product', targetId: productId, metadata: { productName: updated.name }, ip: getRequestIp(req) });
 
+  if (updated.sellerId) {
+    createNotification({
+      userId: updated.sellerId,
+      type: 'PRODUCT_APPROVED',
+      title: 'Product Approved',
+      body: `Your product "${updated.name}" has been approved and is now live on the marketplace.`,
+      data: { productId: updated.id },
+    });
+  }
+
   res.json({ message: 'Product approved', product: { id: updated.id, name: updated.name, requestPending: updated.requestPending, marketplaceVisible: updated.marketplaceVisible } });
 });
 
@@ -515,6 +530,172 @@ router.post('/products/:productId/reject', async (req: Request<{ productId: stri
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'product.reject', targetType: 'Product', targetId: productId, metadata: { productName: product.name }, ip: getRequestIp(req) });
 
   res.json({ message: 'Product rejected and removed' });
+});
+
+/**
+ * POST /api/admin/products/:productId/approve-edit
+ * Approve pending edits — merges pendingEdits into live product, pushes to Zoho.
+ */
+router.post('/products/:productId/approve-edit', async (req: Request<{ productId: string }>, res: Response) => {
+  const { productId } = req.params;
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+  if (!product.editPending) {
+    return res.status(400).json({ error: 'No pending edit to approve' });
+  }
+
+  const pending = (product.pendingEdits as Record<string, any>) || {};
+  const { newImageUrls, imageUrls: reorderedImageUrls, ...fieldChanges } = pending;
+
+  try {
+    // Build the update object
+    const updateData: Record<string, any> = {};
+
+    // Apply field changes
+    for (const [key, value] of Object.entries(fieldChanges)) {
+      if (key === 'harvestDate') {
+        updateData.harvestDate = value ? new Date(value as string) : null;
+      } else {
+        updateData[key] = value;
+      }
+    }
+
+    // Handle image changes
+    let finalImageUrls = product.imageUrls as string[];
+    if (reorderedImageUrls) {
+      finalImageUrls = reorderedImageUrls as string[];
+    }
+    if (newImageUrls && (newImageUrls as string[]).length > 0) {
+      finalImageUrls = [...finalImageUrls, ...(newImageUrls as string[])];
+    }
+    if (reorderedImageUrls || (newImageUrls && (newImageUrls as string[]).length > 0)) {
+      updateData.imageUrls = finalImageUrls;
+    }
+
+    // Clear pending state
+    updateData.editPending = false;
+    updateData.pendingEdits = Prisma.JsonNull;
+
+    const updated = await prisma.product.update({
+      where: { id: productId },
+      data: updateData,
+    });
+
+    // Push field changes to Zoho — fire-and-forget
+    const zohoFields: Record<string, any> = {};
+    for (const [key, value] of Object.entries(fieldChanges)) {
+      if (key !== 'harvestDate') {
+        zohoFields[key] = value;
+      }
+    }
+    if (Object.keys(zohoFields).length > 0) {
+      pushProductUpdate(productId, zohoFields).catch((err) => {
+        logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] Zoho push after edit approval failed (non-critical)');
+      });
+    }
+
+    // SHORTLIST_PRICE_DROP — notify shortlisters if price decreased
+    if (fieldChanges.pricePerUnit !== undefined && product.pricePerUnit != null && fieldChanges.pricePerUnit < product.pricePerUnit) {
+      try {
+        const shortlisters = await prisma.shortlistItem.findMany({
+          where: { productId },
+          select: { buyerId: true },
+        });
+        if (shortlisters.length > 0) {
+          createNotificationBatch(
+            shortlisters.map((s) => ({
+              userId: s.buyerId,
+              type: 'SHORTLIST_PRICE_DROP' as const,
+              title: 'Price drop on shortlisted product',
+              body: `${product.name} price dropped to $${Number(fieldChanges.pricePerUnit).toFixed(2)}/g`,
+              data: { productId },
+            })),
+          );
+        }
+      } catch (e) {
+        logger.error({ err: e }, '[ADMIN] SHORTLIST_PRICE_DROP notification error after edit approval');
+      }
+    }
+
+    // Notify seller
+    createNotification({
+      userId: product.sellerId,
+      type: 'EDIT_APPROVED',
+      title: 'Edit Approved',
+      body: `Your changes to "${product.name}" have been approved and are now live.`,
+      data: { productId },
+    });
+
+    logger.info({ productId, productName: product.name, approvedBy: req.user?.email }, '[ADMIN] Edit approved');
+    logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'product.approve-edit', targetType: 'Product', targetId: productId, metadata: { productName: product.name, changes: Object.keys(pending) }, ip: getRequestIp(req) });
+
+    res.json({ message: 'Edit approved', product: { id: updated.id, name: updated.name, editPending: updated.editPending } });
+  } catch (err: any) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] Edit approval failed');
+    res.status(500).json({ error: 'Failed to approve edit' });
+  }
+});
+
+/**
+ * POST /api/admin/products/:productId/reject-edit
+ * Reject pending edits — clears pendingEdits, cleans up S3 for uploaded images.
+ */
+router.post('/products/:productId/reject-edit', validate(rejectEditSchema), async (req: Request<{ productId: string }>, res: Response) => {
+  const { productId } = req.params;
+  const { reason } = req.body;
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+  if (!product.editPending) {
+    return res.status(400).json({ error: 'No pending edit to reject' });
+  }
+
+  const pending = (product.pendingEdits as Record<string, any>) || {};
+
+  try {
+    // Clean up S3 files from pendingEdits.newImageUrls
+    const newImageUrls = (pending.newImageUrls as string[]) || [];
+    for (const url of newImageUrls) {
+      // Only delete S3 keys (not legacy /uploads/ paths)
+      if (url.startsWith('products/')) {
+        s3Delete(url).catch((err) => {
+          logger.error({ err: err instanceof Error ? err : { message: String(err) }, key: url }, '[ADMIN] S3 cleanup failed on edit rejection');
+        });
+      }
+    }
+
+    // Clear pending state
+    await prisma.product.update({
+      where: { id: productId },
+      data: {
+        editPending: false,
+        pendingEdits: Prisma.JsonNull,
+      },
+    });
+
+    // Notify seller
+    const reasonSuffix = reason ? ` Reason: ${reason}` : '';
+    createNotification({
+      userId: product.sellerId,
+      type: 'EDIT_REJECTED',
+      title: 'Edit Rejected',
+      body: `Your proposed changes to "${product.name}" were not approved.${reasonSuffix}`,
+      data: { productId, reason: reason || null },
+    });
+
+    logger.info({ productId, productName: product.name, rejectedBy: req.user?.email, reason }, '[ADMIN] Edit rejected');
+    logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'product.reject-edit', targetType: 'Product', targetId: productId, metadata: { productName: product.name, reason }, ip: getRequestIp(req) });
+
+    res.json({ message: 'Edit rejected' });
+  } catch (err: any) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] Edit rejection failed');
+    res.status(500).json({ error: 'Failed to reject edit' });
+  }
 });
 
 // ─── All Bids (admin view) ───

@@ -235,6 +235,9 @@ export interface SellerListing {
   isActive: boolean;
   marketplaceVisible?: boolean;
   requestPending: boolean;
+  editPending: boolean;
+  pendingEdits: Record<string, any> | null;
+  imageSource: string;
   pricePerUnit: number | null;
   gramsAvailable: number | null;
   upcomingQty: number | null;
@@ -276,12 +279,17 @@ export async function updateMyListing(
 export async function uploadListingImages(
   id: string,
   files: File[],
-): Promise<{ product: { id: string; imageUrls: string[] } }> {
+  onProgress?: (percent: number) => void,
+): Promise<{ message: string; editPending: boolean; newImageUrls: string[] }> {
   const form = new FormData();
   for (const file of files) {
     form.append('images', file);
   }
-  const res = await api.post(`/my-listings/${id}/images`, form);
+  const res = await api.post(`/my-listings/${id}/images`, form, {
+    onUploadProgress: onProgress
+      ? (e) => { if (e.total) onProgress(Math.round((e.loaded * 100) / e.total)); }
+      : undefined,
+  });
   return res.data;
 }
 
@@ -522,6 +530,11 @@ export interface PendingProduct {
   cbdMax: number | null;
   source: string;
   createdAt: string;
+  requestPending: boolean;
+  editPending: boolean;
+  pendingEdits: Record<string, any> | null;
+  imageUrls: string[];
+  description: string | null;
   seller: { id: string; email: string; companyName: string | null; firstName: string | null; lastName: string | null };
 }
 
@@ -536,6 +549,18 @@ export async function approveProduct(productId: string): Promise<void> {
 
 export async function rejectProduct(productId: string): Promise<void> {
   await api.post(`/admin/products/${productId}/reject`);
+}
+
+export async function approveEdit(productId: string): Promise<void> {
+  await api.post(`/admin/products/${productId}/approve-edit`);
+}
+
+export async function rejectEdit(productId: string, reason?: string): Promise<void> {
+  await api.post(`/admin/products/${productId}/reject-edit`, reason ? { reason } : {});
+}
+
+export async function reorderListingImages(id: string, imageUrls: string[]): Promise<void> {
+  await api.patch(`/my-listings/${id}/images/reorder`, { imageUrls });
 }
 
 // ─── Curated Shares Types ───
@@ -614,7 +639,9 @@ export type NotificationTypeEnum =
   | 'BID_RECEIVED' | 'BID_ACCEPTED' | 'BID_REJECTED' | 'BID_COUNTERED' | 'BID_OUTCOME'
   | 'PRODUCT_NEW' | 'PRODUCT_PRICE' | 'PRODUCT_STOCK'
   | 'MATCH_SUGGESTION' | 'COA_PROCESSED' | 'PREDICTION_DUE' | 'SHORTLIST_PRICE_DROP'
-  | 'ISO_MATCH_FOUND' | 'ISO_SELLER_RESPONSE' | 'SYSTEM_ANNOUNCEMENT';
+  | 'ISO_MATCH_FOUND' | 'ISO_SELLER_RESPONSE'
+  | 'EDIT_APPROVED' | 'EDIT_REJECTED'
+  | 'SYSTEM_ANNOUNCEMENT';
 
 export interface NotificationRecord {
   id: string;

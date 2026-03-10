@@ -123,11 +123,18 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
           logger.error({ err }, `[SYNC] Failed to fetch file URLs for product ${p.id}`);
         }
 
+        // Check if existing product has manual images — protect from sync overwrite
+        const existingForImages = await prisma.product.findUnique({
+          where: { zohoProductId: p.id },
+          select: { imageSource: true },
+        });
+        const skipImageOverwrite = existingForImages?.imageSource === 'manual';
+
         const product = await prisma.product.upsert({
           where: { zohoProductId: p.id },
           update: {
             ...fields,
-            ...(fileUrls.imageUrls.length > 0 ? { imageUrls: fileUrls.imageUrls } : {}),
+            ...(!skipImageOverwrite && fileUrls.imageUrls.length > 0 ? { imageUrls: fileUrls.imageUrls } : {}),
             ...(fileUrls.coaUrls.length > 0 ? { coaUrls: fileUrls.coaUrls } : {}),
           },
           create: {
@@ -250,14 +257,17 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
         // Check if this is a new product or price change (for notifications)
         const existing = await prisma.product.findUnique({
           where: { zohoProductId: p.id },
-          select: { id: true, pricePerUnit: true, sellerId: true },
+          select: { id: true, pricePerUnit: true, sellerId: true, imageSource: true },
         });
+
+        // Protect manual images from sync overwrite
+        const skipImageOverwrite = existing?.imageSource === 'manual';
 
         const product = await prisma.product.upsert({
           where: { zohoProductId: p.id },
           update: {
             ...fields,
-            ...(fileUrls.imageUrls.length > 0 ? { imageUrls: fileUrls.imageUrls } : {}),
+            ...(!skipImageOverwrite && fileUrls.imageUrls.length > 0 ? { imageUrls: fileUrls.imageUrls } : {}),
             ...(fileUrls.coaUrls.length > 0 ? { coaUrls: fileUrls.coaUrls } : {}),
           },
           create: {

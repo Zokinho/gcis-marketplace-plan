@@ -187,6 +187,8 @@ export const notificationPrefsSchema = z.object({
   SHORTLIST_PRICE_DROP: z.boolean().optional(),
   ISO_MATCH_FOUND: z.boolean().optional(),
   ISO_SELLER_RESPONSE: z.boolean().optional(),
+  EDIT_APPROVED: z.boolean().optional(),
+  EDIT_REJECTED: z.boolean().optional(),
   SYSTEM_ANNOUNCEMENT: z.boolean().optional(),
 }).strict();
 
@@ -417,4 +419,14 @@ export const isoRespondSchema = z.object({
 export const isoUpdateSchema = z.object({
   status: z.enum(['CLOSED']).optional(),
   renew:  z.boolean().optional(),
+});
+
+// ─── Edit approval schemas ───
+
+export const imageReorderSchema = z.object({
+  imageUrls: z.array(z.string().min(1)).min(0).max(20),
+});
+
+export const rejectEditSchema = z.object({
+  reason: z.string().max(1000).optional(),
 });

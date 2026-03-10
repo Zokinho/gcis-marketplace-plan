@@ -3,7 +3,7 @@ import request from 'supertest';
 import { prisma } from '../../index';
 import adminRouter from '../../routes/admin';
 import notificationsRouter from '../../routes/notifications';
-import { createE2EApp, makeAdmin } from './helpers';
+import { createE2EApp, makeAdmin, makeSeller } from './helpers';
 
 // Set ADMIN_EMAILS before module load
 vi.hoisted(() => {
@@ -29,6 +29,19 @@ vi.mock('../../services/notificationService', () => ({
   getUnreadCount: vi.fn().mockResolvedValue(0),
   getEffectivePrefs: vi.fn().mockResolvedValue({}),
   DEFAULT_NOTIFICATION_PREFS: {},
+}));
+
+vi.mock('../../services/zohoApi', () => ({
+  pushProductUpdate: vi.fn().mockResolvedValue(undefined),
+  createZohoProduct: vi.fn().mockResolvedValue('zoho-new-123'),
+  createProductReviewTask: vi.fn().mockResolvedValue(undefined),
+  uploadProductFiles: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../utils/s3', () => ({
+  deleteFile: vi.fn().mockResolvedValue(undefined),
+  isS3Configured: false,
+  uploadFile: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../services/coaClient', () => ({
@@ -90,7 +103,7 @@ describe('E2E: Admin operations + audit trail', () => {
     expect(res.status).toBe(200);
     expect(res.body.users).toHaveLength(2);
     expect(prisma.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { approved: false, OR: [{ docUploaded: true }, { zohoContactId: { not: null } }] } }),
+      expect.objectContaining({ where: { approved: false, OR: [{ eulaAcceptedAt: { not: null } }, { docUploaded: true }, { zohoContactId: { not: null } }] } }),
     );
   });
 
@@ -289,6 +302,183 @@ describe('E2E: Admin operations + audit trail', () => {
     const { logAudit } = await import('../../services/auditService');
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'coa.dismiss' }),
+    );
+  });
+});
+
+describe('E2E: Seller edit → Admin review → Approve', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const seller = makeSeller();
+  const editPendingProduct = {
+    id: 'product-edit-1',
+    zohoProductId: 'zoho-edit-1',
+    name: 'OG Kush',
+    sellerId: 'seller-1',
+    pricePerUnit: 5.0,
+    gramsAvailable: 5000,
+    imageUrls: ['img1.jpg'],
+    requestPending: false,
+    editPending: true,
+    pendingEdits: { pricePerUnit: 4.5, description: 'New description' },
+    createdAt: new Date(),
+    seller: { id: 'seller-1', email: 'seller@example.com', companyName: 'Seller Corp', firstName: 'John', lastName: 'Seller' },
+  };
+
+  it('full flow: seller edits → admin sees in queue → approve → live product updated', async () => {
+    // Import both routers so seller and admin use same mock state
+    const myListingsRouter = (await import('../../routes/myListings')).default;
+
+    // Step 1: Seller submits an edit (PATCH /api/my-listings/:id)
+    const sellerApp = createE2EApp(seller, { '/api/my-listings': myListingsRouter });
+
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'product-edit-1',
+      sellerId: 'seller-1',
+      zohoProductId: 'zoho-edit-1',
+      pricePerUnit: 5.0,
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValueOnce({} as any);
+
+    const editRes = await request(sellerApp)
+      .patch('/api/my-listings/product-edit-1')
+      .send({ pricePerUnit: 4.5, description: 'New description' });
+
+    expect(editRes.status).toBe(200);
+    expect(editRes.body.editPending).toBe(true);
+    expect(editRes.body.message).toBe('Edit submitted for approval');
+
+    // Verify Zoho was NOT called
+    const { pushProductUpdate } = await import('../../services/zohoApi');
+    expect(pushProductUpdate).not.toHaveBeenCalled();
+
+    // Step 2: Admin views pending products queue
+    const adminApp = createE2EApp(admin, { '/api/admin': adminRouter });
+
+    vi.mocked(prisma.product.findMany).mockResolvedValueOnce([editPendingProduct] as any);
+
+    const queueRes = await request(adminApp).get('/api/admin/pending-products');
+
+    expect(queueRes.status).toBe(200);
+    expect(queueRes.body.products).toHaveLength(1);
+    expect(queueRes.body.products[0].editPending).toBe(true);
+    expect(queueRes.body.products[0].pendingEdits).toEqual({ pricePerUnit: 4.5, description: 'New description' });
+
+    // Step 3: Admin approves the edit
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'product-edit-1',
+      name: 'OG Kush',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: { pricePerUnit: 4.5, description: 'New description' },
+      pricePerUnit: 5.0,
+      imageUrls: ['img1.jpg'],
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValueOnce({
+      id: 'product-edit-1',
+      name: 'OG Kush',
+      editPending: false,
+      pricePerUnit: 4.5,
+      description: 'New description',
+    } as any);
+    vi.mocked(prisma.shortlistItem.findMany).mockResolvedValueOnce([{ buyerId: 'buyer-1' }] as any);
+
+    const approveRes = await request(adminApp).post('/api/admin/products/product-edit-1/approve-edit');
+
+    expect(approveRes.status).toBe(200);
+    expect(approveRes.body.message).toBe('Edit approved');
+    expect(approveRes.body.product.editPending).toBe(false);
+
+    // Verify product was updated with the pending changes
+    expect(prisma.product.update).toHaveBeenLastCalledWith({
+      where: { id: 'product-edit-1' },
+      data: expect.objectContaining({
+        pricePerUnit: 4.5,
+        description: 'New description',
+        editPending: false,
+      }),
+    });
+
+    // Verify Zoho push was called for field changes
+    expect(pushProductUpdate).toHaveBeenCalledWith('product-edit-1', { pricePerUnit: 4.5, description: 'New description' });
+
+    // Verify EDIT_APPROVED notification sent
+    const { createNotification } = await import('../../services/notificationService');
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'seller-1', type: 'EDIT_APPROVED' }),
+    );
+
+    // Verify SHORTLIST_PRICE_DROP sent (price decreased from 5.0 → 4.5)
+    const { createNotificationBatch } = await import('../../services/notificationService');
+    expect(createNotificationBatch).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ userId: 'buyer-1', type: 'SHORTLIST_PRICE_DROP' }),
+      ]),
+    );
+
+    // Verify audit log
+    const { logAudit } = await import('../../services/auditService');
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'product.approve-edit', targetId: 'product-edit-1' }),
+    );
+  });
+
+  it('full flow: seller edits → admin rejects → pending cleared, S3 cleaned', async () => {
+    const adminApp = createE2EApp(admin, { '/api/admin': adminRouter });
+
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'product-edit-1',
+      name: 'OG Kush',
+      sellerId: 'seller-1',
+      editPending: true,
+      pendingEdits: {
+        pricePerUnit: 4.5,
+        newImageUrls: ['products/product-edit-1/images/new1.jpg'],
+      },
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValueOnce({} as any);
+
+    const rejectRes = await request(adminApp)
+      .post('/api/admin/products/product-edit-1/reject-edit')
+      .send({ reason: 'Price is too low' });
+
+    expect(rejectRes.status).toBe(200);
+    expect(rejectRes.body.message).toBe('Edit rejected');
+
+    // Verify pending state cleared
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 'product-edit-1' },
+      data: expect.objectContaining({
+        editPending: false,
+      }),
+    });
+
+    // Verify S3 cleanup
+    const { deleteFile } = await import('../../utils/s3');
+    expect(deleteFile).toHaveBeenCalledWith('products/product-edit-1/images/new1.jpg');
+
+    // Verify EDIT_REJECTED notification with reason
+    const { createNotification } = await import('../../services/notificationService');
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'seller-1',
+        type: 'EDIT_REJECTED',
+        body: expect.stringContaining('Price is too low'),
+      }),
+    );
+
+    // Verify audit log
+    const { logAudit } = await import('../../services/auditService');
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'product.reject-edit',
+        targetId: 'product-edit-1',
+        metadata: expect.objectContaining({ reason: 'Price is too low' }),
+      }),
     );
   });
 });

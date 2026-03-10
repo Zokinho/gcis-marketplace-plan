@@ -9,6 +9,7 @@ vi.mock('../index', () => ({
       count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
     },
     bid: {
       findUnique: vi.fn(),

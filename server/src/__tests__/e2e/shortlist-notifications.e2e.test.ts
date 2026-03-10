@@ -106,43 +106,33 @@ describe('E2E: Shortlist → Price drop notification flow', () => {
     expect(res.body.count).toBe(1);
   });
 
-  it('seller lowers price → SHORTLIST_PRICE_DROP notification sent', async () => {
+  it('seller lowers price → edit stored as pending (notification deferred to admin approval)', async () => {
     const myListingsRouter = (await import('../../routes/myListings')).default;
     const app = createE2EApp(seller, { '/api/my-listings': myListingsRouter });
 
     // Ownership check
-    vi.mocked(prisma.product.findUnique)
-      .mockResolvedValueOnce({
-        id: 'prod-1',
-        name: 'Blue Dream',
-        sellerId: 'seller-1',
-        zohoProductId: 'zoho-prod-1',
-        pricePerUnit: 5.0,
-      } as any)
-      // After update, return updated product
-      .mockResolvedValueOnce({
-        ...makeProduct({ id: 'prod-1', pricePerUnit: 4.0 }),
-      } as any);
-
-    // Shortlisters for this product
-    vi.mocked(prisma.shortlistItem.findMany).mockResolvedValue([
-      { buyerId: 'buyer-1' },
-      { buyerId: 'buyer-2' },
-    ] as any);
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'prod-1',
+      name: 'Blue Dream',
+      sellerId: 'seller-1',
+      zohoProductId: 'zoho-prod-1',
+      pricePerUnit: 5.0,
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
 
     const res = await request(app)
       .patch('/api/my-listings/prod-1')
       .send({ pricePerUnit: 4.0 });
 
     expect(res.status).toBe(200);
+    expect(res.body.editPending).toBe(true);
+    expect(res.body.message).toBe('Edit submitted for approval');
 
+    // Price drop notification should NOT be sent (deferred to admin approval)
     const { createNotificationBatch } = await import('../../services/notificationService');
-    expect(createNotificationBatch).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ userId: 'buyer-1', type: 'SHORTLIST_PRICE_DROP' }),
-        expect.objectContaining({ userId: 'buyer-2', type: 'SHORTLIST_PRICE_DROP' }),
-      ]),
-    );
+    expect(createNotificationBatch).not.toHaveBeenCalled();
   });
 
   it('buyer removes product from shortlist', async () => {
@@ -165,56 +155,53 @@ describe('E2E: Shortlist → Price drop notification flow', () => {
     expect(res.body.shortlisted).toBe(false);
   });
 
-  it('seller lowers price again → no notification (no shortlisters after removal)', async () => {
+  it('seller lowers price again → edit stored as pending (no immediate notification)', async () => {
     const myListingsRouter = (await import('../../routes/myListings')).default;
     const app = createE2EApp(seller, { '/api/my-listings': myListingsRouter });
 
-    vi.mocked(prisma.product.findUnique)
-      .mockResolvedValueOnce({
-        id: 'prod-1',
-        name: 'Blue Dream',
-        sellerId: 'seller-1',
-        zohoProductId: 'zoho-prod-1',
-        pricePerUnit: 4.0,
-      } as any)
-      .mockResolvedValueOnce({
-        ...makeProduct({ id: 'prod-1', pricePerUnit: 3.5 }),
-      } as any);
-
-    // No shortlisters
-    vi.mocked(prisma.shortlistItem.findMany).mockResolvedValue([] as any);
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'prod-1',
+      name: 'Blue Dream',
+      sellerId: 'seller-1',
+      zohoProductId: 'zoho-prod-1',
+      pricePerUnit: 4.0,
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
 
     const res = await request(app)
       .patch('/api/my-listings/prod-1')
       .send({ pricePerUnit: 3.5 });
 
     expect(res.status).toBe(200);
+    expect(res.body.editPending).toBe(true);
 
     const { createNotificationBatch } = await import('../../services/notificationService');
     expect(createNotificationBatch).not.toHaveBeenCalled();
   });
 
-  it('seller increases price → no price-drop notification', async () => {
+  it('seller increases price → edit stored as pending (no notification)', async () => {
     const myListingsRouter = (await import('../../routes/myListings')).default;
     const app = createE2EApp(seller, { '/api/my-listings': myListingsRouter });
 
-    vi.mocked(prisma.product.findUnique)
-      .mockResolvedValueOnce({
-        id: 'prod-1',
-        name: 'Blue Dream',
-        sellerId: 'seller-1',
-        zohoProductId: 'zoho-prod-1',
-        pricePerUnit: 5.0,
-      } as any)
-      .mockResolvedValueOnce({
-        ...makeProduct({ id: 'prod-1', pricePerUnit: 6.0 }),
-      } as any);
+    vi.mocked(prisma.product.findUnique).mockResolvedValueOnce({
+      id: 'prod-1',
+      name: 'Blue Dream',
+      sellerId: 'seller-1',
+      zohoProductId: 'zoho-prod-1',
+      pricePerUnit: 5.0,
+      editPending: false,
+      pendingEdits: null,
+    } as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
 
     const res = await request(app)
       .patch('/api/my-listings/prod-1')
       .send({ pricePerUnit: 6.0 });
 
     expect(res.status).toBe(200);
+    expect(res.body.editPending).toBe(true);
 
     const { createNotificationBatch } = await import('../../services/notificationService');
     expect(createNotificationBatch).not.toHaveBeenCalled();
