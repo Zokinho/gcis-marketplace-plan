@@ -28,6 +28,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
   const { data: userStatus } = useUserStatus();
   const isSeller = userStatus?.user?.contactType?.includes('Seller') ?? false;
   const isAdmin = userStatus?.user?.isAdmin ?? false;
@@ -75,32 +76,62 @@ export default function ProductDetailContent({ productId }: { productId: string 
       {/* Left: Product info (2 cols) */}
       <div className="lg:col-span-2 space-y-6">
         {/* Image Gallery */}
-        {product.imageUrls && product.imageUrls.length > 0 && (
-          <div className="rounded-lg border card-blue shadow-md p-4">
-            <div className="mb-3 flex items-center justify-center overflow-hidden rounded-lg surface-muted" style={{ minHeight: '320px' }}>
-              <ProductImage
-                src={product.imageUrls[selectedImage]}
-                alt={`${product.name} — image ${selectedImage + 1}`}
-                className="max-h-[480px] w-full object-contain"
-              />
-            </div>
-            {product.imageUrls.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto">
-                {product.imageUrls.map((url, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedImage(i)}
-                    className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 transition ${
-                      i === selectedImage ? 'border-brand-teal' : 'border-transparent hover:border-default'
-                    }`}
-                  >
-                    <ProductImage src={url} alt={`Thumbnail ${i + 1}`} className="h-full w-full object-cover" />
-                  </button>
-                ))}
+        {product.imageUrls && product.imageUrls.length > 0 && (() => {
+          const validImages = product.imageUrls
+            .map((url, i) => ({ url, index: i }))
+            .filter(({ index }) => !failedImages.has(index));
+          const currentSrc = product.imageUrls[selectedImage];
+          const currentFailed = failedImages.has(selectedImage);
+          return validImages.length > 0 || !currentFailed ? (
+            <div className="rounded-lg border card-blue shadow-md p-4">
+              <div className="mb-3 flex items-center justify-center overflow-hidden rounded-lg surface-muted" style={{ minHeight: '320px' }}>
+                {currentSrc && !currentFailed && (
+                  <ProductImage
+                    src={currentSrc}
+                    alt={`${product.name} — image ${selectedImage + 1}`}
+                    className="max-h-[480px] w-full object-contain"
+                    onLoadError={() => {
+                      setFailedImages(prev => {
+                        const next = new Set(prev);
+                        next.add(selectedImage);
+                        return next;
+                      });
+                      // Auto-select next valid image
+                      const nextValid = product.imageUrls!.findIndex((_, i) => i !== selectedImage && !failedImages.has(i));
+                      if (nextValid !== -1) setSelectedImage(nextValid);
+                    }}
+                  />
+                )}
               </div>
-            )}
-          </div>
-        )}
+              {validImages.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto">
+                  {validImages.map(({ url, index }) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedImage(index)}
+                      className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 transition ${
+                        index === selectedImage ? 'border-brand-teal' : 'border-transparent hover:border-default'
+                      }`}
+                    >
+                      <ProductImage
+                        src={url}
+                        alt={`Thumbnail ${index + 1}`}
+                        className="h-full w-full object-cover"
+                        onLoadError={() => {
+                          setFailedImages(prev => {
+                            const next = new Set(prev);
+                            next.add(index);
+                            return next;
+                          });
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null;
+        })()}
 
         {/* Header */}
         <div className="rounded-lg border card-blue border-l-4 border-l-brand-teal shadow-md p-6">
