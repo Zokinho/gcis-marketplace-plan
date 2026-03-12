@@ -537,10 +537,35 @@ export interface PendingProduct {
   id: string;
   name: string;
   category: string | null;
+  type: string | null;
+  certification: string | null;
+  licensedProducer: string | null;
+  growthMedium: string | null;
+  lineage: string | null;
+  harvestDate: string | null;
   pricePerUnit: number | null;
   gramsAvailable: number | null;
+  upcomingQty: number | null;
+  minQtyRequest: number | null;
+  thcMin: number | null;
   thcMax: number | null;
+  cbdMin: number | null;
   cbdMax: number | null;
+  dominantTerpene: string | null;
+  highestTerpenes: string | null;
+  totalTerpenePercent: number | null;
+  aromas: string | null;
+  budSizePopcorn: number | null;
+  budSizeSmall: number | null;
+  budSizeMedium: number | null;
+  budSizeLarge: number | null;
+  budSizeXLarge: number | null;
+  labName: string | null;
+  testDate: string | null;
+  reportNumber: string | null;
+  testResults: any;
+  coaPdfUrl: string | null;
+  coaUrls: string[];
   source: string;
   createdAt: string;
   requestPending: boolean;
@@ -548,6 +573,7 @@ export interface PendingProduct {
   pendingEdits: Record<string, any> | null;
   imageUrls: string[];
   description: string | null;
+  sellerId: string;
   seller: { id: string; email: string; companyName: string | null; firstName: string | null; lastName: string | null };
 }
 

@@ -32,6 +32,253 @@ function formatFieldValue(key: string, value: any): string {
   return String(value);
 }
 
+function formatRange(min: number | null, max: number | null, suffix: string): string {
+  if (min != null && max != null) {
+    if (min === max) return `${min}${suffix}`;
+    return `${min}–${max}${suffix}`;
+  }
+  if (max != null) return `${max}${suffix}`;
+  if (min != null) return `${min}+${suffix}`;
+  return '—';
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  Sativa: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  Indica: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  Hybrid: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+};
+
+const CERT_COLORS: Record<string, string> = {
+  GACP: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  GMP1: 'bg-brand-sage/20 text-brand-teal dark:text-brand-sage',
+  GMP2: 'bg-brand-sage/20 text-brand-teal dark:text-brand-sage',
+  GPP: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'IMC-GAP': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+};
+
+function Spec({ label, value, highlighted }: { label: string; value: string; highlighted?: boolean }) {
+  return (
+    <div className={`rounded-lg surface-muted px-3 py-2 ${highlighted ? 'ring-2 ring-green-400/60 bg-green-50 dark:bg-green-900/15' : ''}`}>
+      <p className="text-xs font-medium text-faint">{label}</p>
+      <p className="text-sm font-semibold text-primary">{value}</p>
+    </div>
+  );
+}
+
+function ProductPreview({ product, isEditRequest }: { product: PendingProduct; isEditRequest: boolean }) {
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
+
+  // For edit requests, merge pending edits to show the "after" state
+  const pending = product.pendingEdits || {};
+  const { newImageUrls: _newImgs, imageUrls: _reorderedImgs, ...fieldEdits } = pending;
+  const merged = isEditRequest ? { ...product, ...fieldEdits } as PendingProduct : product;
+  const changedKeys = new Set(Object.keys(fieldEdits));
+
+  const images = merged.imageUrls || [];
+  const budSizes = [
+    { label: '0-1cm (Popcorn)', value: merged.budSizePopcorn },
+    { label: '1-2cm (Small)', value: merged.budSizeSmall },
+    { label: '2-3cm (Medium)', value: merged.budSizeMedium },
+    { label: '3-5cm (Large)', value: merged.budSizeLarge },
+    { label: '5cm+ (X-Large)', value: merged.budSizeXLarge },
+  ].filter((b) => b.value != null && b.value > 0);
+
+  const terpenes = merged.dominantTerpene?.split(';').map((t) => t.trim()).filter(Boolean) || [];
+  const hasTerpeneSection = terpenes.length > 0 || merged.highestTerpenes || merged.aromas;
+
+  const isChanged = (key: string) => isEditRequest && changedKeys.has(key);
+
+  const validImages = images
+    .map((url, i) => ({ url, index: i }))
+    .filter(({ index }) => !failedImages.has(index));
+  const currentFailed = failedImages.has(selectedImage);
+
+  return (
+    <div className="mt-4 border-t border-default pt-4">
+      {isEditRequest && changedKeys.size > 0 && (
+        <div className="mb-3 flex items-center gap-2 text-xs text-green-700 dark:text-green-400">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+          </svg>
+          <span>Fields highlighted with a green border reflect proposed changes.</span>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {/* Image Gallery */}
+        {validImages.length > 0 && (
+          <div className="rounded-lg border border-default surface p-3">
+            <div className="mb-2 flex items-center justify-center overflow-hidden rounded-lg surface-muted" style={{ minHeight: '240px' }}>
+              {images[selectedImage] && !currentFailed && (
+                <ProductImage
+                  src={images[selectedImage]}
+                  alt={`${merged.name} — image ${selectedImage + 1}`}
+                  className="max-h-[360px] w-full object-contain"
+                  onLoadError={() => {
+                    setFailedImages(prev => {
+                      const next = new Set(prev);
+                      next.add(selectedImage);
+                      return next;
+                    });
+                    const nextValid = images.findIndex((_, i) => i !== selectedImage && !failedImages.has(i));
+                    if (nextValid !== -1) setSelectedImage(nextValid);
+                  }}
+                />
+              )}
+            </div>
+            {validImages.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto">
+                {validImages.map(({ url, index }) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImage(index)}
+                    className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg border-2 transition ${
+                      index === selectedImage ? 'border-brand-teal' : 'border-transparent hover:border-default'
+                    }`}
+                  >
+                    <ProductImage
+                      src={url}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="h-full w-full object-cover"
+                      onLoadError={() => {
+                        setFailedImages(prev => {
+                          const next = new Set(prev);
+                          next.add(index);
+                          return next;
+                        });
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Badges */}
+        <div className="flex flex-wrap gap-2">
+          {merged.category && (
+            <span className="rounded-full surface-muted px-3 py-1 text-xs font-medium text-secondary">{merged.category}</span>
+          )}
+          {merged.type && (
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${TYPE_COLORS[merged.type] || 'surface-muted text-secondary'}`}>
+              {merged.type}
+            </span>
+          )}
+          {merged.certification && merged.certification.split(', ').map((cert) => (
+            <span key={cert} className={`rounded-full px-3 py-1 text-xs font-medium ${CERT_COLORS[cert.trim()] || 'surface-muted text-secondary'}`}>
+              {cert.trim()}
+            </span>
+          ))}
+        </div>
+
+        {/* Description */}
+        {merged.description && (
+          <div className={`rounded-lg p-3 ${isChanged('description') ? 'ring-2 ring-green-400/60 bg-green-50 dark:bg-green-900/15' : 'surface-muted'}`}>
+            <p className="mb-1 text-xs font-medium text-faint">Description</p>
+            <p className="text-sm leading-relaxed text-secondary">{merged.description}</p>
+          </div>
+        )}
+
+        {/* Specifications grid */}
+        <div>
+          <h4 className="mb-2 border-l-2 border-brand-teal pl-2 text-xs font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Specifications</h4>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {merged.pricePerUnit != null && (
+              <Spec label="Price" value={`$${merged.pricePerUnit.toFixed(2)}/g`} highlighted={isChanged('pricePerUnit')} />
+            )}
+            <Spec label="THC" value={formatRange(merged.thcMin, merged.thcMax, '%')} highlighted={isChanged('thcMin') || isChanged('thcMax')} />
+            <Spec label="CBD" value={formatRange(merged.cbdMin, merged.cbdMax, '%')} highlighted={isChanged('cbdMin') || isChanged('cbdMax')} />
+            <Spec label="Available" value={merged.gramsAvailable != null ? `${merged.gramsAvailable.toLocaleString()}g` : '—'} highlighted={isChanged('gramsAvailable')} />
+            {(merged.upcomingQty != null && merged.upcomingQty > 0) && (
+              <Spec label="Upcoming" value={`${merged.upcomingQty.toLocaleString()}g`} highlighted={isChanged('upcomingQty')} />
+            )}
+            {merged.minQtyRequest != null && (
+              <Spec label="Min Order" value={`${merged.minQtyRequest.toLocaleString()}g`} highlighted={isChanged('minQtyRequest')} />
+            )}
+            {merged.growthMedium && <Spec label="Growth Medium" value={merged.growthMedium} highlighted={isChanged('growthMedium')} />}
+            {merged.lineage && <Spec label="Lineage" value={merged.lineage} highlighted={isChanged('lineage')} />}
+            {merged.harvestDate && (
+              <Spec label="Harvest Date" value={new Date(merged.harvestDate).toLocaleDateString()} highlighted={isChanged('harvestDate')} />
+            )}
+            {merged.licensedProducer && <Spec label="Licensed Producer" value={merged.licensedProducer} highlighted={isChanged('licensedProducer')} />}
+          </div>
+        </div>
+
+        {/* Terpene profile */}
+        {hasTerpeneSection && (
+          <div>
+            <h4 className="mb-2 border-l-2 border-brand-sage pl-2 text-xs font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Terpene Profile</h4>
+            {terpenes.length > 0 && (
+              <div className={`mb-2 rounded-lg p-2 ${isChanged('dominantTerpene') ? 'ring-2 ring-green-400/60 bg-green-50 dark:bg-green-900/15' : ''}`}>
+                <p className="mb-1 text-xs font-medium text-muted">Dominant Terpenes</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {terpenes.map((t) => (
+                    <span key={t} className="rounded-full bg-brand-sage/20 px-2.5 py-0.5 text-xs font-medium text-brand-teal dark:text-brand-sage">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {merged.totalTerpenePercent != null && (
+              <p className={`mb-1 text-xs text-secondary ${isChanged('totalTerpenePercent') ? 'font-semibold text-green-700 dark:text-green-400' : ''}`}>
+                Total Terpenes: {merged.totalTerpenePercent}%
+              </p>
+            )}
+            {merged.highestTerpenes && (
+              <div className={`mb-2 ${isChanged('highestTerpenes') ? 'rounded-lg ring-2 ring-green-400/60 bg-green-50 dark:bg-green-900/15 p-2' : ''}`}>
+                <p className="mb-0.5 text-xs font-medium text-muted">Breakdown</p>
+                <p className="whitespace-pre-line text-sm text-secondary">{merged.highestTerpenes}</p>
+              </div>
+            )}
+            {merged.aromas && (
+              <div className={isChanged('aromas') ? 'rounded-lg ring-2 ring-green-400/60 bg-green-50 dark:bg-green-900/15 p-2' : ''}>
+                <p className="mb-0.5 text-xs font-medium text-muted">Aromas</p>
+                <p className="whitespace-pre-line text-sm text-secondary">{merged.aromas}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bud size distribution */}
+        {budSizes.length > 0 && (
+          <div>
+            <h4 className="mb-2 border-l-2 border-brand-blue pl-2 text-xs font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Bud Size Distribution</h4>
+            <div className="space-y-1.5">
+              {budSizes.map((b) => (
+                <div key={b.label} className="flex items-center gap-2">
+                  <span className="w-28 shrink-0 text-xs text-secondary">{b.label}</span>
+                  <div className="h-3.5 flex-1 overflow-hidden rounded-full surface-muted">
+                    <div
+                      className="h-full rounded-full bg-brand-teal transition-all"
+                      style={{ width: `${b.value}%` }}
+                    />
+                  </div>
+                  <span className="w-10 text-right text-xs font-medium text-secondary">{b.value}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* CoA info (display only) */}
+        {(merged.labName || merged.testDate || merged.reportNumber) && (
+          <div>
+            <h4 className="mb-2 border-l-2 border-brand-teal pl-2 text-xs font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">CoA Info</h4>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {merged.labName && <Spec label="Lab" value={merged.labName} />}
+              {merged.testDate && <Spec label="Test Date" value={new Date(merged.testDate).toLocaleDateString()} />}
+              {merged.reportNumber && <Spec label="Report #" value={merged.reportNumber} />}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PendingProducts() {
   const [products, setProducts] = useState<PendingProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +286,7 @@ export default function PendingProducts() {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [rejectReasonFor, setRejectReasonFor] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +308,7 @@ export default function PendingProducts() {
     try {
       await approveProduct(id);
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      if (expandedId === id) setExpandedId(null);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to approve product');
     } finally {
@@ -73,6 +322,7 @@ export default function PendingProducts() {
     try {
       await rejectProduct(id);
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      if (expandedId === id) setExpandedId(null);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to reject product');
     } finally {
@@ -85,6 +335,7 @@ export default function PendingProducts() {
     try {
       await approveEdit(id);
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      if (expandedId === id) setExpandedId(null);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to approve edit');
     } finally {
@@ -99,11 +350,16 @@ export default function PendingProducts() {
       setProducts((prev) => prev.filter((p) => p.id !== id));
       setRejectReasonFor(null);
       setRejectReason('');
+      if (expandedId === id) setExpandedId(null);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to reject edit');
     } finally {
       setActionInProgress(null);
     }
+  }
+
+  function togglePreview(id: string) {
+    setExpandedId((prev) => (prev === id ? null : id));
   }
 
   return (
@@ -149,6 +405,7 @@ export default function PendingProducts() {
             const { newImageUrls, imageUrls: reorderedImageUrls, ...fieldChanges } = pending;
             const hasFieldChanges = Object.keys(fieldChanges).length > 0;
             const hasImageChanges = !!(newImageUrls?.length || reorderedImageUrls);
+            const isExpanded = expandedId === product.id;
 
             return (
               <div
@@ -176,10 +433,30 @@ export default function PendingProducts() {
                       }`}>
                         {isEditRequest ? 'Edit Request' : 'New Listing'}
                       </span>
+                      <button
+                        onClick={() => togglePreview(product.id)}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition ${
+                          isExpanded
+                            ? 'bg-brand-teal/10 text-brand-teal dark:text-brand-sage'
+                            : 'surface-muted text-secondary hover:bg-brand-teal/10 hover:text-brand-teal dark:hover:text-brand-sage'
+                        }`}
+                      >
+                        <svg className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          {isExpanded ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                          ) : (
+                            <>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.64 0 8.577 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.64 0-8.577-3.007-9.963-7.178Z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </>
+                          )}
+                        </svg>
+                        {isExpanded ? 'Hide' : 'Preview'}
+                      </button>
                     </div>
 
                     {/* Current stats for new listings */}
-                    {isNewListing && (
+                    {isNewListing && !isExpanded && (
                       <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
                         {product.pricePerUnit != null && (
                           <span><span className="font-medium text-faint">Price:</span> ${product.pricePerUnit.toFixed(2)}/g</span>
@@ -196,8 +473,8 @@ export default function PendingProducts() {
                       </div>
                     )}
 
-                    {/* Diff view for edit requests */}
-                    {isEditRequest && hasFieldChanges && (
+                    {/* Diff view for edit requests (compact, only when NOT expanded) */}
+                    {isEditRequest && hasFieldChanges && !isExpanded && (
                       <div className="mt-2 space-y-1">
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Proposed Changes</h4>
                         <div className="rounded-md border border-default surface p-3 text-sm">
@@ -215,8 +492,8 @@ export default function PendingProducts() {
                       </div>
                     )}
 
-                    {/* Image changes */}
-                    {isEditRequest && hasImageChanges && (
+                    {/* Image changes (compact, only when NOT expanded) */}
+                    {isEditRequest && hasImageChanges && !isExpanded && (
                       <div className="mt-2 space-y-1">
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Image Changes</h4>
                         <div className="rounded-md border border-default surface p-3">
@@ -323,6 +600,11 @@ export default function PendingProducts() {
                     )}
                   </div>
                 </div>
+
+                {/* Expandable Preview */}
+                {isExpanded && (
+                  <ProductPreview product={product} isEditRequest={!!isEditRequest} />
+                )}
               </div>
             );
           })}
