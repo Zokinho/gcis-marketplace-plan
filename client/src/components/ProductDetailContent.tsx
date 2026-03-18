@@ -4,6 +4,7 @@ import TestResultsDisplay from './TestResultsDisplay';
 import ShortlistButton from './ShortlistButton';
 import ShareButton from './ShareButton';
 import ProductImage from './ProductImage';
+import ProductPlaceholder from './ProductPlaceholder';
 import { fetchProductById, fetchZohoFileBlob, type ProductDetail as ProductDetailType } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
@@ -74,7 +75,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
       {/* Left: Product info (2 cols) */}
       <div className="lg:col-span-2 space-y-6">
         {/* Image Gallery */}
-        {product.imageUrls && product.imageUrls.length > 0 && (() => {
+        {product.imageUrls && product.imageUrls.length > 0 ? (() => {
           const validImages = product.imageUrls
             .map((url, i) => ({ url, index: i }))
             .filter(({ index }) => !failedImages.has(index));
@@ -129,7 +130,11 @@ export default function ProductDetailContent({ productId }: { productId: string 
               )}
             </div>
           ) : null;
-        })()}
+        })() : (
+          <div className="overflow-hidden rounded-lg border card-blue shadow-md">
+            <ProductPlaceholder productId={product.id} className="h-64" iconSize="h-16 w-16" />
+          </div>
+        )}
 
         {/* Header */}
         <div className="rounded-lg border card-blue border-l-4 border-l-brand-teal shadow-md p-6">

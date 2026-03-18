@@ -6,6 +6,7 @@ import SellerScoreCard from '../components/SellerScoreCard';
 import ShareModal from '../components/ShareModal';
 import ContactModal from '../components/ContactModal';
 import ProductImage from '../components/ProductImage';
+import ProductPlaceholder from '../components/ProductPlaceholder';
 import {
   fetchMyListings,
   updateMyListing,
@@ -436,15 +437,11 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         {/* Thumbnail */}
-        <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg surface-muted">
+        <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg">
           {listing.imageUrls?.[0] ? (
             <ProductImage src={listing.imageUrls[0]} alt={listing.name} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <svg className="h-8 w-8 text-faint dark:text-slate-500" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
-              </svg>
-            </div>
+            <ProductPlaceholder productId={listing.id} className="h-full w-full" iconSize="h-7 w-7" />
           )}
         </div>
 

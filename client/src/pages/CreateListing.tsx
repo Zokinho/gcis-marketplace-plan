@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
 import TerpenePercentageTable from '../components/TerpenePercentageTable';
 import { createListing, analyzeCoaPdf, type AnalyzedCoaFields, type RedactionRegion } from '../lib/api';
+import { getFieldConfig, type ConditionalField } from '../lib/categoryConfig';
 
 const FORM_CACHE_KEY = 'create-listing-draft';
 
@@ -38,13 +39,14 @@ const CATEGORIES = [
   'Milled Flower',
   'Cannabis trimmings',
   'Cannabis kief',
-  'Cannabis hash',
   'Cannabis cured rosins and cured resins',
   'Cannabis hashish',
   'Cannabis live rosin and live resin',
   'Cannabinoid isolates',
   'Cannabinoid distillates',
   "Cannabis crude oils ('resins')",
+  'THCa flowers',
+  'THCa diamonds',
   'Genetics',
   'Chocolates',
   'Gummies',
@@ -150,6 +152,15 @@ export default function CreateListing() {
     return 'text-red-600';
   }, [budSizeTotal]);
 
+  // Category-based field visibility
+  const fieldConfig = useMemo(() => getFieldConfig(category), [category]);
+  /** Field is visible (not hidden). If no category selected, show everything. */
+  const isVisible = (field: ConditionalField) => !fieldConfig || fieldConfig[field] !== 'hidden';
+  /** Field is required. If no category selected, default to required. */
+  const isRequired = (field: ConditionalField) => fieldConfig ? fieldConfig[field] === 'required' : true;
+  /** Returns "(Optional)" suffix when field is optional, empty string otherwise. */
+  const optionalSuffix = (field: ConditionalField) => fieldConfig && fieldConfig[field] === 'optional' ? ' (Optional)' : '';
+
   // Auto-save draft to sessionStorage
   useEffect(() => { saveDraft(); }, [saveDraft]);
 
@@ -226,25 +237,24 @@ export default function CreateListing() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // Required field validation
+    // Required field validation (category-aware)
     const missing: string[] = [];
     if (!name.trim()) missing.push('Product Name');
     if (!description.trim()) missing.push('Description');
     if (!category) missing.push('Category');
     if (!licensedProducer.trim()) missing.push('Licensed Producer');
-    if (!lineage.trim()) missing.push('Lineage');
-    if (!harvestDate) missing.push('Harvest Date');
-    if (certifications.length === 0) missing.push('Certification');
-    if (!thc) missing.push('THC %');
-    if (!cbd) missing.push('CBD %');
-    if (terpenes.length === 0) missing.push('Terpenes');
+    if (isRequired('lineage') && !lineage.trim()) missing.push('Lineage');
+    if (isRequired('harvestDate') && !harvestDate) missing.push('Harvest Date');
+    if (isRequired('certifications') && certifications.length === 0) missing.push('Certification');
+    if (isRequired('thc') && !thc) missing.push('THC %');
+    if (isRequired('terpenes') && terpenes.length === 0) missing.push('Terpenes');
     if (!gramsAvailable) missing.push('Grams Available');
-    if (!upcomingQty) missing.push('Upcoming Qty');
-    if (!minQtyRequest) missing.push('Min Order Quantity');
+    if (isRequired('upcomingQty') && !upcomingQty) missing.push('Upcoming Qty');
+    if (isRequired('minQtyRequest') && !minQtyRequest) missing.push('Min Order Quantity');
     if (!pricePerUnit) missing.push('Bid Minimum Per Gram');
-    if (!coverPhoto) missing.push('Cover Photo');
-    if (images.length === 0) missing.push('Product Images');
-    if (coaFiles.length === 0) missing.push('Certificate of Analysis');
+    if (isRequired('images') && !coverPhoto) missing.push('Cover Photo');
+    if (isRequired('images') && images.length === 0) missing.push('Product Images');
+    if (isRequired('coaFiles') && coaFiles.length === 0) missing.push('Certificate of Analysis');
 
     if (missing.length > 0) {
       setError(`Required fields missing: ${missing.join(', ')}`);
@@ -438,6 +448,26 @@ export default function CreateListing() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Category selector — prominently above all sections */}
+          <div className="rounded-lg border card-blue shadow-md p-5">
+            <div className={autoFilledFields.has('category') ? 'rounded-lg border-l-2 border-brand-teal dark:border-brand-sage pl-2' : ''}>
+              <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-primary">
+                Product Category
+                <span className="text-red-500">*</span>
+                {autoFilledFields.has('category') && (
+                  <span className="rounded bg-brand-teal/10 dark:bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand-teal dark:text-brand-sage">
+                    AI
+                  </span>
+                )}
+              </label>
+              <p className="mb-2 text-xs text-muted">This determines which fields are shown below.</p>
+              <select value={category} onChange={(e) => { setCategory(e.target.value); clearAutoFill('category'); }} className="input-field">
+                <option value="">Select a category...</option>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
           {/* Section 1: Basic Info */}
           <Section title="Basic Info">
             <Field label="Product Name" required autoFilled={autoFilledFields.has('product name')}>
@@ -458,20 +488,14 @@ export default function CreateListing() {
                 className="input-field"
               />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Category" required autoFilled={autoFilledFields.has('category')}>
-                <select value={category} onChange={(e) => { setCategory(e.target.value); clearAutoFill('category'); }} className="input-field">
-                  <option value="">Select...</option>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </Field>
-              <Field label="Type" autoFilled={autoFilledFields.has('type')}>
+            {isVisible('type') && (
+              <Field label={`Type (Sativa / Indica / Hybrid)${optionalSuffix('type')}`} required={isRequired('type')} autoFilled={autoFilledFields.has('type')}>
                 <select value={type} onChange={(e) => { setType(e.target.value); clearAutoFill('type'); }} className="input-field">
                   <option value="">Select...</option>
                   {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </Field>
-            </div>
+            )}
           </Section>
 
           {/* Section 2: Origin & Production */}
@@ -480,18 +504,24 @@ export default function CreateListing() {
               <Field label="Licensed Producer" required autoFilled={autoFilledFields.has('licensed producer')}>
                 <input type="text" value={licensedProducer} onChange={(e) => { setLicensedProducer(e.target.value); clearAutoFill('licensed producer'); }} className="input-field" />
               </Field>
-              <Field label="Lineage" required>
-                <input type="text" value={lineage} onChange={(e) => setLineage(e.target.value)} className="input-field" />
-              </Field>
+              {isVisible('lineage') && (
+                <Field label={`Lineage${optionalSuffix('lineage')}`} required={isRequired('lineage')}>
+                  <input type="text" value={lineage} onChange={(e) => setLineage(e.target.value)} className="input-field" />
+                </Field>
+              )}
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <Field label="Growth Medium">
-                <input type="text" value={growthMedium} onChange={(e) => setGrowthMedium(e.target.value)} className="input-field" />
-              </Field>
-              <Field label="Harvest Date" required>
-                <input type="date" value={harvestDate} onChange={(e) => setHarvestDate(e.target.value)} className="input-field" />
-              </Field>
-              <Field label="Certification" required>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {isVisible('growthMedium') && (
+                <Field label={`Growth Medium${optionalSuffix('growthMedium')}`}>
+                  <input type="text" value={growthMedium} onChange={(e) => setGrowthMedium(e.target.value)} className="input-field" />
+                </Field>
+              )}
+              {isVisible('harvestDate') && (
+                <Field label={`Harvest Date${optionalSuffix('harvestDate')}`} required={isRequired('harvestDate')}>
+                  <input type="date" value={harvestDate} onChange={(e) => setHarvestDate(e.target.value)} className="input-field" />
+                </Field>
+              )}
+              <Field label={`Certification${optionalSuffix('certifications')}`} required={isRequired('certifications')}>
                 <div className="flex flex-wrap gap-1.5">
                   {CERTIFICATIONS.map((c) => (
                     <button
@@ -513,24 +543,32 @@ export default function CreateListing() {
           </Section>
 
           {/* Section 3: Potency & Terpenes */}
-          <Section title="Potency & Terpenes">
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="THC %" required autoFilled={autoFilledFields.has('thc %')}>
-                <input type="number" step="0.01" min="0" max="100" value={thc} onChange={(e) => { const v = e.target.value; const dot = v.indexOf('.'); setThc(dot >= 0 && v.length - dot > 3 ? v.slice(0, dot + 3) : v); clearAutoFill('thc %'); }} placeholder="e.g. 24.5" className="input-field" />
-              </Field>
-              <Field label="CBD %" required autoFilled={autoFilledFields.has('cbd %')}>
-                <input type="number" step="0.01" min="0" max="100" value={cbd} onChange={(e) => { const v = e.target.value; const dot = v.indexOf('.'); setCbd(dot >= 0 && v.length - dot > 3 ? v.slice(0, dot + 3) : v); clearAutoFill('cbd %'); }} placeholder="e.g. 0.5" className="input-field" />
-              </Field>
-            </div>
-            <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} required />
-            <TerpenePercentageTable
-              terpenes={terpenes}
-              percentages={terpenePercentages}
-              onChange={setTerpenePercentages}
-              totalPercent={totalTerpenePercent}
-              onTotalChange={setTotalTerpenePercent}
-            />
-          </Section>
+          {(isVisible('thc') || isVisible('terpenes')) && (
+            <Section title={isVisible('terpenes') ? 'Potency & Terpenes' : 'Potency'}>
+              <div className="grid grid-cols-2 gap-4">
+                {isVisible('thc') && (
+                  <Field label={`THC %${optionalSuffix('thc')}`} required={isRequired('thc')} autoFilled={autoFilledFields.has('thc %')}>
+                    <input type="number" step="0.01" min="0" max="100" value={thc} onChange={(e) => { const v = e.target.value; const dot = v.indexOf('.'); setThc(dot >= 0 && v.length - dot > 3 ? v.slice(0, dot + 3) : v); clearAutoFill('thc %'); }} placeholder="e.g. 24.5" className="input-field" />
+                  </Field>
+                )}
+                <Field label={`CBD %${optionalSuffix('cbd')}`} required={isRequired('cbd')} autoFilled={autoFilledFields.has('cbd %')}>
+                  <input type="number" step="0.01" min="0" max="100" value={cbd} onChange={(e) => { const v = e.target.value; const dot = v.indexOf('.'); setCbd(dot >= 0 && v.length - dot > 3 ? v.slice(0, dot + 3) : v); clearAutoFill('cbd %'); }} placeholder="e.g. 0.5" className="input-field" />
+                </Field>
+              </div>
+              {isVisible('terpenes') && (
+                <>
+                  <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} required={isRequired('terpenes')} />
+                  <TerpenePercentageTable
+                    terpenes={terpenes}
+                    percentages={terpenePercentages}
+                    onChange={setTerpenePercentages}
+                    totalPercent={totalTerpenePercent}
+                    onTotalChange={setTotalTerpenePercent}
+                  />
+                </>
+              )}
+            </Section>
+          )}
 
           {/* Section 4: Inventory & Pricing */}
           <Section title="Inventory & Pricing">
@@ -538,12 +576,12 @@ export default function CreateListing() {
               <Field label="Grams Available" required>
                 <input type="number" step="1" min="0" value={gramsAvailable} onChange={(e) => setGramsAvailable(e.target.value)} className="input-field" />
               </Field>
-              <Field label="Upcoming Qty (3 months)" required>
+              <Field label={`Upcoming Qty (3 months)${optionalSuffix('upcomingQty')}`} required={isRequired('upcomingQty')}>
                 <input type="number" step="1" min="0" value={upcomingQty} onChange={(e) => setUpcomingQty(e.target.value)} className="input-field" />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Min Order Quantity (g)" required>
+              <Field label={`Min Order Quantity (g)${optionalSuffix('minQtyRequest')}`} required={isRequired('minQtyRequest')}>
                 <input type="number" step="1" min="0" value={minQtyRequest} onChange={(e) => setMinQtyRequest(e.target.value)} className="input-field" />
               </Field>
               <Field label="Bid Minimum Per Gram (CAD)" required>
@@ -553,34 +591,36 @@ export default function CreateListing() {
           </Section>
 
           {/* Section 5: Bud Size Distribution */}
-          <Section title="Bud Size Distribution (Optional)">
-            <div className="grid grid-cols-5 gap-3">
-              <Field label="Popcorn 0-1cm">
-                <input type="number" step="0.1" min="0" max="100" value={budPopcorn} onChange={(e) => setBudPopcorn(e.target.value)} placeholder="%" className="input-field" />
-              </Field>
-              <Field label="Small 1-2cm">
-                <input type="number" step="0.1" min="0" max="100" value={budSmall} onChange={(e) => setBudSmall(e.target.value)} placeholder="%" className="input-field" />
-              </Field>
-              <Field label="Medium 2-3cm">
-                <input type="number" step="0.1" min="0" max="100" value={budMedium} onChange={(e) => setBudMedium(e.target.value)} placeholder="%" className="input-field" />
-              </Field>
-              <Field label="Large 3-5cm">
-                <input type="number" step="0.1" min="0" max="100" value={budLarge} onChange={(e) => setBudLarge(e.target.value)} placeholder="%" className="input-field" />
-              </Field>
-              <Field label="X-Large 5cm+">
-                <input type="number" step="0.1" min="0" max="100" value={budXLarge} onChange={(e) => setBudXLarge(e.target.value)} placeholder="%" className="input-field" />
-              </Field>
-            </div>
-            <p className={`mt-1 text-sm font-semibold ${budSizeColor}`}>
-              Total: {budSizeTotal.toFixed(1)}%
-              {budSizeTotal > 0 && budSizeTotal >= 99 && budSizeTotal <= 101 && ' — Good'}
-              {budSizeTotal > 0 && (budSizeTotal < 99 || budSizeTotal > 101) && ' — Should be ~100%'}
-            </p>
-          </Section>
+          {isVisible('budSizes') && (
+            <Section title="Bud Size Distribution (Optional)">
+              <div className="grid grid-cols-5 gap-3">
+                <Field label="Popcorn 0-1cm">
+                  <input type="number" step="0.1" min="0" max="100" value={budPopcorn} onChange={(e) => setBudPopcorn(e.target.value)} placeholder="%" className="input-field" />
+                </Field>
+                <Field label="Small 1-2cm">
+                  <input type="number" step="0.1" min="0" max="100" value={budSmall} onChange={(e) => setBudSmall(e.target.value)} placeholder="%" className="input-field" />
+                </Field>
+                <Field label="Medium 2-3cm">
+                  <input type="number" step="0.1" min="0" max="100" value={budMedium} onChange={(e) => setBudMedium(e.target.value)} placeholder="%" className="input-field" />
+                </Field>
+                <Field label="Large 3-5cm">
+                  <input type="number" step="0.1" min="0" max="100" value={budLarge} onChange={(e) => setBudLarge(e.target.value)} placeholder="%" className="input-field" />
+                </Field>
+                <Field label="X-Large 5cm+">
+                  <input type="number" step="0.1" min="0" max="100" value={budXLarge} onChange={(e) => setBudXLarge(e.target.value)} placeholder="%" className="input-field" />
+                </Field>
+              </div>
+              <p className={`mt-1 text-sm font-semibold ${budSizeColor}`}>
+                Total: {budSizeTotal.toFixed(1)}%
+                {budSizeTotal > 0 && budSizeTotal >= 99 && budSizeTotal <= 101 && ' — Good'}
+                {budSizeTotal > 0 && (budSizeTotal < 99 || budSizeTotal > 101) && ' — Should be ~100%'}
+              </p>
+            </Section>
+          )}
 
           {/* Section 6: Media */}
           <Section title="Media">
-            <Field label="Cover Photo" required>
+            <Field label={`Cover Photo${optionalSuffix('images')}`} required={isRequired('images')}>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -595,7 +635,7 @@ export default function CreateListing() {
                 />
               )}
             </Field>
-            <Field label="Product Images (up to 10)" required>
+            <Field label={`Product Images (up to 10)${optionalSuffix('images')}`} required={isRequired('images')}>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -619,7 +659,7 @@ export default function CreateListing() {
                 </div>
               )}
             </Field>
-            <Field label="Certificates of Analysis (up to 10 PDFs)" required>
+            <Field label={`Certificates of Analysis (up to 10 PDFs)${optionalSuffix('coaFiles')}`} required={isRequired('coaFiles')}>
               <input
                 type="file"
                 accept="application/pdf"

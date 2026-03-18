@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import TestResultsDisplay from '../components/TestResultsDisplay';
 import HarvexLogo from '../components/HarvexLogo';
 import ProductImage from '../components/ProductImage';
+import ProductPlaceholder from '../components/ProductPlaceholder';
 import { fetchSharedProducts, getSharedProductPdfUrl, type SharedProduct } from '../lib/api';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -80,7 +81,7 @@ export default function SharedProductDetail() {
           {/* Left: Product info */}
           <div className="space-y-6 lg:col-span-2">
             {/* Image Gallery */}
-            {product.imageUrls && product.imageUrls.length > 0 && (() => {
+            {product.imageUrls && product.imageUrls.length > 0 ? (() => {
               const validImages = product.imageUrls
                 .map((url, i) => ({ url, index: i }))
                 .filter(({ index }) => !failedImages.has(index));
@@ -134,7 +135,11 @@ export default function SharedProductDetail() {
                   )}
                 </div>
               ) : null;
-            })()}
+            })() : (
+              <div className="overflow-hidden rounded-lg border border-subtle surface">
+                <ProductPlaceholder productId={product.id} className="h-64" iconSize="h-16 w-16" />
+              </div>
+            )}
 
             {/* Header card */}
             <div className="rounded-lg border border-subtle surface p-6">
