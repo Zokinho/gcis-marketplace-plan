@@ -225,6 +225,9 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     }
     return map;
   });
+  const [totalTerpenePercent, setTotalTerpenePercent] = useState(
+    listing.totalTerpenePercent != null ? String(listing.totalTerpenePercent) : '',
+  );
 
   // Track whether images were reordered/removed
   const imagesChanged = JSON.stringify(existingImages) !== JSON.stringify(listing.imageUrls || []);
@@ -261,6 +264,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       }
     }
     setTerpenePercentages(map);
+    setTotalTerpenePercent(listing.totalTerpenePercent != null ? String(listing.totalTerpenePercent) : '');
     setEditError(null);
     setEditSuccess(null);
   }
@@ -325,6 +329,10 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       const newHighestTerpenes = terpeneLines.length > 0 ? terpeneLines.join('\n') : null;
       if (newHighestTerpenes !== (listing.highestTerpenes ?? null)) {
         updates.highestTerpenes = newHighestTerpenes;
+      }
+      const newTotalTerpene = totalTerpenePercent ? parseFloat(totalTerpenePercent) : null;
+      if (newTotalTerpene !== (listing.totalTerpenePercent ?? null)) {
+        updates.totalTerpenePercent = newTotalTerpene as any;
       }
 
       let anyChanges = false;
@@ -554,6 +562,8 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 terpenes={terpenes}
                 percentages={terpenePercentages}
                 onChange={setTerpenePercentages}
+                totalPercent={totalTerpenePercent}
+                onTotalChange={setTotalTerpenePercent}
               />
               {/* Image manager */}
               <div>
