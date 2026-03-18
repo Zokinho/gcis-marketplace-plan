@@ -389,6 +389,12 @@ export default function CreateListing() {
                 )}
                 {!scanning && <span className="text-xs text-muted">or fill in the form manually below</span>}
               </div>
+              <p className="mt-2.5 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-md px-2.5 py-2">
+                <svg className="h-4 w-4 flex-shrink-0 mt-px" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                </svg>
+                <span><span className="font-semibold">Please only upload one CoA here</span> — this scanner reads a single document. If you have additional CoA files, attach them in the <span className="font-semibold">Media</span> section at the bottom of the form.</span>
+              </p>
               {scanError && (
                 <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
                   {scanFileName && <span className="font-medium">{scanFileName}:</span>} {scanError}
