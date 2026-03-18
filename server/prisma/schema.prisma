@@ -135,6 +135,11 @@ model Product {
   testResults    Json?
   source         String   @default("zoho") // "zoho" | "coa_upload" | "coa_email"
 
+  // CoA redaction fields
+  coaOriginalKey  String?   // S3 key for original (admin-only)
+  coaRedactedKey  String?   // S3 key for redacted (marketplace-visible)
+  coaPageCount    Int?      // Number of pages in CoA PDF
+
   // Intelligence fields
   matchCount     Int      @default(0)
 
@@ -151,6 +156,7 @@ model Product {
   spotSales      SpotSale[]
   isoMatches     IsoRequest[]    @relation("IsoMatchedProduct")
   isoResponses   IsoResponse[]   @relation("IsoResponseProduct")
+  redactionRegions RedactionRegion[]
 
   @@index([sellerId])
   @@index([category])
@@ -578,6 +584,43 @@ model IsoResponse {
   @@unique([isoRequestId, sellerId])
   @@index([sellerId])
   @@index([isoRequestId])
+}
+
+// ─── CoA Redaction Regions ───
+
+model RedactionRegion {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  page       Int      // 0-indexed page number
+  xPct       Float    // Left edge as % of page width (0-100)
+  yPct       Float    // Top edge as % of page height (0-100)
+  wPct       Float    // Width as % of page width
+  hPct       Float    // Height as % of page height
+  reason     String   // e.g. "Client company name", "QR code"
+  confidence String   @default("high")  // high | medium | low
+  approved   Boolean  @default(true)
+  source     String   @default("ai")    // ai | manual
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([productId])
+  @@index([productId, page])
+}
+
+// ─── Redaction Templates (auto-learned from admin corrections) ───
+
+model RedactionTemplate {
+  id         String   @id @default(cuid())
+  labName    String   @unique  // Normalized lab name (lowercase, trimmed)
+  pageCount  Int               // Expected page count for validation
+  regions    Json               // Array of { page, xPct, yPct, wPct, hPct, reason }
+  createdBy  String?            // Admin who applied the first correction
+  useCount   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([labName])
 }
 
 // ─── Spot Sales (admin-curated limited-time deals) ───

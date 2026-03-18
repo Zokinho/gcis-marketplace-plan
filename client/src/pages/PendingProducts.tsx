@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import ProductImage from '../components/ProductImage';
+import RedactionEditor from '../components/RedactionEditor';
 import {
   fetchPendingProducts,
   approveProduct,
   rejectProduct,
   approveEdit,
   rejectEdit,
+  getRedactionPageUrl,
+  initializeRedaction,
   type PendingProduct,
 } from '../lib/api';
 
@@ -65,7 +68,7 @@ function Spec({ label, value, highlighted }: { label: string; value: string; hig
   );
 }
 
-function ProductPreview({ product, isEditRequest }: { product: PendingProduct; isEditRequest: boolean }) {
+function ProductPreview({ product, isEditRequest, onReload }: { product: PendingProduct; isEditRequest: boolean; onReload: () => void }) {
   const [selectedImage, setSelectedImage] = useState(0);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
 
@@ -274,6 +277,155 @@ function ProductPreview({ product, isEditRequest }: { product: PendingProduct; i
             </div>
           </div>
         )}
+
+        {/* CoA PDF preview */}
+        {merged.coaOriginalKey && (merged.coaPageCount ?? 0) > 0 ? (
+          <CoaPagePreview productId={merged.id} pageCount={merged.coaPageCount!} />
+        ) : merged.coaUrls && merged.coaUrls.length > 0 ? (
+          <CoaPdfEmbed urls={merged.coaUrls} productId={merged.id} onInitialized={onReload} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CoaPagePreview({ productId, pageCount }: { productId: string; pageCount: number }) {
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageUrl, setPageUrl] = useState<string | null>(null);
+  const [loadingPage, setLoadingPage] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingPage(true);
+    getRedactionPageUrl(productId, currentPage)
+      .then((data) => { if (!cancelled) setPageUrl(data.url); })
+      .catch(() => { if (!cancelled) setPageUrl(null); })
+      .finally(() => { if (!cancelled) setLoadingPage(false); });
+    return () => { cancelled = true; };
+  }, [productId, currentPage]);
+
+  return (
+    <div>
+      <h4 className="mb-2 border-l-2 border-brand-coral pl-2 text-xs font-bold uppercase tracking-wide text-brand-coral">
+        CoA Document ({pageCount} page{pageCount !== 1 ? 's' : ''})
+      </h4>
+      {pageCount > 1 && (
+        <div className="mb-2 flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+            disabled={currentPage === 0}
+            className="rounded border border-default px-2 py-0.5 text-xs disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-secondary">
+            Page {currentPage + 1} of {pageCount}
+          </span>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={currentPage >= pageCount - 1}
+            className="rounded border border-default px-2 py-0.5 text-xs disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      )}
+      <div className="overflow-hidden rounded-lg border border-default">
+        {loadingPage ? (
+          <div className="flex h-[400px] items-center justify-center surface-muted">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-teal border-t-transparent" />
+          </div>
+        ) : pageUrl ? (
+          <img src={pageUrl} alt={`CoA page ${currentPage + 1}`} className="w-full h-auto" />
+        ) : (
+          <div className="flex h-[200px] items-center justify-center surface-muted text-sm text-muted">
+            Page image not available
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CoaPdfEmbed({ urls, productId, onInitialized }: { urls: string[]; productId: string; onInitialized: () => void }) {
+  const [initializing, setInitializing] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+
+  async function handleInitialize() {
+    setInitializing(true);
+    setInitError(null);
+    try {
+      await initializeRedaction(productId);
+      onInitialized();
+    } catch (err: any) {
+      setInitError(err?.response?.data?.error || 'Failed to initialize redaction');
+    } finally {
+      setInitializing(false);
+    }
+  }
+
+  return (
+    <div>
+      <h4 className="mb-2 border-l-2 border-brand-coral pl-2 text-xs font-bold uppercase tracking-wide text-brand-coral">
+        CoA Document{urls.length > 1 ? 's' : ''}
+      </h4>
+      <div className="rounded-lg border border-default surface-muted p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-coral/10">
+            <svg className="h-5 w-5 text-brand-coral" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-primary">
+              {urls.length} CoA PDF{urls.length > 1 ? 's' : ''} uploaded
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              This product was uploaded before the redaction system was active. Set up redaction to review and redact client info.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {urls.map((url, i) => {
+                const absoluteUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
+                return (
+                  <a
+                    key={i}
+                    href={absoluteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-default px-3 py-1.5 text-xs font-medium text-secondary transition hover:bg-brand-teal/10 hover:text-brand-teal"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                    {urls.length > 1 ? `View CoA ${i + 1}` : 'View CoA PDF'}
+                  </a>
+                );
+              })}
+              <button
+                onClick={handleInitialize}
+                disabled={initializing}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-coral px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-coral/90 disabled:opacity-50"
+              >
+                {initializing ? (
+                  <>
+                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                    </svg>
+                    Set Up Redaction
+                  </>
+                )}
+              </button>
+            </div>
+            {initError && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">{initError}</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -287,6 +439,7 @@ export default function PendingProducts() {
   const [rejectReasonFor, setRejectReasonFor] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [redactionEditorFor, setRedactionEditorFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -453,6 +606,23 @@ export default function PendingProducts() {
                         </svg>
                         {isExpanded ? 'Hide' : 'Preview'}
                       </button>
+                      {isNewListing && product.coaOriginalKey && (
+                        <button
+                          onClick={() => setRedactionEditorFor(redactionEditorFor === product.id ? null : product.id)}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition ${
+                            redactionEditorFor === product.id
+                              ? 'bg-brand-coral/15 text-brand-coral'
+                              : 'surface-muted text-secondary hover:bg-brand-coral/10 hover:text-brand-coral'
+                          }`}
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                          </svg>
+                          {(product.redactionRegionCount ?? 0) > 0
+                            ? `Edit Redactions (${product.redactionRegionCount})`
+                            : 'Review CoA'}
+                        </button>
+                      )}
                     </div>
 
                     {/* Current stats for new listings */}
@@ -603,7 +773,19 @@ export default function PendingProducts() {
 
                 {/* Expandable Preview */}
                 {isExpanded && (
-                  <ProductPreview product={product} isEditRequest={!!isEditRequest} />
+                  <ProductPreview product={product} isEditRequest={!!isEditRequest} onReload={load} />
+                )}
+
+                {/* Redaction Editor */}
+                {redactionEditorFor === product.id && (
+                  <div className="mt-4 border-t border-default pt-4">
+                    <RedactionEditor
+                      productId={product.id}
+                      onApplied={() => {
+                        setRedactionEditorFor(null);
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             );

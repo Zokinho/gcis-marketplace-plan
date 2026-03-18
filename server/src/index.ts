@@ -313,6 +313,10 @@ async function mountRoutes() {
   // Admin — requires JWT auth + marketplace auth + admin check
   app.use('/api/admin', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, adminRoutes);
 
+  // Redaction — admin-only CRUD + page preview + apply
+  const redactionRoutes = (await import('./routes/redaction')).default;
+  app.use('/api/redaction', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, redactionRoutes);
+
   // CoA upload — requires JWT auth + marketplace auth
   app.use('/api/coa', writeLimiter, requireAuth(), marketplaceAuth, coaRoutes);
 

@@ -385,6 +385,8 @@ export const createListingSchema = z.object({
   budSizeLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeLarge must be a number'),
   budSizeXLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeXLarge must be a number'),
   highestTerpenes: z.string().max(2000).optional(),
+  testResults: z.string().max(100000).optional(),
+  redactionRegions: z.string().max(500000).optional(), // JSON array of redaction regions from CoA scan
 }).passthrough(); // Allow extra form fields (multer adds _fieldname etc.)
 
 // ─── ISO schemas ───
@@ -433,4 +435,44 @@ export const rejectEditSchema = z.object({
 
 export const shareAnalyticsParamsSchema = z.object({
   id: z.string().min(1),
+});
+
+// ─── Redaction schemas ───
+
+export const redactionRegionCreateSchema = z.object({
+  page: z.coerce.number().int().min(0),
+  xPct: z.coerce.number().min(0).max(100),
+  yPct: z.coerce.number().min(0).max(100),
+  wPct: z.coerce.number().min(0).max(100),
+  hPct: z.coerce.number().min(0).max(100),
+  reason: z.string().min(1).max(500),
+  confidence: z.enum(['high', 'medium', 'low']).default('medium'),
+});
+
+export const redactionRegionUpdateSchema = z.object({
+  xPct: z.coerce.number().min(0).max(100).optional(),
+  yPct: z.coerce.number().min(0).max(100).optional(),
+  wPct: z.coerce.number().min(0).max(100).optional(),
+  hPct: z.coerce.number().min(0).max(100).optional(),
+  reason: z.string().min(1).max(500).optional(),
+  confidence: z.enum(['high', 'medium', 'low']).optional(),
+  approved: z.boolean().optional(),
+}).superRefine((data, ctx) => {
+  if (Object.values(data).every((v) => v === undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'At least one field must be provided' });
+  }
+});
+
+export const redactionProductParamsSchema = z.object({
+  productId: z.string().min(1),
+});
+
+export const redactionRegionParamsSchema = z.object({
+  productId: z.string().min(1),
+  regionId: z.string().min(1),
+});
+
+export const redactionPageParamsSchema = z.object({
+  productId: z.string().min(1),
+  pageNum: z.coerce.number().int().min(0),
 });

@@ -22,6 +22,9 @@ RUN npm run build --workspace=server
 # Stage 2: Production
 FROM node:20-alpine
 
+# Install ghostscript and graphicsmagick (needed by pdf2pic for PDF page rendering)
+RUN apk add --no-cache ghostscript graphicsmagick
+
 WORKDIR /app
 
 # Copy node_modules (hoisted to root by npm workspaces, includes generated Prisma client)

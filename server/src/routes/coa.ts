@@ -1,14 +1,27 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { Prisma } from '@prisma/client';
 import logger from '../utils/logger';
 import { prisma } from '../index';
 import { getCoaClient } from '../services/coaClient';
 import { mapCoaToProductFields } from '../utils/coaMapper';
+import { extractCoaData } from '../services/coaExtractor';
+import { mapExtractedToFormFields } from '../utils/coaAnalyzeMapper';
 import { createNotification } from '../services/notificationService';
 import { validate, coaConfirmBodySchema } from '../utils/validation';
+import { normalizeLabName } from '../utils/labNormalize';
 
 const router = Router();
+
+// Dedicated rate limiter for CoA analysis (expensive API call)
+const analyzeLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many analysis requests, please wait a moment' },
+});
 
 // Multer: accept single PDF up to 50MB in memory
 const upload = multer({
@@ -21,6 +34,103 @@ const upload = multer({
     }
     cb(null, true);
   },
+});
+
+/**
+ * POST /api/coa/analyze
+ * Send a CoA PDF to Anthropic API for direct extraction.
+ * Returns structured form-compatible fields for the CreateListing page.
+ * Does NOT create any database records — purely a scan & auto-fill helper.
+ */
+router.post('/analyze', analyzeLimiter, upload.single('coaPdf'), async (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No PDF file provided' });
+  }
+
+  // Verify PDF magic bytes (%PDF-)
+  if (!req.file.buffer.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+    return res.status(400).json({ error: 'File is not a valid PDF' });
+  }
+
+  // Anthropic API limit: 32MB
+  if (req.file.buffer.length > 32 * 1024 * 1024) {
+    return res.status(400).json({ error: 'PDF exceeds 32MB limit' });
+  }
+
+  // Check if Anthropic API is configured
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: 'CoA analysis not configured' });
+  }
+
+  try {
+    const extracted = await extractCoaData(req.file.buffer);
+    const fields = mapExtractedToFormFields(extracted);
+
+    // Check for a saved redaction template for this lab
+    let redactionRegions: Array<{
+      page: number; xPct: number; yPct: number; wPct: number; hPct: number;
+      reason: string; confidence: string; source?: string;
+    }> = [];
+    let templateUsed = false;
+
+    if (extracted.lab) {
+      const normalizedLab = normalizeLabName(extracted.lab);
+      if (normalizedLab) {
+        const template = await prisma.redactionTemplate.findUnique({
+          where: { labName: normalizedLab },
+        });
+
+        // Count pages in the uploaded PDF (from redaction_regions max page, or 0-indexed)
+        const aiRegions = extracted.redaction_regions || [];
+        const maxAiPage = aiRegions.reduce((max, r) => Math.max(max, r.page), -1);
+        const estimatedPages = maxAiPage + 1;
+
+        if (
+          template &&
+          (template.pageCount === 0 || estimatedPages === 0 || template.pageCount === estimatedPages)
+        ) {
+          // Use template regions instead of AI regions
+          const savedRegions = template.regions as Array<{
+            page: number; xPct: number; yPct: number; wPct: number; hPct: number; reason: string;
+          }>;
+          redactionRegions = savedRegions.map((r) => ({
+            ...r,
+            confidence: 'high',
+            source: 'template',
+          }));
+          templateUsed = true;
+
+          // Increment use count (fire-and-forget)
+          prisma.redactionTemplate
+            .update({ where: { labName: normalizedLab }, data: { useCount: { increment: 1 } } })
+            .catch(() => {});
+
+          logger.info({ labName: normalizedLab, regionCount: redactionRegions.length }, '[COA] Using redaction template');
+        }
+      }
+    }
+
+    if (!templateUsed) {
+      redactionRegions = (extracted.redaction_regions || []).map((r) => ({
+        page: r.page,
+        xPct: r.x_pct,
+        yPct: r.y_pct,
+        wPct: r.w_pct,
+        hPct: r.h_pct,
+        reason: r.reason,
+        confidence: r.confidence || 'medium',
+        source: 'ai',
+      }));
+    }
+
+    res.json({ fields, redactionRegions, templateUsed });
+  } catch (err: any) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[COA] Analysis failed');
+    res.status(502).json({
+      error: 'CoA analysis failed',
+      details: err?.message,
+    });
+  }
 });
 
 /**

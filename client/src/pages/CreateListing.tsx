@@ -1,9 +1,33 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
 import TerpenePercentageTable from '../components/TerpenePercentageTable';
-import { createListing } from '../lib/api';
+import { createListing, analyzeCoaPdf, type AnalyzedCoaFields, type RedactionRegion } from '../lib/api';
+
+const FORM_CACHE_KEY = 'create-listing-draft';
+
+interface FormDraft {
+  name: string; description: string; category: string; type: string;
+  licensedProducer: string; lineage: string; growthMedium: string; harvestDate: string;
+  certifications: string[]; thc: string; cbd: string;
+  terpenes: string[]; terpenePercentages: Record<string, string>; totalTerpenePercent: string;
+  gramsAvailable: string; upcomingQty: string; minQtyRequest: string; pricePerUnit: string;
+  budPopcorn: string; budSmall: string; budMedium: string; budLarge: string; budXLarge: string;
+  scanResult: AnalyzedCoaFields | null; scanFileName: string | null;
+  autoFilledFields: string[];
+}
+
+function loadDraft(): Partial<FormDraft> | null {
+  try {
+    const raw = sessionStorage.getItem(FORM_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function clearDraft() {
+  sessionStorage.removeItem(FORM_CACHE_KEY);
+}
 
 const CATEGORIES = [
   'Cannabis flowers (mix sizes)',
@@ -31,27 +55,30 @@ const CERTIFICATIONS = ['GACP', 'GMP1', 'GMP2', 'GPP', 'IMC-GAP'];
 
 export default function CreateListing() {
   const navigate = useNavigate();
+  const draft = useMemo(() => loadDraft(), []);
+  const [hasDraft] = useState(() => draft !== null && Object.values(draft).some((v) => v !== '' && v !== null && !(Array.isArray(v) && v.length === 0)));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Basic info
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [type, setType] = useState('');
+  const [name, setName] = useState(draft?.name ?? '');
+  const [description, setDescription] = useState(draft?.description ?? '');
+  const [category, setCategory] = useState(draft?.category ?? '');
+  const [type, setType] = useState(draft?.type ?? '');
 
   // Origin & production
-  const [licensedProducer, setLicensedProducer] = useState('');
-  const [lineage, setLineage] = useState('');
-  const [growthMedium, setGrowthMedium] = useState('');
-  const [harvestDate, setHarvestDate] = useState('');
-  const [certifications, setCertifications] = useState<string[]>([]);
+  const [licensedProducer, setLicensedProducer] = useState(draft?.licensedProducer ?? '');
+  const [lineage, setLineage] = useState(draft?.lineage ?? '');
+  const [growthMedium, setGrowthMedium] = useState(draft?.growthMedium ?? '');
+  const [harvestDate, setHarvestDate] = useState(draft?.harvestDate ?? '');
+  const [certifications, setCertifications] = useState<string[]>(draft?.certifications ?? []);
 
   // Potency & terpenes
-  const [thc, setThc] = useState('');
-  const [cbd, setCbd] = useState('');
-  const [terpenes, setTerpenes] = useState<string[]>([]);
-  const [terpenePercentages, setTerpenePercentages] = useState<Record<string, string>>({});
+  const [thc, setThc] = useState(draft?.thc ?? '');
+  const [cbd, setCbd] = useState(draft?.cbd ?? '');
+  const [terpenes, setTerpenes] = useState<string[]>(draft?.terpenes ?? []);
+  const [terpenePercentages, setTerpenePercentages] = useState<Record<string, string>>(draft?.terpenePercentages ?? {});
+  const [totalTerpenePercent, setTotalTerpenePercent] = useState(draft?.totalTerpenePercent ?? '');
 
   function handleTerpenesChange(next: string[]) {
     setTerpenes(next);
@@ -65,22 +92,51 @@ export default function CreateListing() {
   }
 
   // Inventory & pricing
-  const [gramsAvailable, setGramsAvailable] = useState('');
-  const [upcomingQty, setUpcomingQty] = useState('');
-  const [minQtyRequest, setMinQtyRequest] = useState('');
-  const [pricePerUnit, setPricePerUnit] = useState('');
+  const [gramsAvailable, setGramsAvailable] = useState(draft?.gramsAvailable ?? '');
+  const [upcomingQty, setUpcomingQty] = useState(draft?.upcomingQty ?? '');
+  const [minQtyRequest, setMinQtyRequest] = useState(draft?.minQtyRequest ?? '');
+  const [pricePerUnit, setPricePerUnit] = useState(draft?.pricePerUnit ?? '');
 
   // Bud size
-  const [budPopcorn, setBudPopcorn] = useState('');
-  const [budSmall, setBudSmall] = useState('');
-  const [budMedium, setBudMedium] = useState('');
-  const [budLarge, setBudLarge] = useState('');
-  const [budXLarge, setBudXLarge] = useState('');
+  const [budPopcorn, setBudPopcorn] = useState(draft?.budPopcorn ?? '');
+  const [budSmall, setBudSmall] = useState(draft?.budSmall ?? '');
+  const [budMedium, setBudMedium] = useState(draft?.budMedium ?? '');
+  const [budLarge, setBudLarge] = useState(draft?.budLarge ?? '');
+  const [budXLarge, setBudXLarge] = useState(draft?.budXLarge ?? '');
 
-  // Media
+  // Media (files can't be cached — user must re-select)
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
   const [images, setImages] = useState<File[]>([]);
   const [coaFiles, setCoaFiles] = useState<File[]>([]);
+
+  // CoA Scan state
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<AnalyzedCoaFields | null>(draft?.scanResult ?? null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set(draft?.autoFilledFields ?? []));
+  const [scanFileName, setScanFileName] = useState<string | null>(draft?.scanFileName ?? null);
+  const [redactionRegions, setRedactionRegions] = useState<RedactionRegion[]>([]);
+  const [redactionTemplateUsed, setRedactionTemplateUsed] = useState(false);
+  const formTopRef = useRef<HTMLDivElement>(null);
+
+  // Persist form state to sessionStorage on changes
+  const saveDraft = useCallback(() => {
+    const data: FormDraft = {
+      name, description, category, type, licensedProducer, lineage, growthMedium, harvestDate,
+      certifications, thc, cbd, terpenes, terpenePercentages, totalTerpenePercent,
+      gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
+      budPopcorn, budSmall, budMedium, budLarge, budXLarge,
+      scanResult, scanFileName,
+      autoFilledFields: Array.from(autoFilledFields),
+    };
+    try { sessionStorage.setItem(FORM_CACHE_KEY, JSON.stringify(data)); } catch { /* quota */ }
+  }, [
+    name, description, category, type, licensedProducer, lineage, growthMedium, harvestDate,
+    certifications, thc, cbd, terpenes, terpenePercentages, totalTerpenePercent,
+    gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
+    budPopcorn, budSmall, budMedium, budLarge, budXLarge,
+    scanResult, scanFileName, autoFilledFields,
+  ]);
 
   const budSizeTotal = useMemo(() => {
     const vals = [budPopcorn, budSmall, budMedium, budLarge, budXLarge];
@@ -94,6 +150,79 @@ export default function CreateListing() {
     return 'text-red-600';
   }, [budSizeTotal]);
 
+  // Auto-save draft to sessionStorage
+  useEffect(() => { saveDraft(); }, [saveDraft]);
+
+  // Ref for the dedicated CoA scan file input at the top
+  const scanFileRef = useRef<HTMLInputElement>(null);
+
+  async function handleScanCoA(file?: File) {
+    const pdfFile = file || coaFiles[0];
+    if (!pdfFile) return;
+    setScanFileName(pdfFile.name);
+    setScanning(true);
+    setScanError(null);
+    setScanResult(null);
+
+    try {
+      const { fields, redactionRegions: regions, templateUsed } = await analyzeCoaPdf(pdfFile);
+      setScanResult(fields);
+      setRedactionRegions(regions || []);
+      setRedactionTemplateUsed(templateUsed ?? false);
+
+      // Also add the file to coaFiles if not already there
+      if (file && !coaFiles.some((f) => f.name === file.name && f.size === file.size)) {
+        setCoaFiles((prev) => [file, ...prev]);
+      }
+
+      if (fields.fieldsExtracted < 2) {
+        setScanError('This doesn\'t appear to be a Certificate of Analysis. You can still fill in the form manually.');
+        setScanning(false);
+        return;
+      }
+
+      // Auto-fill empty fields only
+      const filled: string[] = [];
+      if (fields.name && !name.trim()) { setName(fields.name); filled.push('Product Name'); }
+      if (fields.category && !category) { setCategory(fields.category); filled.push('Category'); }
+      if (fields.type && !type) { setType(fields.type); filled.push('Type'); }
+      if (fields.licensedProducer && !licensedProducer.trim()) { setLicensedProducer(fields.licensedProducer); filled.push('Licensed Producer'); }
+      if (fields.thc && !thc) { setThc(fields.thc); filled.push('THC %'); }
+      if (fields.cbd && !cbd) { setCbd(fields.cbd); filled.push('CBD %'); }
+      if (fields.terpenes.length > 0 && terpenes.length === 0) {
+        setTerpenes(fields.terpenes);
+        setTerpenePercentages(fields.terpenePercentages);
+        if (fields.totalTerpenePercent) setTotalTerpenePercent(fields.totalTerpenePercent);
+        filled.push('Terpenes');
+      }
+
+      setAutoFilledFields(new Set(filled.map((f) => f.toLowerCase())));
+
+      // Scroll to top so user can see the auto-filled fields
+      if (filled.length > 0) {
+        formTopRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    } catch (err: any) {
+      const apiError = err?.response?.data?.error;
+      const status = err?.response?.status;
+      let msg = 'CoA analysis failed. You can still fill in the form manually.';
+      if (status === 502) msg = 'CoA analysis service temporarily unavailable — please try again in a moment.';
+      else if (apiError) msg = apiError;
+      setScanError(msg);
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  // Clear auto-fill indicator when a field is manually edited
+  function clearAutoFill(fieldLabel: string) {
+    setAutoFilledFields((prev) => {
+      const next = new Set(prev);
+      next.delete(fieldLabel.toLowerCase());
+      return next;
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -102,7 +231,6 @@ export default function CreateListing() {
     if (!name.trim()) missing.push('Product Name');
     if (!description.trim()) missing.push('Description');
     if (!category) missing.push('Category');
-    if (!type) missing.push('Type');
     if (!licensedProducer.trim()) missing.push('Licensed Producer');
     if (!lineage.trim()) missing.push('Lineage');
     if (!harvestDate) missing.push('Harvest Date');
@@ -146,6 +274,7 @@ export default function CreateListing() {
       .filter((t) => terpenePercentages[t] && terpenePercentages[t].trim() !== '')
       .map((t) => `${t}: ${terpenePercentages[t]}%`);
     if (terpeneLines.length > 0) formData.append('highestTerpenes', terpeneLines.join('\n'));
+    if (totalTerpenePercent) formData.append('totalTerpenePercent', totalTerpenePercent);
     if (gramsAvailable) formData.append('gramsAvailable', gramsAvailable);
     if (upcomingQty) formData.append('upcomingQty', upcomingQty);
     if (minQtyRequest) formData.append('minQtyRequest', minQtyRequest);
@@ -156,12 +285,23 @@ export default function CreateListing() {
     if (budLarge) formData.append('budSizeLarge', budLarge);
     if (budXLarge) formData.append('budSizeXLarge', budXLarge);
 
+    // Include CoA test results if scan was performed
+    if (scanResult?.testResults) {
+      formData.append('testResults', JSON.stringify(scanResult.testResults));
+    }
+
+    // Include redaction regions from CoA scan
+    if (redactionRegions.length > 0) {
+      formData.append('redactionRegions', JSON.stringify(redactionRegions));
+    }
+
     if (coverPhoto) formData.append('coverPhoto', coverPhoto);
     for (const img of images) formData.append('images', img);
     for (const coa of coaFiles) formData.append('coaFiles', coa);
 
     try {
       await createListing(formData);
+      clearDraft();
       navigate('/my-listings', { state: { created: true, pending: true } });
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to create listing');
@@ -172,7 +312,7 @@ export default function CreateListing() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl" ref={formTopRef}>
         <div className="mb-6">
           <div>
             <h2 className="text-2xl font-semibold text-primary">Create Listing</h2>
@@ -181,14 +321,124 @@ export default function CreateListing() {
           </div>
         </div>
 
+        {/* Restored draft notice */}
+        {hasDraft && (
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-brand-blue/20 bg-brand-blue/5 dark:bg-brand-blue/10 px-4 py-2.5 text-sm text-brand-blue dark:text-blue-300">
+            <span>Your previous draft has been restored (including CoA scan data).</span>
+            <button
+              type="button"
+              onClick={() => { clearDraft(); window.location.reload(); }}
+              className="ml-3 text-xs font-medium underline hover:no-underline"
+            >
+              Start fresh
+            </button>
+          </div>
+        )}
+
+        {/* CoA Quick-Scan — top of page */}
+        <div className="mb-6 rounded-lg border border-brand-teal/20 dark:border-brand-sage/20 bg-gradient-to-br from-brand-teal/5 to-brand-blue/5 dark:from-brand-teal/10 dark:to-brand-blue/10 p-5">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-lg bg-brand-teal/10 dark:bg-brand-sage/15 p-2">
+              <svg className="h-5 w-5 text-brand-teal dark:text-brand-sage" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-primary">Have a CoA? Let AI fill the form for you</h3>
+              <p className="mt-0.5 text-xs text-muted">
+                Upload your Certificate of Analysis and we'll extract product name, potency, terpenes, and lab info automatically. <span className="font-semibold">This can take up to a minute depending on the size of the document.</span> You can review and edit everything before submitting.
+              </p>
+              <div className="mt-3 flex items-center gap-3">
+                <input
+                  ref={scanFileRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleScanCoA(file);
+                    // Reset so re-selecting the same file triggers onChange
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => scanFileRef.current?.click()}
+                  disabled={scanning}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-teal dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:opacity-50"
+                >
+                  {scanning ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Scanning CoA...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                      </svg>
+                      Upload CoA PDF
+                    </>
+                  )}
+                </button>
+                {scanning && scanFileName && (
+                  <span className="text-xs text-muted truncate max-w-[200px]">{scanFileName}</span>
+                )}
+                {!scanning && <span className="text-xs text-muted">or fill in the form manually below</span>}
+              </div>
+              {scanError && (
+                <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
+                  {scanFileName && <span className="font-medium">{scanFileName}:</span>} {scanError}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Auto-fill summary banner */}
+        {scanResult && scanResult.fieldsExtracted >= 2 && autoFilledFields.size > 0 && (
+          <div className="mb-4 rounded-lg border border-brand-sage/40 bg-brand-sage/10 dark:bg-brand-sage/5 p-3 text-sm text-brand-teal dark:text-brand-sage">
+            <span className="font-semibold">Auto-filled {autoFilledFields.size} field{autoFilledFields.size !== 1 ? 's' : ''}</span>
+            {scanFileName ? ` from ${scanFileName}` : ' from CoA'}
+            {': '}
+            {Array.from(autoFilledFields).map((f) => f.charAt(0).toUpperCase() + f.slice(1)).join(', ')}
+            <p className="mt-2 text-[0.925rem] font-semibold text-brand-coral">
+              Please double-check all auto-filled information before submitting — AI extraction may contain errors.
+            </p>
+          </div>
+        )}
+
+        {/* Redaction info banner */}
+        {redactionRegions.length > 0 && (
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-4 py-3 text-sm text-blue-800 dark:text-blue-200">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+              </svg>
+              <span className="font-semibold">
+                {redactionRegions.length} client info region{redactionRegions.length !== 1 ? 's' : ''}{' '}
+                {redactionTemplateUsed ? 'from template' : 'detected'}
+              </span>
+            </div>
+            <p>
+              {redactionTemplateUsed
+                ? 'Redaction regions were loaded from a saved template for this lab. An admin will review before your listing goes live.'
+                : 'Client/buyer information will be automatically redacted from the CoA before it appears on the marketplace. An admin will review the redactions before your listing goes live.'}
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Section 1: Basic Info */}
           <Section title="Basic Info">
-            <Field label="Product Name" required>
+            <Field label="Product Name" required autoFilled={autoFilledFields.has('product name')}>
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); clearAutoFill('product name'); }}
                 placeholder="e.g. Pink Kush"
                 className="input-field"
               />
@@ -203,14 +453,14 @@ export default function CreateListing() {
               />
             </Field>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Category" required>
-                <select value={category} onChange={(e) => setCategory(e.target.value)} className="input-field">
+              <Field label="Category" required autoFilled={autoFilledFields.has('category')}>
+                <select value={category} onChange={(e) => { setCategory(e.target.value); clearAutoFill('category'); }} className="input-field">
                   <option value="">Select...</option>
                   {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </Field>
-              <Field label="Type" required>
-                <select value={type} onChange={(e) => setType(e.target.value)} className="input-field">
+              <Field label="Type" autoFilled={autoFilledFields.has('type')}>
+                <select value={type} onChange={(e) => { setType(e.target.value); clearAutoFill('type'); }} className="input-field">
                   <option value="">Select...</option>
                   {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -221,8 +471,8 @@ export default function CreateListing() {
           {/* Section 2: Origin & Production */}
           <Section title="Origin & Production">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Licensed Producer" required>
-                <input type="text" value={licensedProducer} onChange={(e) => setLicensedProducer(e.target.value)} className="input-field" />
+              <Field label="Licensed Producer" required autoFilled={autoFilledFields.has('licensed producer')}>
+                <input type="text" value={licensedProducer} onChange={(e) => { setLicensedProducer(e.target.value); clearAutoFill('licensed producer'); }} className="input-field" />
               </Field>
               <Field label="Lineage" required>
                 <input type="text" value={lineage} onChange={(e) => setLineage(e.target.value)} className="input-field" />
@@ -259,11 +509,11 @@ export default function CreateListing() {
           {/* Section 3: Potency & Terpenes */}
           <Section title="Potency & Terpenes">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="THC %" required>
-                <input type="number" step="0.01" min="0" max="100" value={thc} onChange={(e) => setThc(e.target.value)} placeholder="e.g. 24.5" className="input-field" />
+              <Field label="THC %" required autoFilled={autoFilledFields.has('thc %')}>
+                <input type="number" step="0.01" min="0" max="100" value={thc} onChange={(e) => { const v = e.target.value; const dot = v.indexOf('.'); setThc(dot >= 0 && v.length - dot > 3 ? v.slice(0, dot + 3) : v); clearAutoFill('thc %'); }} placeholder="e.g. 24.5" className="input-field" />
               </Field>
-              <Field label="CBD %" required>
-                <input type="number" step="0.01" min="0" max="100" value={cbd} onChange={(e) => setCbd(e.target.value)} placeholder="e.g. 0.5" className="input-field" />
+              <Field label="CBD %" required autoFilled={autoFilledFields.has('cbd %')}>
+                <input type="number" step="0.01" min="0" max="100" value={cbd} onChange={(e) => { const v = e.target.value; const dot = v.indexOf('.'); setCbd(dot >= 0 && v.length - dot > 3 ? v.slice(0, dot + 3) : v); clearAutoFill('cbd %'); }} placeholder="e.g. 0.5" className="input-field" />
               </Field>
             </div>
             <TerpeneAutocomplete selected={terpenes} onChange={handleTerpenesChange} required />
@@ -271,6 +521,8 @@ export default function CreateListing() {
               terpenes={terpenes}
               percentages={terpenePercentages}
               onChange={setTerpenePercentages}
+              totalPercent={totalTerpenePercent}
+              onTotalChange={setTotalTerpenePercent}
             />
           </Section>
 
@@ -369,6 +621,10 @@ export default function CreateListing() {
                 onChange={(e) => {
                   const files = Array.from(e.target.files ?? []).slice(0, 10);
                   setCoaFiles(files);
+                  // Reset scan state when files change
+                  setScanResult(null);
+                  setScanError(null);
+                  setAutoFilledFields(new Set());
                 }}
                 className="input-field text-sm"
               />
@@ -424,12 +680,17 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, autoFilled, children }: { label: string; required?: boolean; autoFilled?: boolean; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="mb-1 block text-xs font-medium text-secondary">
+    <div className={autoFilled ? 'rounded-lg border-l-2 border-brand-teal dark:border-brand-sage pl-2' : ''}>
+      <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-secondary">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="text-red-500">*</span>}
+        {autoFilled && (
+          <span className="rounded bg-brand-teal/10 dark:bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand-teal dark:text-brand-sage">
+            AI
+          </span>
+        )}
       </label>
       {children}
     </div>

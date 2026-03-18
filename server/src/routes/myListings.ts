@@ -13,6 +13,7 @@ import { createNotificationBatch } from '../services/notificationService';
 import { writeLimiter } from '../utils/rateLimiters';
 import { isS3Configured, uploadFile as s3Upload } from '../utils/s3';
 import { isCoupledMode, marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
+import { generatePageImages } from '../services/coaRedactor';
 
 const router = Router();
 
@@ -65,8 +66,32 @@ router.post(
       thc, cbd, dominantTerpene, totalTerpenePercent,
       gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
       budSizePopcorn, budSizeSmall, budSizeMedium, budSizeLarge, budSizeXLarge,
-      highestTerpenes,
+      highestTerpenes, testResults: testResultsStr,
+      redactionRegions: redactionRegionsStr,
     } = parsed.data as Record<string, string>;
+
+    // Parse testResults JSON if provided (from CoA analysis)
+    let parsedTestResults: Record<string, any> | null = null;
+    if (testResultsStr) {
+      try {
+        parsedTestResults = JSON.parse(testResultsStr);
+      } catch {
+        // Silently ignore invalid JSON — testResults is optional
+      }
+    }
+
+    // Parse redaction regions JSON if provided (from CoA analysis)
+    let parsedRedactionRegions: Array<{
+      page: number; xPct: number; yPct: number; wPct: number; hPct: number;
+      reason: string; confidence: string;
+    }> | null = null;
+    if (redactionRegionsStr) {
+      try {
+        parsedRedactionRegions = JSON.parse(redactionRegionsStr);
+      } catch {
+        // Silently ignore invalid JSON
+      }
+    }
 
     // Collect all uploaded file buffers for processing after product creation
     const imageFiles: Express.Multer.File[] = [];
@@ -156,6 +181,8 @@ router.post(
           budSizeXLarge: parseFloat_(budSizeXLarge) ?? null,
           imageUrls,
           coaUrls,
+          testResults: parsedTestResults ?? Prisma.JsonNull,
+          ...(parsedTestResults ? { coaProcessedAt: new Date() } : {}),
           source: 'manual',
           imageSource: 'manual', // New listings always have marketplace-uploaded images
           isActive: false,
@@ -214,6 +241,63 @@ router.post(
           }
         } catch (err) {
           logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] File upload failed');
+        }
+      }
+
+      // CoA redaction: store original + generate page images + create regions
+      // Works with both S3 and local disk storage
+      if (coaFileList.length > 0) {
+        try {
+          const coaBuffer = coaFileList[0].buffer;
+          const originalKey = `products/${product.id}/coa/${crypto.randomUUID()}_original.pdf`;
+
+          if (isS3Configured) {
+            await s3Upload(originalKey, coaBuffer, 'application/pdf');
+          } else {
+            // Local fallback: store under uploads/ directory
+            const localDir = path.join(uploadsDir, `products/${product.id}/coa`);
+            fs.mkdirSync(localDir, { recursive: true });
+            fs.writeFileSync(path.join(uploadsDir, originalKey), coaBuffer);
+          }
+
+          // Generate page images for admin preview
+          const { images, pageCount } = await generatePageImages(coaBuffer);
+          for (let i = 0; i < images.length; i++) {
+            const pageKey = `products/${product.id}/coa/pages/page_${i}.png`;
+            if (isS3Configured) {
+              await s3Upload(pageKey, images[i], 'image/png');
+            } else {
+              const pagesDir = path.join(uploadsDir, `products/${product.id}/coa/pages`);
+              fs.mkdirSync(pagesDir, { recursive: true });
+              fs.writeFileSync(path.join(uploadsDir, pageKey), images[i]);
+            }
+          }
+
+          // Update product with original key and page count
+          await prisma.product.update({
+            where: { id: product.id },
+            data: { coaOriginalKey: originalKey, coaPageCount: pageCount },
+          });
+
+          // Create redaction regions from CoA scan
+          if (parsedRedactionRegions && parsedRedactionRegions.length > 0) {
+            await prisma.redactionRegion.createMany({
+              data: parsedRedactionRegions.map((r) => ({
+                productId: product.id,
+                page: r.page,
+                xPct: r.xPct,
+                yPct: r.yPct,
+                wPct: r.wPct,
+                hPct: r.hPct,
+                reason: r.reason,
+                confidence: r.confidence || 'medium',
+                source: 'ai',
+                approved: true,
+              })),
+            });
+          }
+        } catch (err) {
+          logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] CoA redaction setup failed (non-critical)');
         }
       }
 

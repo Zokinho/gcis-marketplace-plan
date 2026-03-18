@@ -426,6 +426,57 @@ export interface SellerOption {
   lastName: string | null;
 }
 
+// ─── CoA Analysis Types ───
+
+export interface AnalyzedCoaFields {
+  name: string | null;
+  category: string | null;
+  type: string | null;
+  licensedProducer: string | null;
+  thc: string | null;
+  cbd: string | null;
+  totalTerpenePercent: string | null;
+  terpenes: string[];
+  terpenePercentages: Record<string, string>;
+  labName: string | null;
+  testDate: string | null;
+  reportNumber: string | null;
+  lotNumber: string | null;
+  testResults: any | null;
+  fieldsExtracted: number;
+}
+
+// ─── Redaction types ───
+
+export interface RedactionRegion {
+  id?: string;
+  page: number;
+  xPct: number;
+  yPct: number;
+  wPct: number;
+  hPct: number;
+  reason: string;
+  confidence: 'high' | 'medium' | 'low';
+  approved?: boolean;
+  source?: 'ai' | 'manual' | 'template';
+}
+
+export interface AnalyzeCoaResponse {
+  fields: AnalyzedCoaFields;
+  redactionRegions: RedactionRegion[];
+  templateUsed?: boolean;
+}
+
+export async function analyzeCoaPdf(file: File): Promise<AnalyzeCoaResponse> {
+  const formData = new FormData();
+  formData.append('coaPdf', file);
+  const res = await api.post<AnalyzeCoaResponse>('/coa/analyze', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 95_000, // 95s client timeout (server allows 90s for Anthropic API)
+  });
+  return res.data;
+}
+
 // ─── CoA API ───
 
 export async function uploadCoaPdf(file: File): Promise<CoaUploadResponse> {
@@ -575,6 +626,9 @@ export interface PendingProduct {
   description: string | null;
   sellerId: string;
   seller: { id: string; email: string; companyName: string | null; firstName: string | null; lastName: string | null };
+  redactionRegionCount?: number;
+  coaPageCount?: number | null;
+  coaOriginalKey?: string | null;
 }
 
 export async function fetchPendingProducts(): Promise<PendingProduct[]> {
@@ -1327,6 +1381,42 @@ export async function respondToIso(id: string, data: {
   message?: string;
 }): Promise<{ response: IsoResponseRecord }> {
   const res = await api.post(`/iso/${id}/respond`, data);
+  return res.data;
+}
+
+// ─── Redaction API (admin) ───
+
+export async function fetchRedactionRegions(productId: string): Promise<{ regions: (RedactionRegion & { id: string })[]; coaPageCount: number | null }> {
+  const res = await api.get(`/redaction/${productId}/regions`);
+  return res.data;
+}
+
+export async function createRedactionRegion(productId: string, data: Omit<RedactionRegion, 'id' | 'approved' | 'source'>): Promise<{ region: RedactionRegion & { id: string } }> {
+  const res = await api.post(`/redaction/${productId}/regions`, data);
+  return res.data;
+}
+
+export async function updateRedactionRegion(productId: string, regionId: string, data: Partial<RedactionRegion>): Promise<{ region: RedactionRegion & { id: string } }> {
+  const res = await api.patch(`/redaction/${productId}/regions/${regionId}`, data);
+  return res.data;
+}
+
+export async function deleteRedactionRegion(productId: string, regionId: string): Promise<void> {
+  await api.delete(`/redaction/${productId}/regions/${regionId}`);
+}
+
+export async function getRedactionPageUrl(productId: string, pageNum: number): Promise<{ url: string; page: number }> {
+  const res = await api.get(`/redaction/${productId}/pages/${pageNum}`);
+  return res.data;
+}
+
+export async function applyRedactions(productId: string): Promise<{ message: string; coaRedactedKey: string; regionsApplied: number }> {
+  const res = await api.post(`/redaction/${productId}/apply`);
+  return res.data;
+}
+
+export async function initializeRedaction(productId: string): Promise<{ message: string; coaOriginalKey: string; coaPageCount: number }> {
+  const res = await api.post(`/redaction/${productId}/initialize`);
   return res.data;
 }
 

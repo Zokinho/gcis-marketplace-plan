@@ -15,7 +15,12 @@ import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 import { hashPassword } from '../utils/auth';
 import { pushProductUpdate } from '../services/zohoApi';
 import { createNotificationBatch } from '../services/notificationService';
-import { deleteFile as s3Delete } from '../utils/s3';
+import fs from 'fs';
+import path from 'path';
+import { deleteFile as s3Delete, uploadFile as s3Upload, getSignedFileUrl, isS3Configured } from '../utils/s3';
+import { applyRedactions } from '../services/coaRedactor';
+
+const uploadsDir = path.join(__dirname, '../../../uploads');
 
 const router = Router();
 
@@ -465,11 +470,18 @@ router.get('/pending-products', async (_req: Request, res: Response) => {
     where: { OR: [{ requestPending: true }, { editPending: true }] },
     include: {
       seller: { select: { id: true, email: true, companyName: true, firstName: true, lastName: true } },
+      _count: { select: { redactionRegions: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
 
-  res.json({ products });
+  const mapped = products.map((p) => ({
+    ...p,
+    redactionRegionCount: (p as any)._count?.redactionRegions ?? 0,
+    _count: undefined,
+  }));
+
+  res.json({ products: mapped });
 });
 
 /**
@@ -486,6 +498,60 @@ router.post('/products/:productId/approve', async (req: Request<{ productId: str
   }
   if (!product.requestPending) {
     return res.status(400).json({ error: 'Product is not pending approval' });
+  }
+
+  // Apply CoA redactions if original CoA exists
+  if (product.coaOriginalKey) {
+    try {
+      const regions = await prisma.redactionRegion.findMany({
+        where: { productId, approved: true },
+        select: { page: true, xPct: true, yPct: true, wPct: true, hPct: true, approved: true },
+      });
+
+      // Read original PDF from S3 or local disk
+      let pdfBuffer: Buffer;
+      if (isS3Configured) {
+        const { default: axios } = await import('axios');
+        const originalUrl = await getSignedFileUrl(product.coaOriginalKey!);
+        if (!originalUrl) throw new Error('Failed to generate presigned URL for original CoA');
+        const pdfResponse = await axios.get(originalUrl, { responseType: 'arraybuffer', timeout: 120_000 });
+        pdfBuffer = Buffer.from(pdfResponse.data);
+      } else {
+        const localPath = path.join(uploadsDir, product.coaOriginalKey!);
+        if (!fs.existsSync(localPath)) throw new Error(`Original CoA not found at ${localPath}`);
+        pdfBuffer = fs.readFileSync(localPath);
+      }
+
+      let redactedBuffer: Buffer;
+      if (regions.length === 0) {
+        redactedBuffer = pdfBuffer;
+      } else {
+        redactedBuffer = await applyRedactions(pdfBuffer, regions);
+      }
+
+      const redactedKey = product.coaOriginalKey!.replace('_original.pdf', '.pdf');
+      if (isS3Configured) {
+        await s3Upload(redactedKey, redactedBuffer, 'application/pdf');
+      } else {
+        const localDir = path.dirname(path.join(uploadsDir, redactedKey));
+        fs.mkdirSync(localDir, { recursive: true });
+        fs.writeFileSync(path.join(uploadsDir, redactedKey), redactedBuffer);
+      }
+
+      await prisma.product.update({
+        where: { id: productId },
+        data: { coaRedactedKey: redactedKey },
+      });
+
+      logAudit({
+        actorId: req.user?.id, actorEmail: req.user?.email,
+        action: 'redaction.apply', targetType: 'Product', targetId: productId,
+        metadata: { regionsApplied: regions.length }, ip: getRequestIp(req),
+      });
+    } catch (err) {
+      // Don't block approval if redaction fails — use original as fallback
+      logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId }, '[ADMIN] Redaction failed on approval — using original CoA');
+    }
   }
 
   const updated = await prisma.product.update({

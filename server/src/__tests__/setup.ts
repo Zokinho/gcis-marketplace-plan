@@ -106,6 +106,22 @@ vi.mock('../index', () => ({
       create: vi.fn(),
       groupBy: vi.fn(),
     },
+    redactionRegion: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      createMany: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    redactionTemplate: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      upsert: vi.fn(),
+    },
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
   },
@@ -131,6 +147,14 @@ vi.mock('../utils/metrics', () => ({
   registry: { metrics: vi.fn(), contentType: 'text/plain' },
   isMetricsEnabled: false,
 }));
+
+// Mock Anthropic SDK to avoid real API calls in tests
+vi.mock('@anthropic-ai/sdk', () => {
+  const MockAnthropic = vi.fn().mockImplementation(function(this: any) {
+    this.messages = { create: vi.fn() };
+  });
+  return { default: MockAnthropic };
+});
 
 // Mock Sentry to avoid SDK initialization in tests
 vi.mock('../utils/sentry', () => ({

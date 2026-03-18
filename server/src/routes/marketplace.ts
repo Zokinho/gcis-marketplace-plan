@@ -273,6 +273,8 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
       coaProcessedAt: true,
       testResults: true,
       source: true,
+      coaOriginalKey: true,
+      coaRedactedKey: true,
       matchCount: true,
       createdAt: true,
       updatedAt: true,
@@ -313,7 +315,7 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
   const isAdminEmail = req.user?.email ? adminEmails.includes(req.user.email.toLowerCase()) : false;
   const canViewCoa = isOwner || isSeller || isAdminEmail;
 
-  const productData = { ...product };
+  const productData = { ...product } as typeof product & { coaOriginalKey: string | null; coaRedactedKey: string | null };
 
   if (!canViewCoa) {
     productData.coaUrls = [];
@@ -324,6 +326,11 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
     productData.testResults = null;
     productData.coaJobId = null;
     productData.coaProcessedAt = null;
+    productData.coaOriginalKey = null;
+    productData.coaRedactedKey = null;
+  } else if (!isAdminEmail) {
+    // Non-admin CoA viewers (sellers): serve redacted version, hide original
+    productData.coaOriginalKey = null;
   }
 
   // Enrich with pricedToSell badge
