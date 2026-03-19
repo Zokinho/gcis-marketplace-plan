@@ -13,12 +13,12 @@ import { logAudit, getRequestIp } from '../services/auditService';
 import { createNotification } from '../services/notificationService';
 import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 import { hashPassword } from '../utils/auth';
-import { pushProductUpdate } from '../services/zohoApi';
+import { pushProductUpdate, downloadZohoFile } from '../services/zohoApi';
 import { createNotificationBatch } from '../services/notificationService';
 import fs from 'fs';
 import path from 'path';
 import { deleteFile as s3Delete, uploadFile as s3Upload, getSignedFileUrl, isS3Configured } from '../utils/s3';
-import { applyRedactions } from '../services/coaRedactor';
+import { applyRedactions, generatePageImages } from '../services/coaRedactor';
 
 const uploadsDir = path.join(__dirname, '../../../uploads');
 
@@ -855,6 +855,84 @@ router.get('/audit-log', validateQuery(auditLogQuerySchema), async (req: Request
   } catch (err) {
     logger.error({ err }, '[ADMIN] Audit log query failed');
     res.status(500).json({ error: 'Failed to fetch audit log' });
+  }
+});
+
+/**
+ * POST /api/admin/products/:productId/regenerate-coa-pages
+ * Re-fetches the CoA PDF from Zoho and regenerates page images into S3.
+ * Used to recover page images that were lost (e.g. stored on local disk pre-S3).
+ */
+router.post('/products/:productId/regenerate-coa-pages', async (req: Request<{ productId: string }>, res: Response) => {
+  const { productId } = req.params;
+
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, name: true, zohoProductId: true, coaUrls: true, coaOriginalKey: true, coaPageCount: true },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Find CoA URL from Zoho (stored as /api/zoho-files/{zohoProductId}/{fileId})
+    const coaUrls = (product.coaUrls as string[]) || [];
+    if (coaUrls.length === 0 || !product.zohoProductId) {
+      return res.status(400).json({ error: 'No CoA file found on Zoho for this product' });
+    }
+
+    // Parse the first CoA URL to get the Zoho file ID
+    const coaUrl = coaUrls[0];
+    const segments = coaUrl.replace('/api/zoho-files/', '').split('/');
+    if (segments.length < 2) {
+      return res.status(400).json({ error: 'Invalid CoA URL format' });
+    }
+    const [zohoProductId, fileId] = segments;
+
+    // Download PDF from Zoho
+    const { data: pdfBuffer } = await downloadZohoFile(zohoProductId, fileId);
+
+    // Upload original PDF to S3
+    const originalKey = `products/${productId}/coa/${crypto.randomUUID()}_original.pdf`;
+    if (isS3Configured) {
+      await s3Upload(originalKey, pdfBuffer, 'application/pdf');
+    } else {
+      const localDir = path.join(uploadsDir, `products/${productId}/coa`);
+      fs.mkdirSync(localDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadsDir, originalKey), pdfBuffer);
+    }
+
+    // Generate page images
+    const { images, pageCount } = await generatePageImages(pdfBuffer);
+    for (let i = 0; i < images.length; i++) {
+      const pageKey = `products/${productId}/coa/pages/page_${i}.png`;
+      if (isS3Configured) {
+        await s3Upload(pageKey, images[i], 'image/png');
+      } else {
+        const pagesDir = path.join(uploadsDir, `products/${productId}/coa/pages`);
+        fs.mkdirSync(pagesDir, { recursive: true });
+        fs.writeFileSync(path.join(uploadsDir, pageKey), images[i]);
+      }
+    }
+
+    // Update product
+    await prisma.product.update({
+      where: { id: productId },
+      data: { coaOriginalKey: originalKey, coaPageCount: pageCount },
+    });
+
+    logAudit({
+      actorId: req.user?.id, actorEmail: req.user?.email,
+      action: 'coa.regenerate', targetType: 'Product', targetId: productId,
+      metadata: { pageCount, originalKey }, ip: getRequestIp(req),
+    });
+
+    logger.info({ productId, pageCount }, '[ADMIN] CoA page images regenerated from Zoho');
+    res.json({ message: 'CoA page images regenerated', pageCount, originalKey });
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId }, '[ADMIN] CoA page regeneration failed');
+    res.status(500).json({ error: 'Failed to regenerate CoA pages' });
   }
 });
 
