@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import BidForm from './BidForm';
-import TestResultsDisplay from './TestResultsDisplay';
+// import TestResultsDisplay from './TestResultsDisplay'; // hidden — re-enable when ready
 import ShortlistButton from './ShortlistButton';
 import ShareButton from './ShareButton';
 import ProductImage from './ProductImage';
 import ProductPlaceholder from './ProductPlaceholder';
-import { fetchProductById, fetchZohoFileBlob, type ProductDetail as ProductDetailType } from '../lib/api';
+import { fetchProductById, /* fetchZohoFileBlob, */ type ProductDetail as ProductDetailType } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -24,7 +24,7 @@ const CERT_COLORS: Record<string, string> = {
 
 export default function ProductDetailContent({ productId }: { productId: string }) {
   const [product, setProduct] = useState<ProductDetailType | null>(null);
-  const [canViewCoa, setCanViewCoa] = useState(false);
+  const [, setCanViewCoa] = useState(false); // canViewCoa hidden — re-enable when ready
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -276,45 +276,7 @@ export default function ProductDetailContent({ productId }: { productId: string 
           </div>
         )}
 
-        {/* CoA downloads — restricted to product owner / admins */}
-        {canViewCoa && product.coaUrls.length > 0 && (
-          <div className="rounded-lg border card-blue shadow-md p-6">
-            <h2 className="mb-3 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Certificates of Analysis</h2>
-            <div className="flex flex-wrap gap-2">
-              {product.coaUrls.map((url, i) => (
-                <CoaDownloadButton key={i} url={url} label={`CoA ${i + 1}`} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* CoA Test Results (from AI extraction) — restricted to product owner / admins */}
-        {canViewCoa && product.testResults && (
-          <div className="rounded-lg border card-blue shadow-md p-6">
-            <h2 className="mb-4 border-l-2 border-brand-blue pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">CoA Data</h2>
-            {product.coaPdfUrl && (
-              <CoaDownloadButton url={product.coaPdfUrl} label="Download CoA PDF" className="mb-4" />
-            )}
-            <TestResultsDisplay
-              testResults={product.testResults}
-              labName={product.labName}
-              testDate={product.testDate}
-              reportNumber={product.reportNumber}
-            />
-          </div>
-        )}
-
-        {/* Restricted notice for buyers */}
-        {!canViewCoa && (
-          <div className="rounded-lg border border-dashed border-default surface-muted p-6">
-            <div className="flex items-center gap-3 text-faint">
-              <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-              </svg>
-              <p className="text-sm">Certificate of Analysis documents are available to product owners and administrators.</p>
-            </div>
-          </div>
-        )}
+        {/* CoA sections hidden — re-enable when ready */}
       </div>
 
       {/* Right: Bid form (1 col) */}
@@ -339,46 +301,10 @@ function Spec({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CoaDownloadButton({ url, label, className = '' }: { url: string; label: string; className?: string }) {
-  const [downloading, setDownloading] = useState(false);
-
-  async function handleClick() {
-    if (downloading) return;
-    setDownloading(true);
-    try {
-      // Direct URLs (http/https) can be opened directly
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        window.open(url, '_blank');
-        return;
-      }
-      // Zoho proxy and other /api/ paths need authenticated fetch
-      const blobUrl = await fetchZohoFileBlob(url);
-      window.open(blobUrl, '_blank');
-    } catch {
-      // Fallback: try opening directly (will fail with auth error but better than nothing)
-      window.open(url, '_blank');
-    } finally {
-      setDownloading(false);
-    }
-  }
-
-  return (
-    <button
-      onClick={handleClick}
-      disabled={downloading}
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-brand-teal dark:text-brand-sage transition hover:bg-brand-sage/10 disabled:opacity-50 ${className}`}
-    >
-      {downloading ? (
-        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-teal border-t-transparent" />
-      ) : (
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-        </svg>
-      )}
-      {label}
-    </button>
-  );
-}
+/*
+// CoaDownloadButton — hidden, re-enable when ready
+function CoaDownloadButton({ url, label, className = '' }: { url: string; label: string; className?: string }) { ... }
+*/
 
 function formatRange(min: number | null, max: number | null, suffix: string): string {
   if (min != null && max != null) {

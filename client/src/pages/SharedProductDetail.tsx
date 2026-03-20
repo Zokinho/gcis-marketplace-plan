@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import TestResultsDisplay from '../components/TestResultsDisplay';
+// import TestResultsDisplay from '../components/TestResultsDisplay'; // hidden — re-enable when ready
 import HarvexLogo from '../components/HarvexLogo';
 import ProductImage from '../components/ProductImage';
 import ProductPlaceholder from '../components/ProductPlaceholder';
-import { fetchSharedProducts, getSharedProductPdfUrl, type SharedProduct } from '../lib/api';
+import { fetchSharedProducts, /* getSharedProductPdfUrl, */ type SharedProduct } from '../lib/api';
 
 const TYPE_COLORS: Record<string, string> = {
   Sativa: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700',
@@ -211,67 +211,15 @@ export default function SharedProductDetail() {
               </div>
             )}
 
-            {/* CoA Test Results */}
-            {product.testResults && (
-              <div className="rounded-lg border border-subtle surface p-6">
-                <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted">
-                  Certificate of Analysis
-                </h2>
-                <TestResultsDisplay
-                  testResults={product.testResults}
-                  labName={product.labName}
-                  testDate={product.testDate}
-                  reportNumber={product.reportNumber}
-                />
-              </div>
-            )}
+            {/* CoA Test Results — hidden, re-enable when ready */}
           </div>
 
           {/* Right: Actions */}
           <div className="lg:sticky lg:top-6 lg:self-start">
             <div className="rounded-lg border border-subtle surface p-6">
-              <h3 className="mb-4 border-l-2 border-brand-teal pl-3 text-sm font-bold uppercase tracking-wide text-brand-teal dark:text-brand-sage">Documents</h3>
+              {/* Documents section hidden — re-enable when ready */}
 
-              {/* PDF download */}
-              {product.coaPdfUrl && token && (
-                <a
-                  href={getSharedProductPdfUrl(token, product.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mb-3 flex items-center gap-2 rounded-lg border border-subtle px-4 py-3 text-sm font-medium text-brand-teal dark:text-brand-sage transition hover:bg-brand-sage/10"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                  </svg>
-                  Download CoA PDF
-                </a>
-              )}
-
-              {/* Info */}
-              {product.labName && (
-                <div className="mt-4 space-y-2 text-xs text-muted">
-                  <div className="flex justify-between">
-                    <span>Lab</span>
-                    <span className="font-medium text-secondary">{product.labName}</span>
-                  </div>
-                  {product.testDate && (
-                    <div className="flex justify-between">
-                      <span>Test Date</span>
-                      <span className="font-medium text-secondary">
-                        {new Date(product.testDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
-                  {product.reportNumber && (
-                    <div className="flex justify-between">
-                      <span>Report #</span>
-                      <span className="font-medium text-secondary">{product.reportNumber}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-6 border-t border-subtle pt-4">
+              <div>
                 <Link
                   to={`/share/${token}`}
                   className="text-sm font-medium text-brand-teal dark:text-brand-sage underline hover:text-brand-teal/80"
