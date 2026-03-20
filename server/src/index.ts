@@ -206,7 +206,7 @@ if (isMetricsEnabled) {
 // General API: 200 requests per minute per IP
 const apiLimiter = rateLimit({
   windowMs: 60_000,
-  max: 200,
+  max: 600,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
@@ -305,7 +305,7 @@ async function mountRoutes() {
   app.use('/api/webhooks', webhookRoutes);
 
   // User status — requires JWT auth only (no marketplace approval check)
-  app.use('/api/user', authLimiter, requireAuth(), userRoutes);
+  app.use('/api/user', apiLimiter, requireAuth(), userRoutes);
 
   // Onboarding — requires JWT auth only (user may not be fully approved yet)
   app.use('/api/onboarding', authLimiter, requireAuth(), onboardingRoutes);
