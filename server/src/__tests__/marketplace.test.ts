@@ -9,6 +9,11 @@ vi.mock('../services/marketContextService', () => ({
   scorePriceVsMarket: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('../utils/s3', () => ({
+  getSignedFileUrl: vi.fn().mockResolvedValue('https://s3.example.com/signed-url'),
+  isS3Configured: vi.fn().mockReturnValue(true),
+}));
+
 // ─── Test fixtures ───
 
 const mockBuyer = {
@@ -97,6 +102,8 @@ function makeProduct(overrides: Record<string, any> = {}) {
     coaProcessedAt: now,
     testResults: { thc: 20, cbd: 0.3 },
     source: 'zoho',
+    coaOriginalKey: 'products/product-1/coa/original.pdf',
+    coaRedactedKey: 'products/product-1/coa/redacted.pdf',
     matchCount: 5,
     createdAt: now,
     updatedAt: now,
@@ -601,7 +608,7 @@ describe('GET /products/:id - Product detail', () => {
     expect(res.body.error).toBe('Product not found');
   });
 
-  it('hides CoA fields for buyers (canViewCoa = false)', async () => {
+  it('shows redacted CoA PDF for buyers when coaRedactedKey exists', async () => {
     const product = makeProduct();
     vi.mocked(prisma.product.findUnique).mockResolvedValue(product as any);
 
@@ -609,8 +616,27 @@ describe('GET /products/:id - Product detail', () => {
     const res = await request(app).get('/products/product-1');
 
     expect(res.status).toBe(200);
+    expect(res.body.canViewCoa).toBe(true);
+    // PDF URL is presigned redacted URL
+    expect(res.body.product.coaPdfUrl).toBe('https://s3.example.com/signed-url');
+    // Metadata hidden — only PDF served
+    expect(res.body.product.labName).toBeNull();
+    expect(res.body.product.reportNumber).toBeNull();
+    expect(res.body.product.testResults).toBeNull();
+    expect(res.body.product.coaUrls).toEqual([]);
+    expect(res.body.product.coaOriginalKey).toBeNull();
+    expect(res.body.product.coaRedactedKey).toBeNull();
+  });
+
+  it('hides CoA for buyers when coaRedactedKey is null', async () => {
+    const product = makeProduct({ coaRedactedKey: null });
+    vi.mocked(prisma.product.findUnique).mockResolvedValue(product as any);
+
+    const app = createTestApp(mockBuyer);
+    const res = await request(app).get('/products/product-1');
+
+    expect(res.status).toBe(200);
     expect(res.body.canViewCoa).toBe(false);
-    // CoA fields should be nullified/emptied
     expect(res.body.product.coaUrls).toEqual([]);
     expect(res.body.product.coaPdfUrl).toBeNull();
     expect(res.body.product.labName).toBeNull();
@@ -621,7 +647,7 @@ describe('GET /products/:id - Product detail', () => {
     expect(res.body.product.coaProcessedAt).toBeNull();
   });
 
-  it('shows CoA fields for product owner (seller who owns the product)', async () => {
+  it('shows redacted CoA PDF for product owner when coaRedactedKey exists', async () => {
     const product = makeProduct({ sellerId: 'seller-1' });
     vi.mocked(prisma.product.findUnique).mockResolvedValue(product as any);
 
@@ -630,14 +656,31 @@ describe('GET /products/:id - Product detail', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.canViewCoa).toBe(true);
-    expect(res.body.product.coaUrls).toEqual(['https://example.com/coa1.pdf']);
-    expect(res.body.product.coaPdfUrl).toBe('https://example.com/coa.pdf');
-    expect(res.body.product.labName).toBe('Test Lab Inc');
-    expect(res.body.product.reportNumber).toBe('RPT-001');
-    expect(res.body.product.testResults).toEqual({ thc: 20, cbd: 0.3 });
+    // Gets presigned redacted URL
+    expect(res.body.product.coaPdfUrl).toBe('https://s3.example.com/signed-url');
+    // Metadata hidden — only PDF served
+    expect(res.body.product.labName).toBeNull();
+    expect(res.body.product.reportNumber).toBeNull();
+    expect(res.body.product.testResults).toBeNull();
+    expect(res.body.product.coaUrls).toEqual([]);
+    expect(res.body.product.coaOriginalKey).toBeNull();
+    expect(res.body.product.coaRedactedKey).toBeNull();
   });
 
-  it('shows CoA fields for any seller (even non-owner)', async () => {
+  it('hides CoA for owner when coaRedactedKey is null', async () => {
+    const product = makeProduct({ sellerId: 'seller-1', coaRedactedKey: null });
+    vi.mocked(prisma.product.findUnique).mockResolvedValue(product as any);
+
+    const app = createTestApp(mockSeller);
+    const res = await request(app).get('/products/product-1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.canViewCoa).toBe(false);
+    expect(res.body.product.coaPdfUrl).toBeNull();
+    expect(res.body.product.testResults).toBeNull();
+  });
+
+  it('shows redacted CoA PDF for any seller (even non-owner) when coaRedactedKey exists', async () => {
     const otherSeller = {
       ...mockSeller,
       id: 'seller-2',
@@ -651,16 +694,18 @@ describe('GET /products/:id - Product detail', () => {
     const res = await request(app).get('/products/product-1');
 
     expect(res.status).toBe(200);
-    // isSeller check: contactType includes 'Seller'
     expect(res.body.canViewCoa).toBe(true);
-    expect(res.body.product.labName).toBe('Test Lab Inc');
+    expect(res.body.product.coaPdfUrl).toBe('https://s3.example.com/signed-url');
+    // Metadata hidden
+    expect(res.body.product.labName).toBeNull();
+    expect(res.body.product.testResults).toBeNull();
+    expect(res.body.product.coaOriginalKey).toBeNull();
   });
 
-  it('shows CoA fields for admin user (email in ADMIN_EMAILS)', async () => {
+  it('shows all CoA fields for admin user including original keys', async () => {
     const product = makeProduct({ sellerId: 'seller-1' });
     vi.mocked(prisma.product.findUnique).mockResolvedValue(product as any);
 
-    // Set ADMIN_EMAILS env var to include admin user
     const originalAdminEmails = process.env.ADMIN_EMAILS;
     process.env.ADMIN_EMAILS = 'admin@example.com';
 
@@ -671,6 +716,11 @@ describe('GET /products/:id - Product detail', () => {
       expect(res.status).toBe(200);
       expect(res.body.canViewCoa).toBe(true);
       expect(res.body.product.labName).toBe('Test Lab Inc');
+      // Admin sees original CoA data untouched
+      expect(res.body.product.coaPdfUrl).toBe('https://example.com/coa.pdf');
+      expect(res.body.product.coaUrls).toEqual(['https://example.com/coa1.pdf']);
+      expect(res.body.product.coaOriginalKey).toBe('products/product-1/coa/original.pdf');
+      expect(res.body.product.coaRedactedKey).toBe('products/product-1/coa/redacted.pdf');
     } finally {
       process.env.ADMIN_EMAILS = originalAdminEmails;
     }
@@ -691,8 +741,24 @@ describe('GET /products/:id - Product detail', () => {
     expect(res.body.product.name).toBe('Blue Dream');
   });
 
-  it('handles unauthenticated request (no req.user) by hiding CoA', async () => {
+  it('shows redacted CoA PDF for unauthenticated request when coaRedactedKey exists', async () => {
     const product = makeProduct();
+    vi.mocked(prisma.product.findUnique).mockResolvedValue(product as any);
+
+    const app = createTestApp(undefined);
+    const res = await request(app).get('/products/product-1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.canViewCoa).toBe(true);
+    expect(res.body.product.coaPdfUrl).toBe('https://s3.example.com/signed-url');
+    // Metadata hidden
+    expect(res.body.product.labName).toBeNull();
+    expect(res.body.product.testResults).toBeNull();
+    expect(res.body.product.coaOriginalKey).toBeNull();
+  });
+
+  it('hides CoA for unauthenticated request when coaRedactedKey is null', async () => {
+    const product = makeProduct({ coaRedactedKey: null });
     vi.mocked(prisma.product.findUnique).mockResolvedValue(product as any);
 
     const app = createTestApp(undefined);

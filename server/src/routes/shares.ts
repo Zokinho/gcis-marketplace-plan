@@ -224,6 +224,7 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
       coaPdfUrl: true,
       coaProcessedAt: true,
       testResults: true,
+      coaRedactedKey: true,
       matchCount: true,
       createdAt: true,
       updatedAt: true,
@@ -250,7 +251,7 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
             return url;
           }
           // S3 keys → presigned URLs
-          if (isS3Configured) {
+          if (isS3Configured()) {
             try {
               const signed = await getSignedFileUrl(url);
               return signed || url;
@@ -261,7 +262,43 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
           return url;
         }),
       );
-      return { ...p, imageUrls: resolvedImageUrls };
+      // CoA filtering: only show CoA data when redacted version exists
+      const { coaRedactedKey, ...productWithoutKey } = p;
+      let coaFields: Record<string, any> = {};
+      if (coaRedactedKey) {
+        // Redacted version exists: serve presigned PDF only, hide metadata
+        let signedPdfUrl: string | null = null;
+        if (isS3Configured()) {
+          try {
+            signedPdfUrl = await getSignedFileUrl(coaRedactedKey);
+          } catch {
+            signedPdfUrl = null;
+          }
+        }
+        coaFields = {
+          coaPdfUrl: signedPdfUrl,
+          coaUrls: [],
+          labName: null,
+          testDate: null,
+          reportNumber: null,
+          testResults: null,
+          coaJobId: null,
+          coaProcessedAt: null,
+        };
+      } else {
+        // No redacted version: hide all CoA data
+        coaFields = {
+          coaPdfUrl: null,
+          coaUrls: [],
+          labName: null,
+          testDate: null,
+          reportNumber: null,
+          testResults: null,
+          coaJobId: null,
+          coaProcessedAt: null,
+        };
+      }
+      return { ...productWithoutKey, imageUrls: resolvedImageUrls, ...coaFields };
     }),
   );
 
@@ -360,36 +397,27 @@ publicShareRouter.get('/:token/products/:id/pdf', async (req: Request<{ token: s
 
   const product = await prisma.product.findUnique({
     where: { id },
-    select: { coaPdfUrl: true, coaJobId: true, name: true },
+    select: { coaPdfUrl: true, coaJobId: true, coaRedactedKey: true, name: true },
   });
 
-  if (!product?.coaJobId) {
+  if (!product?.coaRedactedKey) {
     return res.status(404).json({ error: 'No CoA PDF available for this product' });
   }
 
   try {
-    // Get the CoA product ID from the sync record
-    const syncRecord = await prisma.coaSyncRecord.findUnique({
-      where: { coaJobId: product.coaJobId },
-    });
-
-    if (!syncRecord?.coaProductId) {
-      return res.status(404).json({ error: 'CoA data not found' });
+    // Serve redacted PDF via presigned S3 URL
+    if (!isS3Configured()) {
+      return res.status(404).json({ error: 'File storage not configured' });
     }
 
-    const coaClient = getCoaClient();
-    const pdfBuffer = await coaClient.getProductPdfBuffer(syncRecord.coaProductId);
-
-    if (!pdfBuffer) {
+    const signedUrl = await getSignedFileUrl(product.coaRedactedKey);
+    if (!signedUrl) {
       return res.status(404).json({ error: 'PDF not found' });
     }
 
-    const safeName = (product.name || 'CoA').replace(/[^a-zA-Z0-9_-]/g, '_');
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeName}_CoA.pdf"`);
-    res.send(pdfBuffer);
+    res.redirect(302, signedUrl);
   } catch (err: any) {
-    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SHARES] PDF proxy failed');
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SHARES] PDF redirect failed');
     res.status(502).json({ error: 'CoA service unavailable' });
   }
 });

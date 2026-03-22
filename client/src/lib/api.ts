@@ -73,6 +73,8 @@ export interface ProductDetail extends ProductCard {
   minQtyRequest: number | null;
   requestPending: boolean;
   coaUrls: string[];
+  coaOriginalKey?: string | null;
+  coaRedactedKey?: string | null;
   seller: { companyName: string | null };
   viewStats?: { totalViews: number; uniqueViewers: number; shortlistCount: number };
 }

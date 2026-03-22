@@ -159,7 +159,7 @@ adminRouter.post(
             return map[mimetype] || 'bin';
           };
 
-          if (isS3Configured) {
+          if (isS3Configured()) {
             for (const f of imageFiles) {
               const key = `products/${resolvedProductId}/images/${crypto.randomUUID()}.${ext(f.mimetype)}`;
               await s3Upload(key, f.buffer, f.mimetype);

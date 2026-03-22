@@ -40,7 +40,7 @@ vi.mock('../../services/zohoApi', () => ({
 
 vi.mock('../../utils/s3', () => ({
   deleteFile: vi.fn().mockResolvedValue(undefined),
-  isS3Configured: false,
+  isS3Configured: vi.fn().mockReturnValue(false),
   uploadFile: vi.fn().mockResolvedValue(undefined),
 }));
 

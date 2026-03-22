@@ -26,7 +26,7 @@ const uploadsDir = path.join(__dirname, '../../../uploads');
 
 /** Save a file to S3 or local disk. Returns the key/path used for DB storage. */
 async function saveFile(key: string, buffer: Buffer, contentType: string): Promise<string> {
-  if (isS3Configured) {
+  if (isS3Configured()) {
     await s3Upload(key, buffer, contentType);
     return key;
   }
@@ -39,7 +39,7 @@ async function saveFile(key: string, buffer: Buffer, contentType: string): Promi
 
 /** Read a file from S3 or local disk given a stored key. */
 async function readFile(key: string): Promise<Buffer> {
-  if (isS3Configured) {
+  if (isS3Configured()) {
     const { default: axios } = await import('axios');
     const url = await getSignedFileUrl(key);
     if (!url) throw new Error(`Failed to generate presigned URL for ${key}`);
@@ -54,7 +54,7 @@ async function readFile(key: string): Promise<Buffer> {
 
 /** Get a URL to serve a stored file (presigned S3 URL or local /uploads/ path). */
 async function getFileUrl(key: string): Promise<string> {
-  if (isS3Configured) {
+  if (isS3Configured()) {
     const url = await getSignedFileUrl(key);
     if (!url) throw new Error(`Failed to generate presigned URL for ${key}`);
     return url;

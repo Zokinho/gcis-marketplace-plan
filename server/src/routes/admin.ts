@@ -510,7 +510,7 @@ router.post('/products/:productId/approve', async (req: Request<{ productId: str
 
       // Read original PDF from S3 or local disk
       let pdfBuffer: Buffer;
-      if (isS3Configured) {
+      if (isS3Configured()) {
         const { default: axios } = await import('axios');
         const originalUrl = await getSignedFileUrl(product.coaOriginalKey!);
         if (!originalUrl) throw new Error('Failed to generate presigned URL for original CoA');
@@ -530,7 +530,7 @@ router.post('/products/:productId/approve', async (req: Request<{ productId: str
       }
 
       const redactedKey = product.coaOriginalKey!.replace('_original.pdf', '.pdf');
-      if (isS3Configured) {
+      if (isS3Configured()) {
         await s3Upload(redactedKey, redactedBuffer, 'application/pdf');
       } else {
         const localDir = path.dirname(path.join(uploadsDir, redactedKey));
@@ -895,7 +895,7 @@ router.post('/products/:productId/regenerate-coa-pages', async (req: Request<{ p
 
     // Upload original PDF to S3
     const originalKey = `products/${productId}/coa/${crypto.randomUUID()}_original.pdf`;
-    if (isS3Configured) {
+    if (isS3Configured()) {
       await s3Upload(originalKey, pdfBuffer, 'application/pdf');
     } else {
       const localDir = path.join(uploadsDir, `products/${productId}/coa`);
@@ -907,7 +907,7 @@ router.post('/products/:productId/regenerate-coa-pages', async (req: Request<{ p
     const { images, pageCount } = await generatePageImages(pdfBuffer);
     for (let i = 0; i < images.length; i++) {
       const pageKey = `products/${productId}/coa/pages/page_${i}.png`;
-      if (isS3Configured) {
+      if (isS3Configured()) {
         await s3Upload(pageKey, images[i], 'image/png');
       } else {
         const pagesDir = path.join(uploadsDir, `products/${productId}/coa/pages`);

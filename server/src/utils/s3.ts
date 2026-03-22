@@ -2,31 +2,26 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import logger from './logger';
 
-const S3_ENDPOINT = process.env.S3_ENDPOINT;
-const S3_REGION = process.env.S3_REGION || 'nyc3';
-const S3_BUCKET = process.env.S3_BUCKET || 'harvex-uploads';
-const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY;
-const S3_SECRET_KEY = process.env.S3_SECRET_KEY;
-const S3_PRESIGN_EXPIRES = parseInt(process.env.S3_PRESIGN_EXPIRES || '3600', 10);
-
-/** Whether S3 storage is configured and available */
-export const isS3Configured = !!(S3_ENDPOINT && S3_ACCESS_KEY && S3_SECRET_KEY);
+/** Whether S3 storage is configured — reads env at call time to avoid import-order issues */
+export function isS3Configured(): boolean {
+  return !!(process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY);
+}
 
 let s3Client: S3Client | null = null;
 
 function getClient(): S3Client | null {
-  if (!isS3Configured) return null;
+  if (!isS3Configured()) return null;
   if (!s3Client) {
     s3Client = new S3Client({
-      endpoint: S3_ENDPOINT!,
-      region: S3_REGION,
+      endpoint: process.env.S3_ENDPOINT!,
+      region: process.env.S3_REGION || 'tor1',
       credentials: {
-        accessKeyId: S3_ACCESS_KEY!,
-        secretAccessKey: S3_SECRET_KEY!,
+        accessKeyId: process.env.S3_ACCESS_KEY!,
+        secretAccessKey: process.env.S3_SECRET_KEY!,
       },
       forcePathStyle: false, // DigitalOcean Spaces uses virtual-hosted style
     });
-    logger.info({ endpoint: S3_ENDPOINT, bucket: S3_BUCKET, region: S3_REGION }, '[S3] Client initialized');
+    logger.info({ endpoint: process.env.S3_ENDPOINT, bucket: process.env.S3_BUCKET || 'harvex-uploads', region: process.env.S3_REGION || 'tor1' }, '[S3] Client initialized');
   }
   return s3Client;
 }
@@ -44,7 +39,7 @@ export async function uploadFile(
   if (!client) return null;
 
   await client.send(new PutObjectCommand({
-    Bucket: S3_BUCKET,
+    Bucket: (process.env.S3_BUCKET || 'harvex-uploads'),
     Key: key,
     Body: buffer,
     ContentType: contentType,
@@ -64,11 +59,11 @@ export async function getSignedFileUrl(key: string): Promise<string | null> {
   if (!client) return null;
 
   const command = new GetObjectCommand({
-    Bucket: S3_BUCKET,
+    Bucket: (process.env.S3_BUCKET || 'harvex-uploads'),
     Key: key,
   });
 
-  const url = await getSignedUrl(client, command, { expiresIn: S3_PRESIGN_EXPIRES });
+  const url = await getSignedUrl(client, command, { expiresIn: parseInt(process.env.S3_PRESIGN_EXPIRES || '3600', 10) });
   return url;
 }
 
@@ -81,7 +76,7 @@ export async function deleteFile(key: string): Promise<boolean> {
   if (!client) return false;
 
   await client.send(new DeleteObjectCommand({
-    Bucket: S3_BUCKET,
+    Bucket: (process.env.S3_BUCKET || 'harvex-uploads'),
     Key: key,
   }));
 

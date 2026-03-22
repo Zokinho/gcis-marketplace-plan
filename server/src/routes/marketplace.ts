@@ -308,16 +308,36 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
     })();
   }
 
-  // CoA visibility: only product owner or admins can see CoA data
-  const isOwner = req.user?.id === product.sellerId;
-  const isSeller = req.user?.contactType?.includes('Seller') ?? false;
+  // CoA visibility: admins see everything, others see redacted CoA only
   const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
   const isAdminEmail = req.user?.email ? adminEmails.includes(req.user.email.toLowerCase()) : false;
-  const canViewCoa = isOwner || isSeller || isAdminEmail;
+  const hasRedacted = !!product.coaRedactedKey;
+  const canViewCoa = isAdminEmail || hasRedacted;
 
   const productData = { ...product } as typeof product & { coaOriginalKey: string | null; coaRedactedKey: string | null };
 
-  if (!canViewCoa) {
+  if (isAdminEmail) {
+    // Admin sees everything — no changes
+  } else if (hasRedacted) {
+    // Non-admin + redacted version exists: serve redacted PDF only, hide metadata + originals
+    try {
+      const signedUrl = await getSignedFileUrl(product.coaRedactedKey!);
+      productData.coaPdfUrl = signedUrl;
+    } catch (err) {
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MARKETPLACE] Failed to sign redacted CoA URL');
+      productData.coaPdfUrl = null;
+    }
+    productData.coaUrls = [];
+    productData.labName = null;
+    productData.testDate = null;
+    productData.reportNumber = null;
+    productData.testResults = null;
+    productData.coaJobId = null;
+    productData.coaProcessedAt = null;
+    productData.coaOriginalKey = null;
+    productData.coaRedactedKey = null;
+  } else {
+    // No redacted version: hide all CoA data from non-admins
     productData.coaUrls = [];
     productData.coaPdfUrl = null;
     productData.labName = null;
@@ -328,9 +348,6 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
     productData.coaProcessedAt = null;
     productData.coaOriginalKey = null;
     productData.coaRedactedKey = null;
-  } else if (!isAdminEmail) {
-    // Non-admin CoA viewers (sellers): serve redacted version, hide original
-    productData.coaOriginalKey = null;
   }
 
   // Enrich with pricedToSell badge
@@ -429,7 +446,7 @@ router.get('/file-url', async (req: Request, res: Response) => {
     return res.status(403).json({ error: 'Invalid file key' });
   }
 
-  if (!isS3Configured) {
+  if (!isS3Configured()) {
     return res.status(404).json({ error: 'File storage not configured' });
   }
 

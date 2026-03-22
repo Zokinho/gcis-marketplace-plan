@@ -10,7 +10,7 @@ vi.mock('../services/auditService', () => ({
 }));
 
 vi.mock('../utils/s3', () => ({
-  isS3Configured: true,
+  isS3Configured: vi.fn().mockReturnValue(true),
   getSignedFileUrl: vi.fn().mockResolvedValue('https://s3.example.com/signed-url'),
   uploadFile: vi.fn().mockResolvedValue(undefined),
 }));

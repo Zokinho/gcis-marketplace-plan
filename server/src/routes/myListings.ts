@@ -200,7 +200,7 @@ router.post(
             return map[mimetype] || 'bin';
           };
 
-          if (isS3Configured) {
+          if (isS3Configured()) {
             // Upload to S3
             for (const f of imageFiles) {
               const key = `products/${product.id}/images/${crypto.randomUUID()}.${ext(f.mimetype)}`;
@@ -251,7 +251,7 @@ router.post(
           const coaBuffer = coaFileList[0].buffer;
           const originalKey = `products/${product.id}/coa/${crypto.randomUUID()}_original.pdf`;
 
-          if (isS3Configured) {
+          if (isS3Configured()) {
             await s3Upload(originalKey, coaBuffer, 'application/pdf');
           } else {
             // Local fallback: store under uploads/ directory
@@ -264,7 +264,7 @@ router.post(
           const { images, pageCount } = await generatePageImages(coaBuffer);
           for (let i = 0; i < images.length; i++) {
             const pageKey = `products/${product.id}/coa/pages/page_${i}.png`;
-            if (isS3Configured) {
+            if (isS3Configured()) {
               await s3Upload(pageKey, images[i], 'image/png');
             } else {
               const pagesDir = path.join(uploadsDir, `products/${product.id}/coa/pages`);
@@ -491,7 +491,7 @@ router.post(
     const newUrls: string[] = [];
 
     try {
-      if (isS3Configured) {
+      if (isS3Configured()) {
         for (const f of imageFiles) {
           const key = `products/${productId}/images/${crypto.randomUUID()}.${ext(f.mimetype)}`;
           await s3Upload(key, f.buffer, f.mimetype);
