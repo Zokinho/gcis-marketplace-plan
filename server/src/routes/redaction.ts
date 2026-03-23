@@ -369,13 +369,20 @@ router.post('/:productId/initialize', validateParams(redactionProductParamsSchem
       }
       pdfBuffer = fs.readFileSync(filePath);
     } else if (coaUrl.startsWith('/api/zoho-files/')) {
-      // Zoho proxy — fetch through our own server
+      // Zoho proxy — call downloadZohoFile directly (avoids HTTP self-request + HTTPS redirect issues)
+      const segments = coaUrl.replace('/api/zoho-files/', '').split('/');
+      if (segments.length < 2) {
+        return res.status(400).json({ error: 'Invalid Zoho file URL format' });
+      }
+      const { downloadZohoFile } = await import('../services/zohoApi');
+      const { data } = await downloadZohoFile(segments[0], segments[1]);
+      pdfBuffer = data;
+    } else if (coaUrl.startsWith('http://') || coaUrl.startsWith('https://')) {
+      // External URL — fetch directly
       const { default: axios } = await import('axios');
-      const baseUrl = `http://localhost:${process.env.PORT || 3001}`;
-      const fetchRes = await axios.get(`${baseUrl}${coaUrl}`, {
+      const fetchRes = await axios.get(coaUrl, {
         responseType: 'arraybuffer',
         timeout: 60_000,
-        headers: req.headers.authorization ? { Authorization: req.headers.authorization } : {},
       });
       pdfBuffer = Buffer.from(fetchRes.data);
     } else {
