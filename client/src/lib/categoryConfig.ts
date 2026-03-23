@@ -65,7 +65,7 @@ const GROUP_FIELDS: Record<CategoryGroup, FieldConfig> = {
     cbd: 'optional',
     terpenes: 'required',
     budSizes: 'optional',
-    upcomingQty: 'required',
+    upcomingQty: 'optional',
     minQtyRequest: 'required',
     images: 'required',
     coaFiles: 'required',
@@ -75,7 +75,7 @@ const GROUP_FIELDS: Record<CategoryGroup, FieldConfig> = {
     lineage: 'hidden',
     harvestDate: 'hidden',
     growthMedium: 'hidden',
-    certifications: 'optional',
+    certifications: 'required',
     thc: 'required',
     cbd: 'optional',
     terpenes: 'hidden',
@@ -83,14 +83,14 @@ const GROUP_FIELDS: Record<CategoryGroup, FieldConfig> = {
     upcomingQty: 'optional',
     minQtyRequest: 'optional',
     images: 'optional',
-    coaFiles: 'optional',
+    coaFiles: 'required',
   },
   edibles: {
     type: 'hidden',
     lineage: 'hidden',
     harvestDate: 'hidden',
     growthMedium: 'hidden',
-    certifications: 'optional',
+    certifications: 'required',
     thc: 'optional',
     cbd: 'optional',
     terpenes: 'hidden',
@@ -98,22 +98,50 @@ const GROUP_FIELDS: Record<CategoryGroup, FieldConfig> = {
     upcomingQty: 'optional',
     minQtyRequest: 'optional',
     images: 'optional',
-    coaFiles: 'optional',
+    coaFiles: 'required',
   },
   other: {
     type: 'optional',
-    lineage: 'optional',
+    lineage: 'required',
     harvestDate: 'optional',
     growthMedium: 'hidden',
-    certifications: 'optional',
-    thc: 'optional',
-    cbd: 'optional',
-    terpenes: 'optional',
+    certifications: 'required',
+    thc: 'required',
+    cbd: 'required',
+    terpenes: 'required',
     budSizes: 'hidden',
     upcomingQty: 'optional',
     minQtyRequest: 'optional',
     images: 'optional',
-    coaFiles: 'optional',
+    coaFiles: 'required',
+  },
+};
+
+/** Per-group label overrides for fields whose meaning changes by category. */
+export interface LabelOverrides {
+  gramsAvailable: string;
+  bidMinimum: string;
+  minOrderQty: string;
+}
+
+const DEFAULT_LABELS: LabelOverrides = {
+  gramsAvailable: 'Grams Available',
+  bidMinimum: 'Bid Minimum Per Gram (CAD)',
+  minOrderQty: 'Min Order Quantity (g)',
+};
+
+const GROUP_LABELS: Record<CategoryGroup, Partial<LabelOverrides>> = {
+  flower: {},
+  concentrates: {},
+  edibles: {
+    gramsAvailable: 'Units Available',
+    bidMinimum: 'Bid Minimum / Unit (CAD)',
+    minOrderQty: 'Min Order Quantity (units)',
+  },
+  other: {
+    gramsAvailable: 'Plants Available',
+    bidMinimum: 'Bid Minimum / Plant (CAD)',
+    minOrderQty: 'Min Order Quantity (plants)',
   },
 };
 
@@ -128,4 +156,11 @@ export function getFieldConfig(category: string): FieldConfig | null {
   const group = getCategoryGroup(category);
   if (!group) return null;
   return GROUP_FIELDS[group];
+}
+
+/** Returns label overrides for a given category (defaults for flower/concentrates). */
+export function getGroupLabels(category: string): LabelOverrides {
+  const group = getCategoryGroup(category);
+  if (!group) return DEFAULT_LABELS;
+  return { ...DEFAULT_LABELS, ...GROUP_LABELS[group] };
 }

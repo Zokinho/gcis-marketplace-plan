@@ -72,9 +72,8 @@ export default function RedactionEditor({ productId, onApplied }: Props) {
   async function loadPageImage() {
     try {
       const data = await getRedactionPageUrl(productId, currentPage);
-      // Append cache-buster when images have been regenerated after applying redactions
-      const url = appliedAt ? `${data.url}${data.url.includes('?') ? '&' : '?'}t=${appliedAt}` : data.url;
-      setPageImageUrl(url);
+      // Each call returns a fresh presigned S3 URL (unique signature) — no cache-buster needed
+      setPageImageUrl(data.url);
     } catch {
       setPageImageUrl(null);
     }

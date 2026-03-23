@@ -4,7 +4,7 @@ import Layout from '../components/Layout';
 import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
 import TerpenePercentageTable from '../components/TerpenePercentageTable';
 import { createListing, analyzeCoaPdf, type AnalyzedCoaFields, type RedactionRegion } from '../lib/api';
-import { getFieldConfig, type ConditionalField } from '../lib/categoryConfig';
+import { getFieldConfig, getGroupLabels, type ConditionalField } from '../lib/categoryConfig';
 
 const FORM_CACHE_KEY = 'create-listing-draft';
 
@@ -152,8 +152,9 @@ export default function CreateListing() {
     return 'text-red-600';
   }, [budSizeTotal]);
 
-  // Category-based field visibility
+  // Category-based field visibility + label overrides
   const fieldConfig = useMemo(() => getFieldConfig(category), [category]);
+  const labels = useMemo(() => getGroupLabels(category), [category]);
   /** Field is visible (not hidden). If no category selected, show everything. */
   const isVisible = (field: ConditionalField) => !fieldConfig || fieldConfig[field] !== 'hidden';
   /** Field is required. If no category selected, default to required. */
@@ -248,10 +249,10 @@ export default function CreateListing() {
     if (isRequired('certifications') && certifications.length === 0) missing.push('Certification');
     if (isRequired('thc') && !thc) missing.push('THC %');
     if (isRequired('terpenes') && terpenes.length === 0) missing.push('Terpenes');
-    if (!gramsAvailable) missing.push('Grams Available');
+    if (!gramsAvailable) missing.push(labels.gramsAvailable);
     if (isRequired('upcomingQty') && !upcomingQty) missing.push('Upcoming Qty');
-    if (isRequired('minQtyRequest') && !minQtyRequest) missing.push('Min Order Quantity');
-    if (!pricePerUnit) missing.push('Bid Minimum Per Gram');
+    if (isRequired('minQtyRequest') && !minQtyRequest) missing.push(labels.minOrderQty);
+    if (!pricePerUnit) missing.push(labels.bidMinimum.replace(' (CAD)', ''));
     if (isRequired('images') && !coverPhoto) missing.push('Cover Photo');
     if (isRequired('images') && images.length === 0) missing.push('Product Images');
     if (isRequired('coaFiles') && coaFiles.length === 0) missing.push('Certificate of Analysis');
@@ -573,7 +574,7 @@ export default function CreateListing() {
           {/* Section 4: Inventory & Pricing */}
           <Section title="Inventory & Pricing">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Grams Available" required>
+              <Field label={labels.gramsAvailable} required>
                 <input type="number" step="1" min="0" value={gramsAvailable} onChange={(e) => setGramsAvailable(e.target.value)} className="input-field" />
               </Field>
               <Field label={`Upcoming Qty (3 months)${optionalSuffix('upcomingQty')}`} required={isRequired('upcomingQty')}>
@@ -581,10 +582,10 @@ export default function CreateListing() {
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Field label={`Min Order Quantity (g)${optionalSuffix('minQtyRequest')}`} required={isRequired('minQtyRequest')}>
+              <Field label={`${labels.minOrderQty}${optionalSuffix('minQtyRequest')}`} required={isRequired('minQtyRequest')}>
                 <input type="number" step="1" min="0" value={minQtyRequest} onChange={(e) => setMinQtyRequest(e.target.value)} className="input-field" />
               </Field>
-              <Field label="Bid Minimum Per Gram (CAD)" required>
+              <Field label={labels.bidMinimum} required>
                 <input type="number" step="0.01" min="0" value={pricePerUnit} onChange={(e) => setPricePerUnit(e.target.value)} placeholder="e.g. 2.50" className="input-field" />
               </Field>
             </div>
