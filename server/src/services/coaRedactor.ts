@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import logger from '../utils/logger';
 
@@ -86,9 +86,9 @@ export async function generatePageImages(pdfBuffer: Buffer): Promise<{ images: B
 }
 
 /**
- * Apply redactions to a PDF.
- * Digital PDFs: use pdf-lib to draw white rectangles directly.
- * Image-based PDFs: rasterize pages, apply sharp redactions, reassemble as PDF.
+ * Apply redactions to a PDF by rasterizing pages, drawing over redacted regions, and
+ * reassembling as an image-only PDF. This destroys the text layer so redacted content
+ * cannot be selected or copy-pasted.
  */
 export async function applyRedactions(
   pdfBuffer: Buffer,
@@ -108,52 +108,10 @@ export async function applyRedactions(
     byPage.set(r.page, arr);
   }
 
-  // Try digital redaction first (pdf-lib)
-  try {
-    return await applyDigitalRedactions(pdfBuffer, byPage);
-  } catch (err) {
-    logger.warn({ err }, '[COA-REDACT] Digital redaction failed, falling back to image-based');
-    return applyImageRedactions(pdfBuffer, byPage);
-  }
-}
-
-/**
- * Digital PDF redaction: draw opaque white rectangles using pdf-lib.
- */
-async function applyDigitalRedactions(
-  pdfBuffer: Buffer,
-  byPage: Map<number, RedactionBox[]>,
-): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
-  const pages = pdfDoc.getPages();
-
-  for (const [pageIdx, boxes] of byPage) {
-    if (pageIdx < 0 || pageIdx >= pages.length) continue;
-    const page = pages[pageIdx];
-    const { width, height } = page.getSize();
-
-    for (const box of boxes) {
-      const x = Math.max(0, box.xPct / 100 * width);
-      const y = Math.max(0, box.yPct / 100 * height);
-      const w = Math.min(width - x, box.wPct / 100 * width);
-      const h = Math.min(height - y, box.hPct / 100 * height);
-
-      // pdf-lib uses bottom-left origin, our coords are top-left
-      const pdfY = height - y - h;
-
-      page.drawRectangle({
-        x,
-        y: pdfY,
-        width: w,
-        height: h,
-        color: rgb(1, 1, 1), // White
-        borderWidth: 0,
-      });
-    }
-  }
-
-  const redactedBytes = await pdfDoc.save();
-  return Buffer.from(redactedBytes);
+  // Always use image-based redaction: rasterize → redact → reassemble.
+  // This destroys the text layer so redacted content cannot be copy-pasted.
+  // (pdf-lib's drawRectangle only covers text visually — the underlying text remains selectable.)
+  return applyImageRedactions(pdfBuffer, byPage);
 }
 
 /**
