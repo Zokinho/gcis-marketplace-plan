@@ -93,6 +93,7 @@ server {
         auth_basic off;
         proxy_pass http://server:3001;
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     # API proxy -> server container
@@ -114,6 +115,7 @@ server {
     location /uploads/ {
         proxy_pass http://server:3001;
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     # SPA fallback - serve index.html for all client routes
