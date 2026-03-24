@@ -24,13 +24,19 @@ const FIELD_LABELS: Record<string, string> = {
   totalTerpenePercent: 'Total Terpenes %',
   highestTerpenes: 'Terpene Breakdown',
   harvestDate: 'Harvest Date',
+  thcMin: 'THC %',
+  cbdMin: 'CBD %',
 };
+
+// These duplicate thcMin/cbdMin (seller sends both min+max as the same value) — hide from diff
+const HIDDEN_DIFF_KEYS = new Set(['thcMax', 'cbdMax']);
 
 function formatFieldValue(key: string, value: any): string {
   if (value === null || value === undefined) return '—';
   if (key === 'pricePerUnit') return `$${Number(value).toFixed(2)}`;
   if (key === 'gramsAvailable' || key === 'upcomingQty' || key === 'minQtyRequest') return `${Number(value).toLocaleString()}g`;
   if (key === 'totalTerpenePercent') return `${value}%`;
+  if (key === 'thcMin' || key === 'cbdMin') return `${Number(value).toFixed(2)}%`;
   if (key === 'harvestDate') return value ? new Date(value).toLocaleDateString() : '—';
   return String(value);
 }
@@ -648,7 +654,7 @@ export default function PendingProducts() {
                       <div className="mt-2 space-y-1">
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Proposed Changes</h4>
                         <div className="rounded-md border border-default surface p-3 text-sm">
-                          {Object.entries(fieldChanges).map(([key, newValue]) => {
+                          {Object.entries(fieldChanges).filter(([key]) => !HIDDEN_DIFF_KEYS.has(key)).map(([key, newValue]) => {
                             const currentValue = (product as any)[key];
                             return (
                               <div key={key} className="flex items-baseline gap-2 py-0.5">

@@ -82,6 +82,10 @@ export const updateListingSchema = z.object({
   totalTerpenePercent: z.coerce.number().min(0).max(100).optional(),
   highestTerpenes: z.string().max(2000).nullable().optional(),
   harvestDate: z.string().nullable().optional(),
+  thcMin: z.coerce.number().min(0).max(100).nullable().optional(),
+  thcMax: z.coerce.number().min(0).max(100).nullable().optional(),
+  cbdMin: z.coerce.number().min(0).max(100).nullable().optional(),
+  cbdMax: z.coerce.number().min(0).max(100).nullable().optional(),
 }).superRefine((data, ctx) => {
   if (Object.values(data).every((v) => v === undefined)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'At least one field must be provided' });

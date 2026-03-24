@@ -213,6 +213,8 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
   const [harvestDate, setHarvestDate] = useState(
     listing.harvestDate ? new Date(listing.harvestDate).toISOString().split('T')[0] : '',
   );
+  const [thc, setThc] = useState(String(listing.thcMin ?? listing.thcMax ?? ''));
+  const [cbd, setCbd] = useState(String(listing.cbdMin ?? listing.cbdMax ?? ''));
   const [newImages, setNewImages] = useState<File[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>(listing.imageUrls || []);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -253,6 +255,8 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
     setDesc(listing.description ?? '');
     setCert(listing.certification ?? '');
     setHarvestDate(listing.harvestDate ? new Date(listing.harvestDate).toISOString().split('T')[0] : '');
+    setThc(String(listing.thcMin ?? listing.thcMax ?? ''));
+    setCbd(String(listing.cbdMin ?? listing.cbdMax ?? ''));
     setNewImages([]);
     setExistingImages(listing.imageUrls || []);
     setUploadProgress(null);
@@ -313,6 +317,20 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       if (!isNaN(newMinQty) && newMinQty !== listing.minQtyRequest) updates.minQtyRequest = newMinQty;
       if (desc.trim() !== (listing.description ?? '')) updates.description = desc.trim();
       if (cert !== (listing.certification ?? '')) updates.certification = cert;
+
+      // THC/CBD diff — send as both min and max (same value)
+      const newThc = thc ? parseFloat(thc) : null;
+      const existingThc = listing.thcMin ?? listing.thcMax ?? null;
+      if (newThc !== existingThc) {
+        updates.thcMin = newThc as any;
+        updates.thcMax = newThc as any;
+      }
+      const newCbd = cbd ? parseFloat(cbd) : null;
+      const existingCbd = listing.cbdMin ?? listing.cbdMax ?? null;
+      if (newCbd !== existingCbd) {
+        updates.cbdMin = newCbd as any;
+        updates.cbdMax = newCbd as any;
+      }
 
       // Harvest date diff
       const existingHD = listing.harvestDate ? new Date(listing.harvestDate).toISOString().split('T')[0] : '';
@@ -535,6 +553,8 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
                 <EditField label="Available (g)" value={grams} onChange={setGrams} step="1" />
                 <EditField label="Upcoming (g)" value={upcoming} onChange={setUpcoming} step="1" />
                 <EditField label="Min QTY (g)" value={minQty} onChange={setMinQty} step="1" />
+                <EditField label="THC %" value={thc} onChange={setThc} step="0.01" />
+                <EditField label="CBD %" value={cbd} onChange={setCbd} step="0.01" />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">Harvest Date</label>

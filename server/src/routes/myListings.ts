@@ -420,7 +420,7 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description, certification, dominantTerpene, totalTerpenePercent, highestTerpenes, harvestDate } = req.body;
+  const { pricePerUnit, gramsAvailable, upcomingQty, minQtyRequest, description, certification, dominantTerpene, totalTerpenePercent, highestTerpenes, harvestDate, thcMin, thcMax, cbdMin, cbdMax } = req.body;
 
   const newChanges: Record<string, any> = {};
   if (pricePerUnit !== undefined) newChanges.pricePerUnit = pricePerUnit;
@@ -433,6 +433,10 @@ router.patch('/:id', writeLimiter, validate(updateListingSchema), async (req: Re
   if (totalTerpenePercent !== undefined) newChanges.totalTerpenePercent = totalTerpenePercent;
   if (highestTerpenes !== undefined) newChanges.highestTerpenes = highestTerpenes || null;
   if (harvestDate !== undefined) newChanges.harvestDate = harvestDate || null;
+  if (thcMin !== undefined) newChanges.thcMin = thcMin;
+  if (thcMax !== undefined) newChanges.thcMax = thcMax;
+  if (cbdMin !== undefined) newChanges.cbdMin = cbdMin;
+  if (cbdMax !== undefined) newChanges.cbdMax = cbdMax;
 
   try {
     // Merge with existing pendingEdits if already pending
