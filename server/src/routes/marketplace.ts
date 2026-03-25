@@ -5,6 +5,7 @@ import { validateQuery, marketplaceQuerySchema } from '../utils/validation';
 import { get30DayAvgPricesBatch, scorePriceVsMarket } from '../services/marketContextService';
 import { getSignedFileUrl, isS3Configured } from '../utils/s3';
 import { marketplaceVisibleWhere, isProductMarketplaceVisible, isCoupledMode } from '../utils/marketplaceVisibility';
+import { isAdmin } from '../middleware/auth';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -309,14 +310,13 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
   }
 
   // CoA visibility: admins see everything, others see redacted CoA only
-  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const isAdminEmail = req.user?.email ? adminEmails.includes(req.user.email.toLowerCase()) : false;
+  const isAdminUser = isAdmin(req.user?.email, req.user?.isAdmin);
   const hasRedacted = !!product.coaRedactedKey;
-  const canViewCoa = isAdminEmail || hasRedacted;
+  const canViewCoa = isAdminUser || hasRedacted;
 
   const productData = { ...product } as typeof product & { coaOriginalKey: string | null; coaRedactedKey: string | null };
 
-  if (isAdminEmail) {
+  if (isAdminUser) {
     // Admin sees everything — no changes
   } else if (hasRedacted) {
     // Non-admin + redacted version exists: serve redacted PDF only, hide metadata + originals
@@ -361,7 +361,7 @@ router.get('/products/:id', async (req: Request<{ id: string }>, res: Response) 
 
   // Admin-only: product view count + unique viewers + shortlist count
   let viewStats: { totalViews: number; uniqueViewers: number; shortlistCount: number } | undefined;
-  if (isAdminEmail) {
+  if (isAdminUser) {
     const [totalViews, uniqueViewerGroups, shortlistCount] = await Promise.all([
       prisma.productView.count({ where: { productId: req.params.id } }),
       prisma.productView.groupBy({ by: ['buyerId'], where: { productId: req.params.id } }),

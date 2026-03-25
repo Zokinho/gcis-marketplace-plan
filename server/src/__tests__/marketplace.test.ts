@@ -54,6 +54,7 @@ const mockAdminUser = {
   companyName: 'Admin Corp',
   contactType: 'Buyer',
   approved: true,
+  isAdmin: true,
   eulaAcceptedAt: new Date(),
   docUploaded: true,
 };
