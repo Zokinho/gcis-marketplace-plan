@@ -133,6 +133,7 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
         const product = await prisma.product.upsert({
           where: { zohoProductId: p.id },
           update: {
+            sellerId,
             ...fields,
             ...(!skipImageOverwrite && fileUrls.imageUrls.length > 0 ? { imageUrls: fileUrls.imageUrls } : {}),
             ...(fileUrls.coaUrls.length > 0 ? { coaUrls: fileUrls.coaUrls } : {}),
@@ -266,6 +267,7 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
         const product = await prisma.product.upsert({
           where: { zohoProductId: p.id },
           update: {
+            sellerId,
             ...fields,
             ...(!skipImageOverwrite && fileUrls.imageUrls.length > 0 ? { imageUrls: fileUrls.imageUrls } : {}),
             ...(fileUrls.coaUrls.length > 0 ? { coaUrls: fileUrls.coaUrls } : {}),

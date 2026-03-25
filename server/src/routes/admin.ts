@@ -487,7 +487,7 @@ router.get('/pending-products', async (_req: Request, res: Response) => {
 /**
  * POST /api/admin/products/:productId/approve
  * Approve a pending product — sets requestPending=false, isActive=true, marketplaceVisible=true.
- * No Zoho writeback — marketplace-only approval.
+ * Also pushes Product_Active + Request_pending back to Zoho (fire-and-forget).
  */
 router.post('/products/:productId/approve', async (req: Request<{ productId: string }>, res: Response) => {
   const { productId } = req.params;
@@ -561,6 +561,17 @@ router.post('/products/:productId/approve', async (req: Request<{ productId: str
 
   logger.info({ productId, productName: updated.name, approvedBy: req.user?.email }, '[ADMIN] Product approved');
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'product.approve', targetType: 'Product', targetId: productId, metadata: { productName: updated.name }, ip: getRequestIp(req) });
+
+  // Zoho writeback: set Product_Active=true, Request_pending=false (fire-and-forget)
+  if (product.zohoProductId) {
+    import('../services/zohoAuth').then(({ zohoRequest }) => {
+      zohoRequest('PUT', `/Products/${product.zohoProductId}`, {
+        data: { data: [{ Product_Active: true, Request_pending: false }], trigger: [] },
+      }).catch((err) => {
+        logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId }, '[ADMIN] Zoho writeback after approval failed (non-critical)');
+      });
+    }).catch(() => {});
+  }
 
   if (updated.sellerId) {
     createNotification({
