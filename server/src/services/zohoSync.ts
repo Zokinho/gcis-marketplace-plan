@@ -77,7 +77,6 @@ function mapProductFields(p: any) {
     // In coupled mode, marketplaceVisible mirrors isActive from Zoho.
     // In decoupled mode, don't touch marketplaceVisible during sync.
     ...(isCoupledMode() ? { marketplaceVisible: isActive } : {}),
-    requestPending: p.Request_pending ?? false,
     pricePerUnit: p.Min_Request_G_Including_5_markup != null ? Number(p.Min_Request_G_Including_5_markup) : null,
     minQtyRequest: p.Min_QTY_Request != null ? Number(p.Min_QTY_Request) : null,
     gramsAvailable: p.Grams_Available_When_submitted != null ? Number(p.Grams_Available_When_submitted) : null,
@@ -151,6 +150,7 @@ export async function syncProducts(): Promise<{ synced: number; skipped: number;
             zohoProductId: p.id,
             sellerId,
             ...fields,
+            requestPending: p.Request_pending ?? false,
             imageUrls: fileUrls.imageUrls,
             coaUrls: fileUrls.coaUrls,
           },
@@ -285,6 +285,7 @@ export async function syncProductsDelta(): Promise<{ synced: number; skipped: nu
             zohoProductId: p.id,
             sellerId,
             ...fields,
+            requestPending: p.Request_pending ?? false,
             imageUrls: fileUrls.imageUrls,
             coaUrls: fileUrls.coaUrls,
           },
