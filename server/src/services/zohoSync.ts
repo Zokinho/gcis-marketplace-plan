@@ -12,9 +12,15 @@ import {
 import { createNotification, createNotificationBatch } from './notificationService';
 import { isCoupledMode, isProductMarketplaceVisible } from '../utils/marketplaceVisibility';
 
-// ─── Seller resolution cache ───
+// ─── Seller resolution cache (10-minute TTL) ───
 
-const sellerCache = new Map<string, string>(); // zohoContactId → local userId
+const SELLER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const sellerCache = new Map<string, { userId: string; expiresAt: number }>(); // zohoContactId → { userId, expiresAt }
+
+/** Clear the seller cache — called on manual sync so reassignments take effect immediately. */
+export function clearSellerCache() {
+  sellerCache.clear();
+}
 
 /**
  * Resolve a Zoho Contact_Name.id to a local User ID.
@@ -23,9 +29,9 @@ const sellerCache = new Map<string, string>(); // zohoContactId → local userId
 async function resolveSellerByZohoId(zohoContactId: string | undefined): Promise<string | null> {
   if (!zohoContactId) return null;
 
-  // Check cache first
+  // Check cache first (with TTL)
   const cached = sellerCache.get(zohoContactId);
-  if (cached) return cached;
+  if (cached && cached.expiresAt > Date.now()) return cached.userId;
 
   // Look up in local DB
   const user = await prisma.user.findUnique({
@@ -34,9 +40,12 @@ async function resolveSellerByZohoId(zohoContactId: string | undefined): Promise
   });
 
   if (user) {
-    sellerCache.set(zohoContactId, user.id);
+    sellerCache.set(zohoContactId, { userId: user.id, expiresAt: Date.now() + SELLER_CACHE_TTL_MS });
     return user.id;
   }
+
+  // Expired entry for a now-missing user — evict
+  if (cached) sellerCache.delete(zohoContactId);
 
   // Seller not in local DB yet — will be linked once they sign up.
   // Return null; these products will be re-linked on next sync after the seller signs up.

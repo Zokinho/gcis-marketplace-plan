@@ -8,6 +8,7 @@ import {
   rejectProduct,
   approveEdit,
   rejectEdit,
+  triggerSync,
   getRedactionPageUrl,
   initializeRedaction,
   type PendingProduct,
@@ -446,6 +447,8 @@ export default function PendingProducts() {
   const [rejectReason, setRejectReason] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [redactionEditorFor, setRedactionEditorFor] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -521,15 +524,52 @@ export default function PendingProducts() {
     setExpandedId((prev) => (prev === id ? null : id));
   }
 
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await triggerSync();
+      const r = res.result;
+      const parts: string[] = [];
+      if (r.products) parts.push(`${r.products.synced} products synced`);
+      if (r.contacts) parts.push(`${r.contacts.synced} contacts synced`);
+      setSyncMsg(parts.join(', ') || 'Sync completed');
+      load();
+    } catch (err: any) {
+      setSyncMsg(err?.response?.data?.error || 'Sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <Layout>
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-primary">Pending Products</h2>
-        <p className="text-sm text-muted">
-          Review and approve new listings and seller-submitted edits.
-        </p>
-        <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue teal:from-brand-yellow teal:to-brand-coral" />
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-primary">Pending Products</h2>
+          <p className="text-sm text-muted">
+            Review and approve new listings and seller-submitted edits.
+          </p>
+          <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue teal:from-brand-yellow teal:to-brand-coral" />
+        </div>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex items-center gap-1.5 rounded-lg border border-default px-3 py-1.5 text-xs font-medium text-secondary transition hover-surface-muted disabled:opacity-50"
+        >
+          <svg className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+          </svg>
+          {syncing ? 'Syncing...' : 'Sync Now'}
+        </button>
       </div>
+
+      {syncMsg && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-brand-sage/40 bg-brand-sage/10 p-3">
+          <span className="text-sm font-medium text-brand-teal">{syncMsg}</span>
+          <button onClick={() => setSyncMsg(null)} className="text-brand-sage hover:text-brand-teal">&times;</button>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3">

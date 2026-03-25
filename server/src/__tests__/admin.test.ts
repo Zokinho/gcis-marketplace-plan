@@ -10,6 +10,7 @@ vi.mock('../services/zohoSync', () => ({
   syncProducts: vi.fn().mockResolvedValue(10),
   syncContacts: vi.fn().mockResolvedValue(5),
   syncProductsDelta: vi.fn().mockResolvedValue(3),
+  clearSellerCache: vi.fn(),
 }));
 
 vi.mock('../services/auditService', () => ({

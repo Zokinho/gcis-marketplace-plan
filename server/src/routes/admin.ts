@@ -4,7 +4,7 @@ import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
 import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema, adminBidsQuerySchema, rejectEditSchema } from '../utils/validation';
 import { prisma } from '../index';
-import { runFullSync, syncProducts, syncContacts, syncProductsDelta } from '../services/zohoSync';
+import { runFullSync, syncProducts, syncContacts, syncProductsDelta, clearSellerCache } from '../services/zohoSync';
 import { getCoaClient } from '../services/coaClient';
 import { mapCoaToProductFields } from '../utils/coaMapper';
 import { detectSeller } from '../services/sellerDetection';
@@ -69,6 +69,9 @@ router.get('/sync-status', async (_req: Request, res: Response) => {
  */
 router.post('/sync-now', validate(syncNowSchema), async (req: Request, res: Response) => {
   const { type } = req.body;
+
+  // Clear seller cache so reassignments take effect immediately
+  clearSellerCache();
 
   try {
     let result;

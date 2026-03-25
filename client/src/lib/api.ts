@@ -638,6 +638,11 @@ export async function fetchPendingProducts(): Promise<PendingProduct[]> {
   return res.data.products;
 }
 
+export async function triggerSync(type?: string): Promise<{ message: string; result: any }> {
+  const res = await api.post<{ message: string; result: any }>('/admin/sync-now', type ? { type } : {});
+  return res.data;
+}
+
 export async function approveProduct(productId: string): Promise<void> {
   await api.post(`/admin/products/${productId}/approve`);
 }
