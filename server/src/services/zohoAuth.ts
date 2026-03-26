@@ -52,7 +52,9 @@ export async function zohoRequest(
     });
     return response.data;
   } catch (err: any) {
-    logger.error({ method, endpoint, status: err?.response?.status, body: err?.response?.data }, '[ZOHO] API error');
+    // Stringify response body deeply so nested objects (like Zoho `details`) aren't lost as [Object]
+    const respData = err?.response?.data;
+    logger.error({ method, endpoint, status: err?.response?.status, body: respData ? JSON.stringify(respData) : undefined }, '[ZOHO] API error');
     throw err;
   }
 }

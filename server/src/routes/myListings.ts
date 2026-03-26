@@ -327,8 +327,13 @@ router.post(
       const finalProduct = await prisma.product.findUnique({ where: { id: product.id } });
       res.status(201).json({ product: finalProduct });
     } catch (err: any) {
-      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Create failed');
-      res.status(500).json({ error: 'Failed to create listing' });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error({ err: err instanceof Error ? err : { message: errMsg } }, '[MY-LISTINGS] Create failed');
+      // Surface Zoho-specific errors so the user knows what went wrong
+      const userMessage = errMsg.startsWith('Zoho rejected') || errMsg.startsWith('Your account is not')
+        ? errMsg
+        : 'Failed to create listing';
+      res.status(500).json({ error: userMessage });
     }
   },
 );

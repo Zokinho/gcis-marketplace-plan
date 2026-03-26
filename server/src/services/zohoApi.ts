@@ -434,9 +434,21 @@ export async function createZohoProduct(fields: {
   if (fields.budSizeLarge != null) zohoFields.cm_Large = fields.budSizeLarge;
   if (fields.budSizeXLarge != null) zohoFields.cm_X_Large = fields.budSizeXLarge;
 
-  const response = await zohoRequest('POST', '/Products', {
-    data: { data: [zohoFields], trigger: [] },
-  });
+  let response;
+  try {
+    response = await zohoRequest('POST', '/Products', {
+      data: { data: [zohoFields], trigger: [] },
+    });
+  } catch (err: any) {
+    // Extract Zoho-specific error details for a useful error message
+    const zohoData = err?.response?.data?.data?.[0];
+    if (zohoData?.code === 'INVALID_DATA') {
+      const details = zohoData.details;
+      const fieldName = details?.api_name || details?.expected_data_type || JSON.stringify(details);
+      throw new Error(`Zoho rejected product data: ${zohoData.message} (field: ${fieldName})`);
+    }
+    throw err;
+  }
 
   const zohoProductId = response?.data?.[0]?.details?.id;
   if (!zohoProductId) {
