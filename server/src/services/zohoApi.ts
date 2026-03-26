@@ -67,8 +67,7 @@ export async function fetchMarketplaceContacts(): Promise<any[]> {
   let page = 1;
   let hasMore = true;
 
-  // Fetch all contacts and filter for those with a User_UID (marketplace users).
-  // Zoho v7 search doesn't support "is_not_empty" operator.
+  // Fetch all contacts — match to marketplace users by Zoho ID, legacy UID, or email.
   while (hasMore) {
     try {
       const response = await zohoRequest('GET', '/Contacts', {
@@ -80,10 +79,7 @@ export async function fetchMarketplaceContacts(): Promise<any[]> {
       });
 
       const contacts = response?.data || [];
-      // Only include contacts that have a User_UID (links to marketplace user)
-      for (const c of contacts) {
-        if (c.User_UID) allContacts.push(c);
-      }
+      allContacts.push(...contacts);
       hasMore = response?.info?.more_records || false;
       page++;
     } catch (err: any) {

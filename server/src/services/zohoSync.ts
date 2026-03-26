@@ -453,17 +453,15 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
 
     for (const c of contacts) {
       try {
-        const userUid = c.User_UID;
-        if (!userUid) continue;
+        // Find the local user by Zoho Contact ID, legacy UID, or email
+        const orConditions: any[] = [
+          { zohoContactId: c.id },
+        ];
+        if (c.User_UID) orConditions.push({ clerkUserId: c.User_UID });
+        if (c.Email) orConditions.push({ email: c.Email.toLowerCase() });
 
-        // Find the local user by legacy UID or Zoho Contact ID
         const existingUser = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { clerkUserId: userUid },
-              { zohoContactId: c.id },
-            ],
-          },
+          where: { OR: orConditions },
         });
 
         if (!existingUser) continue; // Not a marketplace user yet
