@@ -317,6 +317,13 @@ async function mountRoutes() {
   const redactionRoutes = (await import('./routes/redaction')).default;
   app.use('/api/redaction', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, redactionRoutes);
 
+  // CoA standalone tool — admin-only upload + redact + download
+  const { default: coaToolRoutes, pageRouter: coaToolPageRouter } = await import('./routes/coaTool');
+  // Page images served without auth (session UUID is the secret, like a presigned URL)
+  app.use('/api/coa-tool', apiLimiter, coaToolPageRouter);
+  // Upload + redact require admin auth
+  app.use('/api/coa-tool', apiLimiter, requireAuth(), marketplaceAuth, requireAdmin, coaToolRoutes);
+
   // CoA upload — requires JWT auth + marketplace auth
   app.use('/api/coa', writeLimiter, requireAuth(), marketplaceAuth, coaRoutes);
 

@@ -45,6 +45,7 @@ const ADMIN_LINKS = [
   { to: '/coa-inbox', label: 'Supplies Inbox' },
   { to: '/shares', label: 'Shares' },
   { to: '/users', label: 'Users' },
+  { to: '/coa-tool', label: 'CoA Tool' },
 ];
 
 function AdminDropdown() {

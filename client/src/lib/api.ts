@@ -1427,4 +1427,31 @@ export async function initializeRedaction(productId: string): Promise<{ message:
   return res.data;
 }
 
+// ─── CoA Standalone Tool ───
+
+export async function uploadCoaForTool(file: File): Promise<{ sessionId: string; pageCount: number; fileName: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await api.post('/coa-tool/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120_000,
+  });
+  return res.data;
+}
+
+export function getCoaToolPageUrl(sessionId: string, pageNum: number): string {
+  return `/api/coa-tool/${sessionId}/pages/${pageNum}`;
+}
+
+export async function downloadRedactedPdf(
+  sessionId: string,
+  regions: Array<{ page: number; xPct: number; yPct: number; wPct: number; hPct: number }>,
+): Promise<Blob> {
+  const res = await api.post(`/coa-tool/${sessionId}/redact`, { regions }, {
+    responseType: 'blob',
+    timeout: 120_000,
+  });
+  return res.data;
+}
+
 export default api;

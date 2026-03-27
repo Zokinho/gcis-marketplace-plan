@@ -30,6 +30,7 @@ import SpotSalesAdmin from './pages/SpotSalesAdmin';
 import PendingProducts from './pages/PendingProducts';
 import AdminBids from './pages/AdminBids';
 import Guide from './pages/Guide';
+import CoaTool from './pages/CoaTool';
 import AccountSettings from './pages/AccountSettings';
 import ChangePassword from './pages/ChangePassword';
 import { ShortlistProvider } from './lib/useShortlist';
@@ -219,6 +220,9 @@ export default function App() {
         } />
         <Route path="/admin/bids" element={
           <RequireAuth><MarketplaceGuard><AdminBids /></MarketplaceGuard></RequireAuth>
+        } />
+        <Route path="/coa-tool" element={
+          <RequireAuth><MarketplaceGuard><CoaTool /></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/users" element={
           <RequireAuth><MarketplaceGuard><UserManagement /></MarketplaceGuard></RequireAuth>
