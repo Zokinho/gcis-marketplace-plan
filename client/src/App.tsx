@@ -109,6 +109,27 @@ function MarketplaceGuard({ children }: { children: React.ReactNode }) {
   }
 }
 
+/**
+ * Admin guard. Redirects non-admin users to the marketplace.
+ */
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const { data, loading } = useUserStatus();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!data?.user?.isAdmin) {
+    return <Navigate to="/marketplace" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function NotFound() {
   return (
     <div className="flex min-h-screen items-center justify-center surface-base px-4">
@@ -170,7 +191,7 @@ export default function App() {
           <RequireAuth><MarketplaceGuard><SpotSales /></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/spot-sales/admin" element={
-          <RequireAuth><MarketplaceGuard><SpotSalesAdmin /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><SpotSalesAdmin /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/my-matches" element={
           <RequireAuth><MarketplaceGuard><BuyerMatchesPage /></MarketplaceGuard></RequireAuth>
@@ -187,45 +208,45 @@ export default function App() {
 
         {/* Intelligence routes (admin) */}
         <Route path="/intelligence" element={
-          <RequireAuth><MarketplaceGuard><IntelDashboard /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><IntelDashboard /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/intelligence/matches" element={
-          <RequireAuth><MarketplaceGuard><MatchExplorer /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><MatchExplorer /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/intelligence/predictions" element={
-          <RequireAuth><MarketplaceGuard><PredictionsPage /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><PredictionsPage /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/intelligence/churn" element={
-          <RequireAuth><MarketplaceGuard><ChurnPage /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><ChurnPage /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/intelligence/market" element={
-          <RequireAuth><MarketplaceGuard><MarketIntelPage /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><MarketIntelPage /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/intelligence/sellers" element={
-          <RequireAuth><MarketplaceGuard><SellerScorecardsPage /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><SellerScorecardsPage /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/intelligence/transactions" element={
-          <RequireAuth><MarketplaceGuard><TransactionsPage /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><TransactionsPage /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
 
-        {/* Admin routes (auth-guarded) */}
+        {/* Admin routes */}
         <Route path="/coa-inbox" element={
-          <RequireAuth><MarketplaceGuard><CoaEmailQueue /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><CoaEmailQueue /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/shares" element={
-          <RequireAuth><MarketplaceGuard><CuratedShares /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><CuratedShares /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/pending-products" element={
-          <RequireAuth><MarketplaceGuard><PendingProducts /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><PendingProducts /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/admin/bids" element={
-          <RequireAuth><MarketplaceGuard><AdminBids /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><AdminBids /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/coa-tool" element={
-          <RequireAuth><MarketplaceGuard><CoaTool /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><CoaTool /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
         <Route path="/users" element={
-          <RequireAuth><MarketplaceGuard><UserManagement /></MarketplaceGuard></RequireAuth>
+          <RequireAuth><MarketplaceGuard><RequireAdmin><UserManagement /></RequireAdmin></MarketplaceGuard></RequireAuth>
         } />
 
         {/* Public share routes (NO auth) */}
