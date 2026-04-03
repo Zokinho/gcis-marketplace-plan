@@ -1323,6 +1323,7 @@ export interface IsoRequestRecord {
   quantityMax: number | null;
   budgetMax: number | null;
   notes: string | null;
+  isPrivate: boolean;
   status: IsoStatusType;
   expiresAt: string | null;
   matchedProduct?: ProductCard;
@@ -1359,6 +1360,7 @@ export async function createIsoRequest(data: {
   quantityMax?: number;
   budgetMax?: number;
   notes?: string;
+  isPrivate?: boolean;
   expiresAt?: string;
 }): Promise<{ iso: IsoRequestRecord }> {
   const res = await api.post('/iso', data);
@@ -1371,6 +1373,7 @@ export async function fetchIsoBoard(params?: {
   status?: IsoStatusType;
   category?: string;
   mine?: boolean;
+  visibility?: 'all' | 'public' | 'private';
   sort?: 'date' | 'expiry' | 'budget';
   order?: 'asc' | 'desc';
 }): Promise<{ items: IsoRequestRecord[]; pagination: Pagination }> {
@@ -1380,6 +1383,7 @@ export async function fetchIsoBoard(params?: {
   if (params?.status) query.status = params.status;
   if (params?.category) query.category = params.category;
   if (params?.mine) query.mine = 'true';
+  if (params?.visibility) query.visibility = params.visibility;
   if (params?.sort) query.sort = params.sort;
   if (params?.order) query.order = params.order;
   const res = await api.get('/iso', { params: query });
@@ -1390,11 +1394,13 @@ export async function fetchMyIsos(params?: {
   page?: number;
   limit?: number;
   status?: IsoStatusType;
+  visibility?: 'all' | 'public' | 'private';
 }): Promise<{ items: IsoRequestRecord[]; pagination: Pagination }> {
   const query: Record<string, string> = {};
   if (params?.page) query.page = String(params.page);
   if (params?.limit) query.limit = String(params.limit);
   if (params?.status) query.status = params.status;
+  if (params?.visibility) query.visibility = params.visibility;
   const res = await api.get('/iso/my', { params: query });
   return res.data;
 }
@@ -1421,6 +1427,7 @@ export async function updateIso(id: string, data: {
   quantityMax?: number | null;
   budgetMax?: number | null;
   notes?: string | null;
+  isPrivate?: boolean;
 }): Promise<{ iso: IsoRequestRecord }> {
   const res = await api.patch(`/iso/${id}`, data);
   return res.data;

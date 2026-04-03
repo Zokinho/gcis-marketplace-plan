@@ -369,7 +369,7 @@ publicShareRouter.get('/:token/isos', async (req: Request<{ token: string }>, re
   })();
 
   const isos = await prisma.isoRequest.findMany({
-    where: { id: { in: share.isoRequestIds } },
+    where: { id: { in: share.isoRequestIds }, isPrivate: false },
     include: {
       _count: { select: { responses: true } },
     },

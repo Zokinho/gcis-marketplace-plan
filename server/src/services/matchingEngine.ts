@@ -78,6 +78,13 @@ async function scoreCategoryMatch(buyerId: string, category: string | null): Pro
   if (categoryShortlists >= 3) return 50;
   if (categoryShortlists >= 1) return 42;
 
+  // Check if buyer has OPEN/MATCHED ISO requests in this category
+  const categoryIsos = await prisma.isoRequest.count({
+    where: { buyerId, category, status: { in: ['OPEN', 'MATCHED'] } },
+  });
+  if (categoryIsos >= 2) return 65;
+  if (categoryIsos >= 1) return 58;
+
   // Check if buyer has viewed products in this category
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const categoryViews = await prisma.productView.count({
@@ -97,7 +104,24 @@ async function scorePriceFit(buyerId: string, productPrice: number | null, categ
     _sum: { quantity: true, totalValue: true },
   });
 
-  if (!avgPrice._sum.totalValue || !avgPrice._sum.quantity) return 50;
+  if (!avgPrice._sum.totalValue || !avgPrice._sum.quantity) {
+    // Fallback: use ISO budget preferences if available
+    const isoWithBudget = await prisma.isoRequest.findFirst({
+      where: { buyerId, category, status: { in: ['OPEN', 'MATCHED'] }, budgetMax: { not: null } },
+      select: { budgetMax: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (isoWithBudget?.budgetMax) {
+      const priceDiff = (productPrice - isoWithBudget.budgetMax) / isoWithBudget.budgetMax;
+      if (priceDiff <= -0.15) return 100;
+      if (priceDiff <= -0.05) return 90;
+      if (priceDiff <= 0.05) return 80;
+      if (priceDiff <= 0.15) return 60;
+      if (priceDiff <= 0.30) return 40;
+      return 20;
+    }
+    return 50;
+  }
 
   const avgUnitPrice = avgPrice._sum.totalValue / avgPrice._sum.quantity;
   const priceDiff = (productPrice - avgUnitPrice) / avgUnitPrice;
@@ -198,7 +222,32 @@ async function scoreQuantityFit(buyerId: string, gramsAvailable: number | null, 
     _avg: { quantity: true },
   });
 
-  if (!avgQuantity._avg.quantity) return 50;
+  if (!avgQuantity._avg.quantity) {
+    // Fallback: use ISO quantity preferences if available
+    const isoWithQty = await prisma.isoRequest.findFirst({
+      where: {
+        buyerId,
+        category,
+        status: { in: ['OPEN', 'MATCHED'] },
+        OR: [{ quantityMin: { not: null } }, { quantityMax: { not: null } }],
+      },
+      select: { quantityMin: true, quantityMax: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (isoWithQty && (isoWithQty.quantityMin || isoWithQty.quantityMax)) {
+      const min = isoWithQty.quantityMin ?? 0;
+      const max = isoWithQty.quantityMax ?? Infinity;
+      if (gramsAvailable >= min && gramsAvailable <= max) return 90;
+      // Within 50%-200% of the range
+      const rangeCenter = max === Infinity ? min : (min + max) / 2;
+      if (rangeCenter > 0) {
+        const ratio = gramsAvailable / rangeCenter;
+        if (ratio >= 0.5 && ratio <= 2.0) return 65;
+      }
+      return 40;
+    }
+    return 50;
+  }
 
   const qtyRatio = gramsAvailable / avgQuantity._avg.quantity;
   if (qtyRatio >= 0.8 && qtyRatio <= 1.2) return 100;
@@ -286,6 +335,9 @@ async function generateInsights(
 
   if (scores.category >= 95) {
     insights.push({ type: 'positive', text: 'Strong category purchase history' });
+  } else if (scores.category >= 58 && scores.category <= 65) {
+    // ISO-driven category score
+    insights.push({ type: 'positive', text: "Matches buyer's wanted request preferences" });
   } else if (scores.category >= 42 && scores.category <= 50) {
     // Shortlist-driven category score — add insight
     insights.push({ type: 'positive', text: 'Buyer has shortlisted products in this category' });

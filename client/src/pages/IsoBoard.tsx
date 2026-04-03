@@ -97,8 +97,20 @@ function IsoCard({
   return (
     <div className="rounded-lg border card-blue p-4 shadow-sm hover:shadow-md transition backdrop-blur-sm">
       <div className="flex items-start justify-between gap-2 mb-1">
-        <h3 className="text-sm font-semibold text-primary line-clamp-1">{iso.title}</h3>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {iso.isPrivate && (
+            <svg className="h-3.5 w-3.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+            </svg>
+          )}
+          <h3 className="text-sm font-semibold text-primary line-clamp-1">{iso.title}</h3>
+        </div>
         <div className="flex items-center gap-2 shrink-0">
+          {iso.isPrivate && (
+            <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              Private
+            </span>
+          )}
           <IsoStatusBadge status={iso.status} />
           {isAdmin && <StaleBadge iso={iso} />}
           <ExpiryCountdown expiresAt={iso.expiresAt} />
@@ -406,6 +418,17 @@ function CreateIsoModal({
             <p className="mt-1 text-xs text-muted">Leave blank for no expiry</p>
           </div>
 
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!form.isPrivate}
+              onChange={(e) => setForm({ ...form, isPrivate: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300 text-brand-teal focus:ring-brand-teal"
+            />
+            <span className="text-sm text-primary">Keep private</span>
+            <span className="text-xs text-muted">(only visible to you and admins — still feeds matching)</span>
+          </label>
+
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex gap-3 justify-end">
@@ -451,6 +474,7 @@ function EditIsoModal({
     budgetMax: iso.budgetMax ?? '',
     notes: iso.notes || '',
     expiresAt: iso.expiresAt ? new Date(iso.expiresAt).toISOString().split('T')[0] : '',
+    isPrivate: iso.isPrivate ?? false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -475,6 +499,7 @@ function EditIsoModal({
       }
 
       if ((form.notes || null) !== (iso.notes || null)) data.notes = form.notes || null;
+      if (form.isPrivate !== (iso.isPrivate ?? false)) data.isPrivate = form.isPrivate;
 
       // Handle expiresAt: compare current form vs original
       const origExpDate = iso.expiresAt ? new Date(iso.expiresAt).toISOString().split('T')[0] : '';
@@ -662,6 +687,17 @@ function EditIsoModal({
             <p className="mt-1 text-xs text-muted">Leave blank for no expiry</p>
           </div>
 
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!form.isPrivate}
+              onChange={(e) => setForm({ ...form, isPrivate: e.target.checked })}
+              className="h-4 w-4 rounded border-gray-300 text-brand-teal focus:ring-brand-teal"
+            />
+            <span className="text-sm text-primary">Keep private</span>
+            <span className="text-xs text-muted">(only visible to you and admins — still feeds matching)</span>
+          </label>
+
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex gap-3 justify-end">
@@ -759,6 +795,7 @@ export default function IsoBoard() {
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 12, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
   const [showCreate, setShowCreate] = useState(false);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [editingIso, setEditingIso] = useState<IsoRequestRecord | null>(null);
@@ -775,7 +812,7 @@ export default function IsoBoard() {
         setItems(res.items);
         setPagination(res.pagination);
       } else {
-        const res = await fetchMyIsos({ page, limit: 12 });
+        const res = await fetchMyIsos({ page, limit: 12, visibility: visibilityFilter !== 'all' ? visibilityFilter : undefined });
         setItems(res.items);
         setPagination(res.pagination);
       }
@@ -784,7 +821,7 @@ export default function IsoBoard() {
     } finally {
       setLoading(false);
     }
-  }, [tab, categoryFilter]);
+  }, [tab, categoryFilter, visibilityFilter]);
 
   useEffect(() => {
     loadData(1);
@@ -843,9 +880,9 @@ export default function IsoBoard() {
         </button>
       </div>
 
-      {/* Category filter (browse tab only) */}
-      {tab === 'browse' && (
-        <div className="mb-4">
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap gap-3">
+        {tab === 'browse' && (
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
@@ -854,8 +891,19 @@ export default function IsoBoard() {
             <option value="">All Categories</option>
             {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-        </div>
-      )}
+        )}
+        {tab === 'my' && (
+          <select
+            value={visibilityFilter}
+            onChange={(e) => setVisibilityFilter(e.target.value as any)}
+            className="rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+          >
+            <option value="all">All Requests</option>
+            <option value="public">Public Only</option>
+            <option value="private">Private Only</option>
+          </select>
+        )}
+      </div>
 
       {/* Content */}
       {loading ? (

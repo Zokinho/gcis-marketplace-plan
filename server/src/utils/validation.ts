@@ -413,14 +413,16 @@ export const isoCreateSchema = z.object({
   quantityMax:   z.coerce.number().positive().optional(),
   budgetMax:     z.coerce.number().positive().optional(),
   notes:         z.string().max(2000).optional(),
+  isPrivate:     z.boolean().optional(),
   expiresAt:     z.coerce.date().refine((d) => d > new Date(), 'expiresAt must be in the future').optional(),
 });
 
 export const isoQuerySchema = paginationQuery.extend({
   status:   z.enum(['OPEN', 'MATCHED', 'FULFILLED', 'CLOSED', 'EXPIRED']).optional(),
   category: z.string().max(100).optional(),
-  mine:     z.enum(['true', 'false']).default('false'),
-  sort:     z.enum(['date', 'expiry', 'budget']).default('date'),
+  mine:       z.enum(['true', 'false']).default('false'),
+  visibility: z.enum(['all', 'public', 'private']).default('all'),
+  sort:       z.enum(['date', 'expiry', 'budget']).default('date'),
   order:    z.enum(['asc', 'desc']).default('desc'),
 });
 
@@ -447,6 +449,7 @@ export const isoUpdateSchema = z.object({
   quantityMax:   z.coerce.number().positive().optional().nullable(),
   budgetMax:     z.coerce.number().positive().optional().nullable(),
   notes:         z.string().max(2000).optional().nullable(),
+  isPrivate:     z.boolean().optional(),
 });
 
 // ─── Edit approval schemas ───

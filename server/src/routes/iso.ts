@@ -57,11 +57,13 @@ router.post('/', writeLimiter, validate(isoCreateSchema), async (req: Request, r
  */
 router.get('/my', validateQuery(isoQuerySchema), async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { page, limit, status, category, sort, order } = req.query as any;
+  const { page, limit, status, category, visibility, sort, order } = req.query as any;
 
   const where: any = { buyerId: userId };
   if (status) where.status = status;
   if (category) where.category = category;
+  if (visibility === 'public') where.isPrivate = false;
+  else if (visibility === 'private') where.isPrivate = true;
 
   let orderBy: any;
   switch (sort) {
@@ -214,12 +216,18 @@ router.get('/admin', async (req: Request, res: Response) => {
  */
 router.get('/', validateQuery(isoQuerySchema), async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { page, limit, status, category, mine, sort, order } = req.query as any;
+  const { page, limit, status, category, mine, visibility, sort, order } = req.query as any;
   const isSeller = req.user!.contactType?.includes('Seller') ?? false;
 
   const where: any = {};
   if (mine === 'true') {
     where.buyerId = userId;
+    // Support visibility filter for "mine" mode
+    if (visibility === 'public') where.isPrivate = false;
+    else if (visibility === 'private') where.isPrivate = true;
+  } else {
+    // Public browse: never show private ISOs
+    where.isPrivate = false;
   }
   if (status) {
     where.status = status;
@@ -282,6 +290,7 @@ router.get('/', validateQuery(isoQuerySchema), async (req: Request, res: Respons
         quantityMax: iso.quantityMax,
         budgetMax: iso.budgetMax,
         notes: iso.notes,
+        isPrivate: iso.isPrivate,
         status: iso.status,
         expiresAt: iso.expiresAt,
         createdAt: iso.createdAt,
@@ -340,6 +349,12 @@ router.get('/:id', validateParams(idParams), async (req: Request, res: Response)
     }
 
     const isOwner = iso.buyerId === userId;
+    const isAdmin = !!(req.user!.email && process.env.ADMIN_EMAILS?.split(',').map((e) => e.trim()).includes(req.user!.email));
+
+    // Private ISOs are only visible to owner and admins
+    if (iso.isPrivate && !isOwner && !isAdmin) {
+      return res.status(404).json({ error: 'ISO request not found' });
+    }
 
     const result: any = {
       id: iso.id,
@@ -355,6 +370,7 @@ router.get('/:id', validateParams(idParams), async (req: Request, res: Response)
       quantityMax: iso.quantityMax,
       budgetMax: iso.budgetMax,
       notes: iso.notes,
+      isPrivate: iso.isPrivate,
       status: iso.status,
       expiresAt: iso.expiresAt,
       createdAt: iso.createdAt,
@@ -382,7 +398,7 @@ router.get('/:id', validateParams(idParams), async (req: Request, res: Response)
 router.patch('/:id', writeLimiter, validateParams(idParams), validate(isoUpdateSchema), async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { id } = (req as any).params;
-  const { status, expiresAt, title, category, type, certification, thcMin, thcMax, cbdMin, cbdMax, quantityMin, quantityMax, budgetMax, notes } = req.body;
+  const { status, expiresAt, title, category, type, certification, thcMin, thcMax, cbdMin, cbdMax, quantityMin, quantityMax, budgetMax, notes, isPrivate } = req.body;
 
   try {
     const iso = await prisma.isoRequest.findUnique({ where: { id } });
@@ -412,6 +428,11 @@ router.patch('/:id', writeLimiter, validateParams(idParams), validate(isoUpdateS
       if (iso.status === 'EXPIRED' || iso.status === 'CLOSED') {
         updateData.status = 'OPEN';
       }
+    }
+
+    // isPrivate can be toggled independently (not gated by status)
+    if (isPrivate !== undefined) {
+      updateData.isPrivate = isPrivate;
     }
 
     // Content field edits — only allowed on OPEN or MATCHED (unless reopening via expiresAt)
@@ -470,6 +491,10 @@ router.post('/:id/respond', writeLimiter, validateParams(idParams), validate(iso
 
     if (!iso) {
       return res.status(404).json({ error: 'ISO request not found' });
+    }
+
+    if (iso.isPrivate) {
+      return res.status(403).json({ error: 'Cannot respond to a private request' });
     }
 
     if (iso.status !== 'OPEN' && iso.status !== 'MATCHED') {
