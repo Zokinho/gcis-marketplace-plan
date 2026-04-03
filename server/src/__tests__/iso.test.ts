@@ -22,6 +22,12 @@ vi.mock('../services/isoMatchingService', () => ({
   matchProductToOpenIsos: vi.fn().mockResolvedValue(0),
 }));
 
+// Mock auditService
+vi.mock('../services/auditService', () => ({
+  logAudit: vi.fn(),
+  getRequestIp: vi.fn().mockReturnValue('127.0.0.1'),
+}));
+
 // ─── Test helpers ───
 
 function createTestApp(user?: { id: string; email: string; approved: boolean; contactType?: string }) {
@@ -45,10 +51,12 @@ async function mountIsoRoutes(app: express.Express) {
 
 const testBuyer = { id: 'buyer1', email: 'buyer@test.com', approved: true, contactType: 'Buyer' };
 const testSeller = { id: 'seller1', email: 'seller@test.com', approved: true, contactType: 'Buyer; Seller' };
+const testAdmin = { id: 'admin1', email: 'admin@test.com', approved: true, contactType: 'Buyer' };
 
 const sampleIso = {
   id: 'iso1',
   buyerId: 'buyer1',
+  title: 'Looking for premium Sativa flower',
   category: 'Flower',
   type: 'Sativa',
   certification: null,
@@ -86,6 +94,7 @@ describe('ISO Routes', () => {
       const res = await request(app)
         .post('/api/iso')
         .send({
+          title: 'Looking for premium Sativa flower',
           category: 'Flower',
           type: 'Sativa',
           thcMin: 20,
@@ -103,12 +112,12 @@ describe('ISO Routes', () => {
           buyerId: 'buyer1',
           category: 'Flower',
           type: 'Sativa',
-          expiresAt: expect.any(Date),
+          expiresAt: null,
         }),
       });
     });
 
-    it('should accept empty body (no filters)', async () => {
+    it('should accept minimal body (title only, no filters)', async () => {
       const app = createTestApp(testBuyer);
       await mountIsoRoutes(app);
 
@@ -116,9 +125,20 @@ describe('ISO Routes', () => {
 
       const res = await request(app)
         .post('/api/iso')
-        .send({});
+        .send({ title: 'Need anything available' });
 
       expect(res.status).toBe(201);
+    });
+
+    it('should reject empty body (title required)', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      const res = await request(app)
+        .post('/api/iso')
+        .send({});
+
+      expect(res.status).toBe(400);
     });
 
     it('should reject invalid thcMin', async () => {
@@ -313,24 +333,24 @@ describe('ISO Routes', () => {
       });
     });
 
-    it('should renew expired ISO', async () => {
+    it('should reopen expired ISO with null expiresAt', async () => {
       const app = createTestApp(testBuyer);
       await mountIsoRoutes(app);
 
       const expiredIso = { ...sampleIso, status: 'EXPIRED' };
       mockPrisma.isoRequest.findUnique.mockResolvedValue(expiredIso as any);
-      mockPrisma.isoRequest.update.mockResolvedValue({ ...expiredIso, status: 'OPEN' } as any);
+      mockPrisma.isoRequest.update.mockResolvedValue({ ...expiredIso, status: 'OPEN', expiresAt: null } as any);
 
       const res = await request(app)
         .patch('/api/iso/iso1')
-        .send({ renew: true });
+        .send({ expiresAt: null });
 
       expect(res.status).toBe(200);
       expect(mockPrisma.isoRequest.update).toHaveBeenCalledWith({
         where: { id: 'iso1' },
         data: expect.objectContaining({
           status: 'OPEN',
-          expiresAt: expect.any(Date),
+          expiresAt: null,
         }),
       });
     });
@@ -359,6 +379,207 @@ describe('ISO Routes', () => {
         .send({ status: 'CLOSED' });
 
       expect(res.status).toBe(404);
+    });
+  });
+
+  // ─── PATCH /:id (content edits) ───
+
+  describe('PATCH /api/iso/:id (content edits)', () => {
+    it('should allow owner to edit content fields', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      mockPrisma.isoRequest.findUnique.mockResolvedValue(sampleIso as any);
+      mockPrisma.isoRequest.update.mockResolvedValue({ ...sampleIso, title: 'Updated title', budgetMax: 8.0 } as any);
+
+      const res = await request(app)
+        .patch('/api/iso/iso1')
+        .send({ title: 'Updated title', budgetMax: 8.0 });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.isoRequest.update).toHaveBeenCalledWith({
+        where: { id: 'iso1' },
+        data: expect.objectContaining({ title: 'Updated title', budgetMax: 8.0 }),
+      });
+    });
+
+    it('should allow admin to edit another user\'s ISO', async () => {
+      process.env.ADMIN_EMAILS = 'admin@test.com';
+      const app = createTestApp(testAdmin);
+      await mountIsoRoutes(app);
+
+      mockPrisma.isoRequest.findUnique.mockResolvedValue(sampleIso as any);
+      mockPrisma.isoRequest.update.mockResolvedValue({ ...sampleIso, category: 'Extracts' } as any);
+
+      const res = await request(app)
+        .patch('/api/iso/iso1')
+        .send({ category: 'Extracts' });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.isoRequest.update).toHaveBeenCalledWith({
+        where: { id: 'iso1' },
+        data: expect.objectContaining({ category: 'Extracts' }),
+      });
+
+      const { logAudit } = await import('../services/auditService');
+      expect(logAudit).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'iso.edit', targetId: 'iso1' }),
+      );
+
+      delete process.env.ADMIN_EMAILS;
+    });
+
+    it('should reject non-owner non-admin edit', async () => {
+      delete process.env.ADMIN_EMAILS;
+      const app = createTestApp(testSeller);
+      await mountIsoRoutes(app);
+
+      mockPrisma.isoRequest.findUnique.mockResolvedValue(sampleIso as any);
+
+      const res = await request(app)
+        .patch('/api/iso/iso1')
+        .send({ title: 'Hack attempt' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('should reject content edits on CLOSED ISO (without expiresAt reopen)', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      mockPrisma.isoRequest.findUnique.mockResolvedValue({ ...sampleIso, status: 'CLOSED' } as any);
+
+      const res = await request(app)
+        .patch('/api/iso/iso1')
+        .send({ title: 'New title' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Cannot edit content on a closed or expired ISO request');
+    });
+
+    it('should reject invalid field values (thcMin > 100)', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      const res = await request(app)
+        .patch('/api/iso/iso1')
+        .send({ thcMin: 150 });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should set expiresAt via update', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      mockPrisma.isoRequest.findUnique.mockResolvedValue(sampleIso as any);
+      const futureDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+      mockPrisma.isoRequest.update.mockResolvedValue({ ...sampleIso, expiresAt: futureDate } as any);
+
+      const res = await request(app)
+        .patch('/api/iso/iso1')
+        .send({ expiresAt: futureDate.toISOString() });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.isoRequest.update).toHaveBeenCalledWith({
+        where: { id: 'iso1' },
+        data: expect.objectContaining({
+          expiresAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('should clear expiresAt by sending null', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      mockPrisma.isoRequest.findUnique.mockResolvedValue(sampleIso as any);
+      mockPrisma.isoRequest.update.mockResolvedValue({ ...sampleIso, expiresAt: null } as any);
+
+      const res = await request(app)
+        .patch('/api/iso/iso1')
+        .send({ expiresAt: null });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.isoRequest.update).toHaveBeenCalledWith({
+        where: { id: 'iso1' },
+        data: expect.objectContaining({
+          expiresAt: null,
+        }),
+      });
+    });
+
+    it('should reject past expiresAt date', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      const res = await request(app)
+        .patch('/api/iso/iso1')
+        .send({ expiresAt: pastDate.toISOString() });
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ─── POST /api/iso (expiresAt) ───
+
+  describe('POST /api/iso (expiresAt)', () => {
+    it('should accept optional expiresAt on create', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      mockPrisma.isoRequest.create.mockResolvedValue({ ...sampleIso, expiresAt: futureDate } as any);
+
+      const res = await request(app)
+        .post('/api/iso')
+        .send({
+          title: 'Looking for Sativa',
+          expiresAt: futureDate.toISOString(),
+        });
+
+      expect(res.status).toBe(201);
+      expect(mockPrisma.isoRequest.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          expiresAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('should create ISO with null expiresAt when not provided', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      mockPrisma.isoRequest.create.mockResolvedValue({ ...sampleIso, expiresAt: null } as any);
+
+      const res = await request(app)
+        .post('/api/iso')
+        .send({ title: 'Need anything available' });
+
+      expect(res.status).toBe(201);
+      expect(mockPrisma.isoRequest.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          expiresAt: null,
+        }),
+      });
+    });
+
+    it('should reject past expiresAt on create', async () => {
+      const app = createTestApp(testBuyer);
+      await mountIsoRoutes(app);
+
+      const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      const res = await request(app)
+        .post('/api/iso')
+        .send({
+          title: 'Backdated request',
+          expiresAt: pastDate.toISOString(),
+        });
+
+      expect(res.status).toBe(400);
     });
   });
 

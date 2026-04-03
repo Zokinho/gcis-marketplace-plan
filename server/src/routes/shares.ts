@@ -17,24 +17,33 @@ const router = Router();
  * Create a curated share link.
  */
 router.post('/', validate(createShareSchema), async (req: Request, res: Response) => {
-  const { label, productIds, expiresAt } = req.body as {
+  const { label, productIds, isoRequestIds, expiresAt } = req.body as {
     label: string;
-    productIds: string[];
+    productIds?: string[];
+    isoRequestIds?: string[];
     expiresAt?: string;
   };
 
-  if (!label || !productIds?.length) {
-    return res.status(400).json({ error: 'label and productIds are required' });
+  // Validate that all product IDs exist (if provided)
+  if (productIds && productIds.length > 0) {
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true },
+    });
+    if (products.length !== productIds.length) {
+      return res.status(400).json({ error: 'Some product IDs are invalid' });
+    }
   }
 
-  // Validate that all product IDs exist
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds } },
-    select: { id: true },
-  });
-
-  if (products.length !== productIds.length) {
-    return res.status(400).json({ error: 'Some product IDs are invalid' });
+  // Validate that all ISO request IDs exist (if provided)
+  if (isoRequestIds && isoRequestIds.length > 0) {
+    const isos = await prisma.isoRequest.findMany({
+      where: { id: { in: isoRequestIds } },
+      select: { id: true },
+    });
+    if (isos.length !== isoRequestIds.length) {
+      return res.status(400).json({ error: 'Some ISO request IDs are invalid' });
+    }
   }
 
   const token = crypto.randomBytes(32).toString('base64url');
@@ -43,7 +52,8 @@ router.post('/', validate(createShareSchema), async (req: Request, res: Response
     data: {
       token,
       label,
-      productIds,
+      productIds: productIds || [],
+      isoRequestIds: isoRequestIds || [],
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     },
   });
@@ -69,9 +79,10 @@ router.get('/', async (_req: Request, res: Response) => {
  */
 router.patch('/:id', validate(updateShareSchema), async (req: Request<{ id: string }>, res: Response) => {
   const { id } = req.params;
-  const { label, productIds, active, expiresAt } = req.body as {
+  const { label, productIds, isoRequestIds, active, expiresAt } = req.body as {
     label?: string;
     productIds?: string[];
+    isoRequestIds?: string[];
     active?: boolean;
     expiresAt?: string | null;
   };
@@ -79,6 +90,7 @@ router.patch('/:id', validate(updateShareSchema), async (req: Request<{ id: stri
   const data: Record<string, any> = {};
   if (label !== undefined) data.label = label;
   if (productIds !== undefined) data.productIds = productIds;
+  if (isoRequestIds !== undefined) data.isoRequestIds = isoRequestIds;
   if (active !== undefined) data.active = active;
   if (expiresAt !== undefined) data.expiresAt = expiresAt ? new Date(expiresAt) : null;
 
@@ -133,6 +145,7 @@ publicShareRouter.get('/validate/:token', async (req: Request<{ token: string }>
   res.json({
     label: share.label,
     productCount: share.productIds.length,
+    isoCount: share.isoRequestIds.length,
     expiresAt: share.expiresAt,
   });
 });
@@ -303,6 +316,87 @@ publicShareRouter.get('/:token/products', async (req: Request<{ token: string }>
   );
 
   res.json({ label: share.label, products: resolvedProducts });
+});
+
+/**
+ * GET /api/shares/public/:token/isos
+ * Return ISO requests in a share (anonymized, view-only).
+ */
+publicShareRouter.get('/:token/isos', async (req: Request<{ token: string }>, res: Response) => {
+  const share = await prisma.curatedShare.findUnique({
+    where: { token: req.params.token },
+  });
+
+  if (!share || !share.active) {
+    return res.status(404).json({ error: 'Invalid or expired share link' });
+  }
+
+  if (share.expiresAt && share.expiresAt < new Date()) {
+    return res.status(410).json({ error: 'Share link has expired' });
+  }
+
+  if (!share.isoRequestIds.length) {
+    return res.json({ label: share.label, isos: [] });
+  }
+
+  // Track usage
+  await prisma.curatedShare.update({
+    where: { id: share.id },
+    data: {
+      lastUsedAt: new Date(),
+      useCount: { increment: 1 },
+    },
+  });
+
+  // Fire-and-forget view tracking
+  const rawIp = getRequestIp(req) || 'unknown';
+  const ipHash = crypto.createHash('sha256').update(rawIp).digest('hex');
+  const userAgent = (req.headers['user-agent'] || '').slice(0, 512) || null;
+  (async () => {
+    try {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const recent = await prisma.shareView.findFirst({
+        where: { shareId: share.id, ipHash, viewedAt: { gte: fiveMinAgo } },
+      });
+      if (!recent) {
+        await prisma.shareView.create({
+          data: { shareId: share.id, ipHash, userAgent },
+        });
+      }
+    } catch (err) {
+      logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[SHARES] View tracking error');
+    }
+  })();
+
+  const isos = await prisma.isoRequest.findMany({
+    where: { id: { in: share.isoRequestIds } },
+    include: {
+      _count: { select: { responses: true } },
+    },
+  });
+
+  // Anonymize: strip buyerId and other sensitive fields
+  const anonymized = isos.map((iso) => ({
+    id: iso.id,
+    title: iso.title,
+    category: iso.category,
+    type: iso.type,
+    certification: iso.certification,
+    thcMin: iso.thcMin,
+    thcMax: iso.thcMax,
+    cbdMin: iso.cbdMin,
+    cbdMax: iso.cbdMax,
+    quantityMin: iso.quantityMin,
+    quantityMax: iso.quantityMax,
+    budgetMax: iso.budgetMax,
+    notes: iso.notes,
+    status: iso.status,
+    expiresAt: iso.expiresAt,
+    createdAt: iso.createdAt,
+    responseCount: iso._count.responses,
+  }));
+
+  res.json({ label: share.label, isos: anonymized });
 });
 
 /**

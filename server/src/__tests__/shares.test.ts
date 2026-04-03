@@ -38,6 +38,7 @@ const mockShare = {
   token: 'valid-token-abc123',
   label: 'Q1 Selection',
   productIds: ['product-1', 'product-2'],
+  isoRequestIds: [],
   active: true,
   expiresAt: null,
   useCount: 0,

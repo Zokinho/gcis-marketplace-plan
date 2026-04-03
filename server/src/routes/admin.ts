@@ -327,6 +327,17 @@ router.post('/users/:userId/approve', validate(approveUserSchema), async (req: R
   logger.info({ userEmail: updated.email, approvedBy: req.user?.email }, '[ADMIN] User approved');
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.approve', targetType: 'User', targetId: userId, metadata: { userEmail: updated.email, contactType }, ip: getRequestIp(req) });
 
+  // Mark Zoho registration task as Completed (fire-and-forget)
+  if (updated.zohoTaskId) {
+    import('../services/zohoAuth').then(({ zohoRequest }) => {
+      zohoRequest('PUT', `/Tasks/${updated.zohoTaskId}`, {
+        data: { data: [{ Status: 'Completed' }], trigger: [] },
+      }).catch((err) => {
+        logger.error({ err: err instanceof Error ? err : { message: String(err) }, userId }, '[ADMIN] Zoho registration task completion failed');
+      });
+    }).catch(() => {});
+  }
+
   // Create Zoho Contact if not already linked (fire-and-forget)
   if (!updated.zohoContactId) {
     (async () => {
@@ -579,6 +590,17 @@ router.post('/products/:productId/approve', async (req: Request<{ productId: str
         data: { data: [{ Product_Active: true, Request_pending: false }], trigger: [] },
       }).catch((err) => {
         logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId }, '[ADMIN] Zoho writeback after approval failed (non-critical)');
+      });
+    }).catch(() => {});
+  }
+
+  // Mark Zoho review task as Completed (fire-and-forget)
+  if (product.zohoReviewTaskId) {
+    import('../services/zohoAuth').then(({ zohoRequest }) => {
+      zohoRequest('PUT', `/Tasks/${product.zohoReviewTaskId}`, {
+        data: { data: [{ Status: 'Completed' }], trigger: [] },
+      }).catch((err) => {
+        logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId }, '[ADMIN] Zoho review task completion failed');
       });
     }).catch(() => {});
   }

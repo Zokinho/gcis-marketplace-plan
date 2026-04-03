@@ -6,8 +6,10 @@ import {
   updateShare,
   deleteShare,
   fetchProducts,
+  fetchIsoBoard,
   type CuratedShareData,
   type ProductCard,
+  type IsoRequestRecord,
 } from '../lib/api';
 
 export default function CuratedShares() {
@@ -74,8 +76,12 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
   const [products, setProducts] = useState<ProductCard[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
+  const [isoItems, setIsoItems] = useState<IsoRequestRecord[]>([]);
+  const [selectedIsoIds, setSelectedIsoIds] = useState<string[]>([]);
+  const [isoSearch, setIsoSearch] = useState('');
   const [creating, setCreating] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingIsos, setLoadingIsos] = useState(true);
 
   useEffect(() => {
     setLoadingProducts(true);
@@ -83,6 +89,12 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
       .then((res) => setProducts(res.products))
       .catch(() => {})
       .finally(() => setLoadingProducts(false));
+
+    setLoadingIsos(true);
+    fetchIsoBoard({ limit: 100 })
+      .then((res) => setIsoItems(res.items))
+      .catch(() => {})
+      .finally(() => setLoadingIsos(false));
   }, []);
 
   const filtered = products.filter((p) => {
@@ -91,11 +103,23 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
     return p.name.toLowerCase().includes(q) || (p.licensedProducer || '').toLowerCase().includes(q);
   });
 
+  const filteredIsos = isoItems.filter((iso) => {
+    if (!isoSearch) return true;
+    const q = isoSearch.toLowerCase();
+    return iso.title.toLowerCase().includes(q) || (iso.category || '').toLowerCase().includes(q) || (iso.type || '').toLowerCase().includes(q);
+  });
+
+  const hasSelection = selectedIds.length > 0 || selectedIsoIds.length > 0;
+
   const handleCreate = async () => {
-    if (!label || selectedIds.length === 0) return;
+    if (!label || !hasSelection) return;
     setCreating(true);
     try {
-      await createShare({ label, productIds: selectedIds });
+      await createShare({
+        label,
+        ...(selectedIds.length > 0 ? { productIds: selectedIds } : {}),
+        ...(selectedIsoIds.length > 0 ? { isoRequestIds: selectedIsoIds } : {}),
+      });
       onCreated();
     } catch {
       // ignore
@@ -155,10 +179,50 @@ function CreateShareForm({ onCreated, onCancel }: { onCreated: () => void; onCan
         </div>
       </div>
 
+      <div className="mb-4">
+        <label className="mb-1 block text-xs font-medium text-muted">
+          ISO Requests ({selectedIsoIds.length} selected)
+        </label>
+        <input
+          type="text"
+          value={isoSearch}
+          onChange={(e) => setIsoSearch(e.target.value)}
+          placeholder="Search ISO requests..."
+          className="mb-2 w-full rounded-lg border border-subtle surface px-3 py-2 text-sm text-primary outline-none focus:border-brand-teal"
+        />
+        <div className="max-h-48 overflow-auto rounded-lg border border-subtle p-2">
+          {loadingIsos ? (
+            <p className="text-xs text-faint">Loading ISO requests...</p>
+          ) : filteredIsos.length === 0 ? (
+            <p className="text-xs text-faint">No ISO requests available</p>
+          ) : (
+            filteredIsos.map((iso) => (
+              <label key={iso.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover-surface-muted">
+                <input
+                  type="checkbox"
+                  checked={selectedIsoIds.includes(iso.id)}
+                  onChange={() => {
+                    setSelectedIsoIds((prev) =>
+                      prev.includes(iso.id) ? prev.filter((id) => id !== iso.id) : [...prev, iso.id],
+                    );
+                  }}
+                  className="rounded border-default"
+                />
+                <span className="text-sm text-secondary">{iso.title}</span>
+                <span className="flex gap-1">
+                  {iso.category && <span className="rounded-full surface-muted px-1.5 py-0.5 text-[10px] text-faint">{iso.category}</span>}
+                  {iso.type && <span className="rounded-full surface-muted px-1.5 py-0.5 text-[10px] text-faint">{iso.type}</span>}
+                </span>
+              </label>
+            ))
+          )}
+        </div>
+      </div>
+
       <div className="flex gap-3">
         <button
           onClick={handleCreate}
-          disabled={!label || selectedIds.length === 0 || creating}
+          disabled={!label || !hasSelection || creating}
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90 disabled:opacity-50"
         >
           {creating ? 'Creating...' : 'Create Share Link'}
@@ -215,7 +279,8 @@ function ShareCard({ share, onUpdate }: { share: CuratedShareData; onUpdate: () 
             </span>
           </div>
           <div className="mt-1 flex flex-wrap gap-3 text-xs text-faint">
-            <span>{share.productIds.length} products</span>
+            {share.productIds.length > 0 && <span>{share.productIds.length} products</span>}
+            {share.isoRequestIds.length > 0 && <span>{share.isoRequestIds.length} ISOs</span>}
             <span>{share.useCount} views</span>
             {share.lastUsedAt && <span>Last viewed: {new Date(share.lastUsedAt).toLocaleDateString()}</span>}
             {share.expiresAt && <span>Expires: {new Date(share.expiresAt).toLocaleDateString()}</span>}

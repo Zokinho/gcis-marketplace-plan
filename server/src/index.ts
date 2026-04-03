@@ -429,7 +429,7 @@ function startIntelligenceCrons() {
   setTimeout(() => {
     runIntelJob('ISO Expiry', LOCK_IDS.ISO_EXPIRY, async () => {
       const result = await prisma.isoRequest.updateMany({
-        where: { status: 'OPEN', expiresAt: { lt: new Date() } },
+        where: { status: 'OPEN', expiresAt: { not: null, lt: new Date() } },
         data: { status: 'EXPIRED' },
       });
       return { expired: result.count };
@@ -437,7 +437,7 @@ function startIntelligenceCrons() {
     setInterval(() => {
       runIntelJob('ISO Expiry', LOCK_IDS.ISO_EXPIRY, async () => {
         const result = await prisma.isoRequest.updateMany({
-          where: { status: 'OPEN', expiresAt: { lt: new Date() } },
+          where: { status: 'OPEN', expiresAt: { not: null, lt: new Date() } },
           data: { status: 'EXPIRED' },
         });
         return { expired: result.count };

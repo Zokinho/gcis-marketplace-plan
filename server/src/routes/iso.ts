@@ -18,6 +18,7 @@ import {
 } from '../utils/validation';
 import { createNotification } from '../services/notificationService';
 import { matchIsoToProducts } from '../services/isoMatchingService';
+import { logAudit, getRequestIp } from '../services/auditService';
 import { z } from 'zod';
 
 const router = Router();
@@ -31,14 +32,11 @@ router.post('/', writeLimiter, validate(isoCreateSchema), async (req: Request, r
   const userId = req.user!.id;
 
   try {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
-
     const iso = await prisma.isoRequest.create({
       data: {
         buyerId: userId,
         ...req.body,
-        expiresAt,
+        expiresAt: req.body.expiresAt ?? null,
       },
     });
 
@@ -226,9 +224,9 @@ router.get('/', validateQuery(isoQuerySchema), async (req: Request, res: Respons
   if (status) {
     where.status = status;
   } else if (mine !== 'true') {
-    // Default: only show OPEN ISOs on the public board
+    // Default: only show OPEN ISOs on the public board (including those with no expiry)
     where.status = 'OPEN';
-    where.expiresAt = { gt: new Date() };
+    where.OR = [{ expiresAt: null }, { expiresAt: { gt: new Date() } }];
   }
   if (category) where.category = category;
 
@@ -272,6 +270,7 @@ router.get('/', validateQuery(isoQuerySchema), async (req: Request, res: Respons
       const isOwner = iso.buyerId === userId;
       return {
         id: iso.id,
+        title: iso.title,
         category: iso.category,
         type: iso.type,
         certification: iso.certification,
@@ -344,6 +343,7 @@ router.get('/:id', validateParams(idParams), async (req: Request, res: Response)
 
     const result: any = {
       id: iso.id,
+      title: iso.title,
       category: iso.category,
       type: iso.type,
       certification: iso.certification,
@@ -377,12 +377,12 @@ router.get('/:id', validateParams(idParams), async (req: Request, res: Response)
 
 /**
  * PATCH /api/iso/:id
- * Close or renew own ISO.
+ * Edit, close, or reopen an ISO. Owner or admin.
  */
 router.patch('/:id', writeLimiter, validateParams(idParams), validate(isoUpdateSchema), async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { id } = (req as any).params;
-  const { status, renew } = req.body;
+  const { status, expiresAt, title, category, type, certification, thcMin, thcMax, cbdMin, cbdMax, quantityMin, quantityMax, budgetMax, notes } = req.body;
 
   try {
     const iso = await prisma.isoRequest.findUnique({ where: { id } });
@@ -391,23 +391,43 @@ router.patch('/:id', writeLimiter, validateParams(idParams), validate(isoUpdateS
       return res.status(404).json({ error: 'ISO request not found' });
     }
 
-    if (iso.buyerId !== userId) {
+    const isOwner = iso.buyerId === userId;
+    const isAdmin = !!(req.user!.email && process.env.ADMIN_EMAILS?.split(',').map((e) => e.trim()).includes(req.user!.email));
+
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({ error: 'You can only modify your own ISO requests' });
     }
 
     const updateData: any = {};
 
+    // Status logic
     if (status === 'CLOSED') {
       updateData.status = 'CLOSED';
     }
 
-    if (renew) {
-      const newExpiry = new Date();
-      newExpiry.setDate(newExpiry.getDate() + 30);
-      updateData.expiresAt = newExpiry;
-      // Reopen if expired
+    // Expiry lifecycle — expiresAt changes bypass content-edit status guard
+    if (expiresAt !== undefined) {
+      updateData.expiresAt = expiresAt; // Date or null (no expiry)
+      // Reopen if was expired or closed
       if (iso.status === 'EXPIRED' || iso.status === 'CLOSED') {
         updateData.status = 'OPEN';
+      }
+    }
+
+    // Content field edits — only allowed on OPEN or MATCHED (unless reopening via expiresAt)
+    const contentFields = { title, category, type, certification, thcMin, thcMax, cbdMin, cbdMax, quantityMin, quantityMax, budgetMax, notes };
+    const hasContentEdits = Object.values(contentFields).some((v) => v !== undefined);
+
+    if (hasContentEdits) {
+      const effectiveStatus = updateData.status || iso.status;
+      if (effectiveStatus !== 'OPEN' && effectiveStatus !== 'MATCHED') {
+        return res.status(400).json({ error: 'Cannot edit content on a closed or expired ISO request' });
+      }
+
+      for (const [key, value] of Object.entries(contentFields)) {
+        if (value !== undefined) {
+          updateData[key] = value;
+        }
       }
     }
 
@@ -415,6 +435,19 @@ router.patch('/:id', writeLimiter, validateParams(idParams), validate(isoUpdateS
       where: { id },
       data: updateData,
     });
+
+    // Audit log when admin edits someone else's ISO
+    if (isAdmin && !isOwner) {
+      logAudit({
+        actorId: userId,
+        actorEmail: req.user!.email,
+        action: 'iso.edit',
+        targetType: 'IsoRequest',
+        targetId: id,
+        metadata: updateData,
+        ip: getRequestIp(req),
+      });
+    }
 
     res.json({ iso: updated });
   } catch (err) {

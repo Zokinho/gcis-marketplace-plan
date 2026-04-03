@@ -13,6 +13,7 @@ model User {
   id             String    @id @default(cuid())
   clerkUserId    String?   @unique // Deprecated — kept for migration compatibility
   zohoContactId  String?   @unique
+  zohoTaskId     String?   @unique // Registration task — completed on approval
   email          String    @unique
   passwordHash   String?
   refreshToken   String?   // SHA-256 of current refresh token
@@ -68,7 +69,8 @@ model User {
 
 model Product {
   id          String  @id @default(cuid())
-  zohoProductId String @unique
+  zohoProductId     String @unique
+  zohoReviewTaskId  String?  @unique // Review task — completed on approval
   productCode String?
 
   // Basic info
@@ -498,8 +500,9 @@ model CuratedShare {
   id          String    @id @default(cuid())
   token       String    @unique
   label       String
-  productIds  String[]
-  active      Boolean   @default(true)
+  productIds    String[]
+  isoRequestIds String[]  @default([])
+  active        Boolean   @default(true)
   expiresAt   DateTime?
   createdAt   DateTime  @default(now())
   lastUsedAt  DateTime?
@@ -537,6 +540,8 @@ model IsoRequest {
   buyerId         String
   buyer           User        @relation("BuyerIsoRequests", fields: [buyerId], references: [id])
 
+  title           String
+
   // What they're looking for
   category        String?
   type            String?
@@ -552,7 +557,7 @@ model IsoRequest {
 
   // Status & lifecycle
   status          IsoStatus   @default(OPEN)
-  expiresAt       DateTime
+  expiresAt       DateTime?
 
   // Matching
   matchedProductId String?

@@ -8,11 +8,35 @@ import {
   createIsoRequest,
   updateIso,
   respondToIso,
-  fetchFilterOptions,
   IsoRequestRecord,
   IsoStatusType,
   Pagination,
 } from '../lib/api';
+
+const ALL_CATEGORIES = [
+  'Cannabis flowers (mix sizes)',
+  'Cannabis flowers (smalls only)',
+  'Cannabis flowers (fresh frozen)',
+  'Cannabis flowers (outdoor grown)',
+  'Cannabis flowers (outdoor fresh frozen)',
+  'Milled Flower',
+  'Cannabis trimmings',
+  'Cannabis kief',
+  'Cannabis cured rosins and cured resins',
+  'Cannabis hashish',
+  'Cannabis live rosin and live resin',
+  'Cannabinoid isolates',
+  'Cannabinoid distillates',
+  "Cannabis crude oils ('resins')",
+  'THCa flowers',
+  'THCa diamonds',
+  'Genetics',
+  'Chocolates',
+  'Gummies',
+  'Edibles (others)',
+];
+
+const ALL_CERTIFICATIONS = ['GACP', 'GMP1', 'GMP2', 'GPP', 'IMC-GAP'];
 
 function IsoStatusBadge({ status }: { status: IsoStatusType }) {
   const styles: Record<string, string> = {
@@ -29,7 +53,8 @@ function IsoStatusBadge({ status }: { status: IsoStatusType }) {
   );
 }
 
-function ExpiryCountdown({ expiresAt }: { expiresAt: string }) {
+function ExpiryCountdown({ expiresAt }: { expiresAt: string | null }) {
+  if (!expiresAt) return <span className="text-xs text-muted">No expiry</span>;
   const diff = new Date(expiresAt).getTime() - Date.now();
   if (diff <= 0) return <span className="text-xs text-red-500">Expired</span>;
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
@@ -40,38 +65,56 @@ function ExpiryCountdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
+function StaleBadge({ iso }: { iso: IsoRequestRecord }) {
+  if (iso.expiresAt || iso.status !== 'OPEN') return null;
+  const ageMs = Date.now() - new Date(iso.createdAt).getTime();
+  const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+  if (ageDays < 60) return null;
+  return (
+    <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+      Stale ({ageDays}d)
+    </span>
+  );
+}
+
 function IsoCard({
   iso,
   isSeller,
+  isAdmin,
   onRespond,
   onClose,
   onRenew,
+  onEdit,
 }: {
   iso: IsoRequestRecord;
   isSeller: boolean;
+  isAdmin: boolean;
   onRespond: (id: string) => void;
   onClose: (id: string) => void;
   onRenew: (id: string) => void;
+  onEdit: (iso: IsoRequestRecord) => void;
 }) {
   return (
     <div className="rounded-lg border card-blue p-4 shadow-sm hover:shadow-md transition backdrop-blur-sm">
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2">
-          {iso.category && (
-            <span className="rounded bg-brand-teal/10 px-2 py-0.5 text-xs font-medium text-brand-teal dark:bg-brand-teal/20 dark:text-brand-sage">
-              {iso.category}
-            </span>
-          )}
-          {iso.type && (
-            <span className="rounded bg-brand-blue/10 px-2 py-0.5 text-xs font-medium text-brand-blue dark:bg-brand-blue/20 dark:text-brand-blue">
-              {iso.type}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <h3 className="text-sm font-semibold text-primary line-clamp-1">{iso.title}</h3>
+        <div className="flex items-center gap-2 shrink-0">
           <IsoStatusBadge status={iso.status} />
+          {isAdmin && <StaleBadge iso={iso} />}
           <ExpiryCountdown expiresAt={iso.expiresAt} />
         </div>
+      </div>
+      <div className="flex items-center gap-2 mb-3">
+        {iso.category && (
+          <span className="rounded bg-brand-teal/10 px-2 py-0.5 text-xs font-medium text-brand-teal dark:bg-brand-teal/20 dark:text-brand-sage">
+            {iso.category}
+          </span>
+        )}
+        {iso.type && (
+          <span className="rounded bg-brand-blue/10 px-2 py-0.5 text-xs font-medium text-brand-blue dark:bg-brand-blue/20 dark:text-brand-blue">
+            {iso.type}
+          </span>
+        )}
       </div>
 
       {/* Criteria */}
@@ -116,6 +159,14 @@ function IsoCard({
           {iso.responseCount ?? 0} response{(iso.responseCount ?? 0) !== 1 ? 's' : ''}
         </span>
         <div className="flex gap-2">
+          {(iso.isOwner || isAdmin) && iso.status === 'OPEN' && (
+            <button
+              onClick={() => onEdit(iso)}
+              className="rounded px-3 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/10 transition"
+            >
+              Edit
+            </button>
+          )}
           {iso.isOwner && iso.status === 'OPEN' && (
             <button
               onClick={() => onClose(iso.id)}
@@ -173,9 +224,16 @@ function CreateIsoModal({
     try {
       const data: Record<string, any> = {};
       for (const [k, v] of Object.entries(form)) {
-        if (v !== '' && v !== undefined && v !== null) data[k] = v;
+        if (v !== '' && v !== undefined && v !== null) {
+          if (k === 'expiresAt' && typeof v === 'string') {
+            // Convert YYYY-MM-DD to end-of-day UTC ISO string
+            data[k] = new Date(v + 'T23:59:59.999Z').toISOString();
+          } else {
+            data[k] = v;
+          }
+        }
       }
-      await createIsoRequest(data);
+      await createIsoRequest(data as any);
       setForm({});
       onCreated();
       onClose();
@@ -199,6 +257,18 @@ function CreateIsoModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Title <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              required
+              maxLength={200}
+              placeholder="e.g. Looking for premium indoor flower"
+              value={form.title || ''}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted">Category</label>
@@ -307,10 +377,7 @@ function CreateIsoModal({
                 className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
               >
                 <option value="">Any</option>
-                <option value="GACP">GACP</option>
-                <option value="GMP1">GMP1</option>
-                <option value="GMP2">GMP2</option>
-                <option value="GPP">GPP</option>
+                {ALL_CERTIFICATIONS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
@@ -327,6 +394,18 @@ function CreateIsoModal({
             />
           </div>
 
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Expiry Date (optional)</label>
+            <input
+              type="date"
+              value={form.expiresAt || ''}
+              min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+              onChange={(e) => setForm({ ...form, expiresAt: e.target.value || undefined })}
+              className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+            />
+            <p className="mt-1 text-xs text-muted">Leave blank for no expiry</p>
+          </div>
+
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex gap-3 justify-end">
@@ -339,6 +418,262 @@ function CreateIsoModal({
               className="rounded bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue transition disabled:opacity-50"
             >
               {loading ? 'Posting...' : 'Post Wanted'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditIsoModal({
+  iso,
+  onClose,
+  onUpdated,
+  categories,
+}: {
+  iso: IsoRequestRecord;
+  onClose: () => void;
+  onUpdated: () => void;
+  categories: string[];
+}) {
+  const [form, setForm] = useState<Record<string, any>>({
+    title: iso.title,
+    category: iso.category || '',
+    type: iso.type || '',
+    certification: iso.certification || '',
+    thcMin: iso.thcMin ?? '',
+    thcMax: iso.thcMax ?? '',
+    cbdMin: iso.cbdMin ?? '',
+    cbdMax: iso.cbdMax ?? '',
+    quantityMin: iso.quantityMin ?? '',
+    quantityMax: iso.quantityMax ?? '',
+    budgetMax: iso.budgetMax ?? '',
+    notes: iso.notes || '',
+    expiresAt: iso.expiresAt ? new Date(iso.expiresAt).toISOString().split('T')[0] : '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const data: Record<string, any> = {};
+      // Only send fields that changed
+      if (form.title !== iso.title) data.title = form.title;
+      if ((form.category || null) !== (iso.category || null)) data.category = form.category || null;
+      if ((form.type || null) !== (iso.type || null)) data.type = form.type || null;
+      if ((form.certification || null) !== (iso.certification || null)) data.certification = form.certification || null;
+
+      const numFields = ['thcMin', 'thcMax', 'cbdMin', 'cbdMax', 'quantityMin', 'quantityMax', 'budgetMax'] as const;
+      for (const key of numFields) {
+        const newVal = form[key] === '' ? null : Number(form[key]);
+        const oldVal = iso[key] ?? null;
+        if (newVal !== oldVal) data[key] = newVal;
+      }
+
+      if ((form.notes || null) !== (iso.notes || null)) data.notes = form.notes || null;
+
+      // Handle expiresAt: compare current form vs original
+      const origExpDate = iso.expiresAt ? new Date(iso.expiresAt).toISOString().split('T')[0] : '';
+      if (form.expiresAt !== origExpDate) {
+        if (form.expiresAt) {
+          data.expiresAt = new Date(form.expiresAt + 'T23:59:59.999Z').toISOString();
+        } else {
+          data.expiresAt = null; // Clear expiry
+        }
+      }
+
+      if (Object.keys(data).length === 0) {
+        onClose();
+        return;
+      }
+
+      await updateIso(iso.id, data);
+      onUpdated();
+      onClose();
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to update request');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-lg rounded-lg surface p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-primary">Edit Wanted Request</h2>
+          <button onClick={onClose} className="text-muted hover:text-primary transition">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Title <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              required
+              maxLength={200}
+              value={form.title || ''}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">Category</label>
+              <select
+                value={form.category || ''}
+                onChange={(e) => setForm({ ...form, category: e.target.value || undefined })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              >
+                <option value="">Any</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">Type</label>
+              <select
+                value={form.type || ''}
+                onChange={(e) => setForm({ ...form, type: e.target.value || undefined })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              >
+                <option value="">Any</option>
+                <option value="Sativa">Sativa</option>
+                <option value="Indica">Indica</option>
+                <option value="Hybrid">Hybrid</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">THC Min (%)</label>
+              <input
+                type="number" step="0.1" min="0" max="100"
+                value={form.thcMin ?? ''}
+                onChange={(e) => setForm({ ...form, thcMin: e.target.value ? Number(e.target.value) : '' })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">THC Max (%)</label>
+              <input
+                type="number" step="0.1" min="0" max="100"
+                value={form.thcMax ?? ''}
+                onChange={(e) => setForm({ ...form, thcMax: e.target.value ? Number(e.target.value) : '' })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">CBD Min (%)</label>
+              <input
+                type="number" step="0.1" min="0" max="100"
+                value={form.cbdMin ?? ''}
+                onChange={(e) => setForm({ ...form, cbdMin: e.target.value ? Number(e.target.value) : '' })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">CBD Max (%)</label>
+              <input
+                type="number" step="0.1" min="0" max="100"
+                value={form.cbdMax ?? ''}
+                onChange={(e) => setForm({ ...form, cbdMax: e.target.value ? Number(e.target.value) : '' })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">Qty Min (g)</label>
+              <input
+                type="number" step="1" min="0"
+                value={form.quantityMin ?? ''}
+                onChange={(e) => setForm({ ...form, quantityMin: e.target.value ? Number(e.target.value) : '' })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">Qty Max (g)</label>
+              <input
+                type="number" step="1" min="0"
+                value={form.quantityMax ?? ''}
+                onChange={(e) => setForm({ ...form, quantityMax: e.target.value ? Number(e.target.value) : '' })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">Max Budget ($/g)</label>
+              <input
+                type="number" step="0.01" min="0"
+                value={form.budgetMax ?? ''}
+                onChange={(e) => setForm({ ...form, budgetMax: e.target.value ? Number(e.target.value) : '' })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted">Certification</label>
+              <select
+                value={form.certification || ''}
+                onChange={(e) => setForm({ ...form, certification: e.target.value || undefined })}
+                className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+              >
+                <option value="">Any</option>
+                {ALL_CERTIFICATIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Notes (optional)</label>
+            <textarea
+              rows={3}
+              maxLength={2000}
+              value={form.notes || ''}
+              onChange={(e) => setForm({ ...form, notes: e.target.value || undefined })}
+              placeholder="Describe what you're looking for..."
+              className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Expiry Date (optional)</label>
+            <input
+              type="date"
+              value={form.expiresAt || ''}
+              min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+              onChange={(e) => setForm({ ...form, expiresAt: e.target.value || '' })}
+              className="w-full rounded border border-default surface-input px-3 py-2 text-sm text-primary"
+            />
+            <p className="mt-1 text-xs text-muted">Leave blank for no expiry</p>
+          </div>
+
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+          <div className="flex gap-3 justify-end">
+            <button type="button" onClick={onClose} className="rounded px-4 py-2 text-sm text-muted hover:text-primary transition">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue transition disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -417,15 +752,16 @@ function RespondModal({
 export default function IsoBoard() {
   const { data } = useUserStatus();
   const isSeller = data?.user?.contactType?.includes('Seller') ?? false;
+  const isAdmin = data?.user?.isAdmin ?? false;
 
   const [tab, setTab] = useState<'browse' | 'my'>('browse');
   const [items, setItems] = useState<IsoRequestRecord[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 12, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  const [editingIso, setEditingIso] = useState<IsoRequestRecord | null>(null);
 
   const loadData = useCallback(async (page = 1) => {
     setLoading(true);
@@ -454,12 +790,6 @@ export default function IsoBoard() {
     loadData(1);
   }, [loadData]);
 
-  useEffect(() => {
-    fetchFilterOptions()
-      .then((opts) => setCategories(opts.categories))
-      .catch(() => {});
-  }, []);
-
   const handleClose = async (id: string) => {
     try {
       await updateIso(id, { status: 'CLOSED' });
@@ -469,7 +799,7 @@ export default function IsoBoard() {
 
   const handleRenew = async (id: string) => {
     try {
-      await updateIso(id, { renew: true });
+      await updateIso(id, { expiresAt: null });
       loadData(pagination.page);
     } catch {}
   };
@@ -522,7 +852,7 @@ export default function IsoBoard() {
             className="rounded border border-default surface-input px-3 py-2 text-sm text-primary"
           >
             <option value="">All Categories</option>
-            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
       )}
@@ -559,9 +889,11 @@ export default function IsoBoard() {
                 key={iso.id}
                 iso={iso}
                 isSeller={isSeller}
+                isAdmin={isAdmin}
                 onRespond={setRespondingTo}
                 onClose={handleClose}
                 onRenew={handleRenew}
+                onEdit={setEditingIso}
               />
             ))}
           </div>
@@ -596,8 +928,17 @@ export default function IsoBoard() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         onCreated={() => loadData(1)}
-        categories={categories}
+        categories={ALL_CATEGORIES}
       />
+
+      {editingIso && (
+        <EditIsoModal
+          iso={editingIso}
+          onClose={() => setEditingIso(null)}
+          onUpdated={() => loadData(pagination.page)}
+          categories={ALL_CATEGORIES}
+        />
+      )}
 
       {respondingTo && (
         <RespondModal

@@ -20,7 +20,7 @@ const PRODUCT_FIELDS = [
 ].join(',');
 
 const CONTACT_FIELDS = [
-  'First_Name', 'Last_Name', 'Email', 'Company', 'Title', 'Contact_Type',
+  'First_Name', 'Last_Name', 'Email', 'Company', 'Account_Name', 'Title', 'Contact_Type',
   'Account_Confirmed', 'Mailing_Country', 'Phone', 'User_UID',
 ].join(',');
 
@@ -329,7 +329,7 @@ export async function pushRegistrationToZoho(
     phone?: string | null;
     mailingCountry?: string | null;
   },
-) {
+): Promise<string | null> {
   // 1. Update Contact fields — User_UID + profile data + EULA milestone
   const contactFields: Record<string, any> = {
     User_UID: user.id,
@@ -348,7 +348,7 @@ export async function pushRegistrationToZoho(
   });
 
   // 2. Create a Task on the Contact timeline
-  await zohoRequest('POST', '/Tasks', {
+  const taskResponse = await zohoRequest('POST', '/Tasks', {
     data: {
       data: [{
         Subject: `Marketplace Registration — ${user.firstName} ${user.lastName}`,
@@ -366,6 +366,8 @@ export async function pushRegistrationToZoho(
       trigger: [],
     },
   });
+
+  return taskResponse?.data?.[0]?.details?.id || null;
 }
 
 // ─── Manual Listing → Zoho Product ───

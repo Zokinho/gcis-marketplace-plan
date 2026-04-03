@@ -475,7 +475,7 @@ export async function syncContacts(): Promise<{ synced: number; errors: number }
             contactType: Array.isArray(c.Contact_Type) ? c.Contact_Type.join('; ') : (c.Contact_Type || existingUser.contactType),
             firstName: c.First_Name || existingUser.firstName,
             lastName: c.Last_Name || existingUser.lastName,
-            companyName: c.Company || existingUser.companyName,
+            companyName: c.Company || c.Account_Name?.name || existingUser.companyName,
             title: c.Title || existingUser.title,
             mailingCountry: c.Mailing_Country || existingUser.mailingCountry,
             phone: c.Phone || existingUser.phone,

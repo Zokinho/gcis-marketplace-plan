@@ -151,7 +151,7 @@ export async function matchProductToOpenIsos(productId: string): Promise<number>
   const openIsos = await prisma.isoRequest.findMany({
     where: {
       status: 'OPEN',
-      expiresAt: { gt: new Date() },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     },
   });
 

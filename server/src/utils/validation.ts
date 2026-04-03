@@ -125,13 +125,18 @@ export const bidOutcomeSchema = z.object({
 
 export const createShareSchema = z.object({
   label: z.string().min(1).max(200),
-  productIds: z.array(z.string().min(1)).min(1, 'At least one product required'),
+  productIds: z.array(z.string().min(1)).optional(),
+  isoRequestIds: z.array(z.string().min(1)).optional(),
   expiresAt: z.string().datetime().optional(),
-});
+}).refine(
+  (data) => (data.productIds && data.productIds.length > 0) || (data.isoRequestIds && data.isoRequestIds.length > 0),
+  { message: 'At least one product or ISO request is required' },
+);
 
 export const updateShareSchema = z.object({
   label: z.string().min(1).max(200).optional(),
   productIds: z.array(z.string().min(1)).optional(),
+  isoRequestIds: z.array(z.string().min(1)).optional(),
   active: z.boolean().optional(),
   expiresAt: z.string().datetime().nullable().optional(),
 });
@@ -396,6 +401,7 @@ export const createListingSchema = z.object({
 // ─── ISO schemas ───
 
 export const isoCreateSchema = z.object({
+  title:         z.string().min(1).max(200),
   category:      z.string().max(100).optional(),
   type:          z.string().max(50).optional(),
   certification: z.string().max(100).optional(),
@@ -407,6 +413,7 @@ export const isoCreateSchema = z.object({
   quantityMax:   z.coerce.number().positive().optional(),
   budgetMax:     z.coerce.number().positive().optional(),
   notes:         z.string().max(2000).optional(),
+  expiresAt:     z.coerce.date().refine((d) => d > new Date(), 'expiresAt must be in the future').optional(),
 });
 
 export const isoQuerySchema = paginationQuery.extend({
@@ -423,8 +430,23 @@ export const isoRespondSchema = z.object({
 });
 
 export const isoUpdateSchema = z.object({
-  status: z.enum(['CLOSED']).optional(),
-  renew:  z.boolean().optional(),
+  status:        z.enum(['CLOSED']).optional(),
+  expiresAt:     z.coerce.date().optional().nullable().refine(
+    (d) => d === null || d === undefined || d > new Date(),
+    'expiresAt must be in the future',
+  ),
+  title:         z.string().min(1).max(200).optional(),
+  category:      z.string().max(100).optional().nullable(),
+  type:          z.string().max(50).optional().nullable(),
+  certification: z.string().max(100).optional().nullable(),
+  thcMin:        z.coerce.number().min(0).max(100).optional().nullable(),
+  thcMax:        z.coerce.number().min(0).max(100).optional().nullable(),
+  cbdMin:        z.coerce.number().min(0).max(100).optional().nullable(),
+  cbdMax:        z.coerce.number().min(0).max(100).optional().nullable(),
+  quantityMin:   z.coerce.number().positive().optional().nullable(),
+  quantityMax:   z.coerce.number().positive().optional().nullable(),
+  budgetMax:     z.coerce.number().positive().optional().nullable(),
+  notes:         z.string().max(2000).optional().nullable(),
 });
 
 // ─── Edit approval schemas ───

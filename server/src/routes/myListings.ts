@@ -301,7 +301,7 @@ router.post(
         }
       }
 
-      // Create review task — fire-and-forget (non-critical)
+      // Create review task — fire-and-forget (non-critical), save task ID to Product
       createProductReviewTask({
         zohoProductId,
         sellerZohoContactId: seller.zohoContactId,
@@ -310,6 +310,10 @@ router.post(
         category: category || null,
         pricePerUnit: parseFloat_(pricePerUnit) ?? null,
         gramsAvailable: parseFloat_(gramsAvailable) ?? null,
+      }).then((taskId) => {
+        if (taskId) {
+          prisma.product.update({ where: { zohoProductId }, data: { zohoReviewTaskId: taskId } }).catch(() => {});
+        }
       }).catch((err) => {
         logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[MY-LISTINGS] Review task creation failed (non-critical)');
       });

@@ -670,6 +670,7 @@ export interface CuratedShareData {
   token: string;
   label: string;
   productIds: string[];
+  isoRequestIds: string[];
   active: boolean;
   expiresAt: string | null;
   createdAt: string;
@@ -680,6 +681,7 @@ export interface CuratedShareData {
 export interface ShareValidation {
   label: string;
   productCount: number;
+  isoCount: number;
   expiresAt: string | null;
 }
 
@@ -696,7 +698,8 @@ export async function fetchShares(): Promise<CuratedShareData[]> {
 
 export async function createShare(data: {
   label: string;
-  productIds: string[];
+  productIds?: string[];
+  isoRequestIds?: string[];
   expiresAt?: string;
 }): Promise<CuratedShareData> {
   const res = await api.post<{ share: CuratedShareData }>('/shares', data);
@@ -705,7 +708,7 @@ export async function createShare(data: {
 
 export async function updateShare(
   id: string,
-  data: { label?: string; productIds?: string[]; active?: boolean; expiresAt?: string | null },
+  data: { label?: string; productIds?: string[]; isoRequestIds?: string[]; active?: boolean; expiresAt?: string | null },
 ): Promise<CuratedShareData> {
   const res = await api.patch<{ share: CuratedShareData }>(`/shares/${id}`, data);
   return res.data.share;
@@ -726,6 +729,31 @@ export async function validateShareToken(token: string): Promise<ShareValidation
 
 export async function fetchSharedProducts(token: string): Promise<{ label: string; products: SharedProduct[] }> {
   const res = await publicApi.get<{ label: string; products: SharedProduct[] }>(`/${token}/products`);
+  return res.data;
+}
+
+export interface SharedIso {
+  id: string;
+  title: string;
+  category: string | null;
+  type: string | null;
+  certification: string | null;
+  thcMin: number | null;
+  thcMax: number | null;
+  cbdMin: number | null;
+  cbdMax: number | null;
+  quantityMin: number | null;
+  quantityMax: number | null;
+  budgetMax: number | null;
+  notes: string | null;
+  status: string;
+  expiresAt: string | null;
+  createdAt: string;
+  responseCount: number;
+}
+
+export async function fetchSharedIsos(token: string): Promise<{ label: string; isos: SharedIso[] }> {
+  const res = await publicApi.get<{ label: string; isos: SharedIso[] }>(`/${token}/isos`);
   return res.data;
 }
 
@@ -1283,6 +1311,7 @@ export type IsoStatusType = 'OPEN' | 'MATCHED' | 'FULFILLED' | 'CLOSED' | 'EXPIR
 export interface IsoRequestRecord {
   id: string;
   buyerId?: string;
+  title: string;
   category: string | null;
   type: string | null;
   certification: string | null;
@@ -1295,7 +1324,7 @@ export interface IsoRequestRecord {
   budgetMax: number | null;
   notes: string | null;
   status: IsoStatusType;
-  expiresAt: string;
+  expiresAt: string | null;
   matchedProduct?: ProductCard;
   responseCount?: number;
   hasResponded?: boolean;
@@ -1318,6 +1347,7 @@ export interface IsoResponseRecord {
 // ─── ISO API ───
 
 export async function createIsoRequest(data: {
+  title: string;
   category?: string;
   type?: string;
   certification?: string;
@@ -1329,6 +1359,7 @@ export async function createIsoRequest(data: {
   quantityMax?: number;
   budgetMax?: number;
   notes?: string;
+  expiresAt?: string;
 }): Promise<{ iso: IsoRequestRecord }> {
   const res = await api.post('/iso', data);
   return res.data;
@@ -1377,7 +1408,19 @@ export async function fetchIsoDetail(id: string): Promise<{
 
 export async function updateIso(id: string, data: {
   status?: 'CLOSED';
-  renew?: boolean;
+  expiresAt?: string | null;
+  title?: string;
+  category?: string | null;
+  type?: string | null;
+  certification?: string | null;
+  thcMin?: number | null;
+  thcMax?: number | null;
+  cbdMin?: number | null;
+  cbdMax?: number | null;
+  quantityMin?: number | null;
+  quantityMax?: number | null;
+  budgetMax?: number | null;
+  notes?: string | null;
 }): Promise<{ iso: IsoRequestRecord }> {
   const res = await api.patch(`/iso/${id}`, data);
   return res.data;

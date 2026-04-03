@@ -99,7 +99,7 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
   if (zohoContactId) {
     try {
       const { pushRegistrationToZoho } = await import('../services/zohoApi');
-      await pushRegistrationToZoho(zohoContactId, {
+      const zohoTaskId = await pushRegistrationToZoho(zohoContactId, {
         id: user.id,
         firstName,
         lastName,
@@ -108,6 +108,9 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
         phone,
         mailingCountry,
       });
+      if (zohoTaskId) {
+        prisma.user.update({ where: { id: user.id }, data: { zohoTaskId } }).catch(() => {});
+      }
     } catch (e) {
       logger.error(
         { err: e instanceof Error ? e : { message: String(e) } },
@@ -359,7 +362,7 @@ router.post('/upload-agreement', async (req: Request, res: Response) => {
         });
 
         // Create registration Task on the new Contact
-        await zohoRequest('POST', '/Tasks', {
+        const taskResult = await zohoRequest('POST', '/Tasks', {
           data: {
             data: [{
               Subject: `Marketplace Registration — ${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
@@ -377,6 +380,10 @@ router.post('/upload-agreement', async (req: Request, res: Response) => {
             trigger: [],
           },
         });
+        const newZohoTaskId = taskResult?.data?.[0]?.details?.id;
+        if (newZohoTaskId) {
+          await prisma.user.update({ where: { id: user.id }, data: { zohoTaskId: newZohoTaskId } });
+        }
 
         logger.info({ userId: user.id, newZohoContactId }, '[AUTH] Zoho Contact created on agreement upload');
       }
