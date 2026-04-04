@@ -421,7 +421,8 @@ export async function createZohoProduct(fields: {
   if (fields.thcMax != null) zohoFields.THC_max = fields.thcMax;
   if (fields.cbdMin != null) zohoFields.CBD_as_is = fields.cbdMin;
   if (fields.cbdMax != null) zohoFields.CBD_max = fields.cbdMax;
-  if (fields.dominantTerpene) zohoFields.Terpen = fields.dominantTerpene;
+  // Note: dominantTerpene (Terpen) is NOT sent — Zoho Terpen is a picklist and CoA-extracted
+  // terpene names may not match. Terpene data is stored locally only.
   if (fields.gramsAvailable != null) zohoFields.Grams_Available_When_submitted = fields.gramsAvailable;
   if (fields.upcomingQty != null) zohoFields.Upcoming_QTY_3_Months = fields.upcomingQty;
   if (fields.minQtyRequest != null) zohoFields.Min_QTY_Request = fields.minQtyRequest;
