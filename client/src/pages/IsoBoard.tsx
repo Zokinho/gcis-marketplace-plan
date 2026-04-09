@@ -171,7 +171,7 @@ function IsoCard({
           {iso.responseCount ?? 0} response{(iso.responseCount ?? 0) !== 1 ? 's' : ''}
         </span>
         <div className="flex gap-2">
-          {(iso.isOwner || isAdmin) && iso.status === 'OPEN' && (
+          {(iso.isOwner || isAdmin) && (
             <button
               onClick={() => onEdit(iso)}
               className="rounded px-3 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/10 transition"

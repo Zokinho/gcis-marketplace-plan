@@ -440,15 +440,15 @@ router.patch('/:id', writeLimiter, validateParams(idParams), validate(isoUpdateS
     const hasContentEdits = Object.values(contentFields).some((v) => v !== undefined);
 
     if (hasContentEdits) {
-      const effectiveStatus = updateData.status || iso.status;
-      if (effectiveStatus !== 'OPEN' && effectiveStatus !== 'MATCHED') {
-        return res.status(400).json({ error: 'Cannot edit content on a closed or expired ISO request' });
-      }
-
       for (const [key, value] of Object.entries(contentFields)) {
         if (value !== undefined) {
           updateData[key] = value;
         }
+      }
+      // Auto-reopen if editing a closed/expired ISO
+      const effectiveStatus = updateData.status || iso.status;
+      if (effectiveStatus === 'CLOSED' || effectiveStatus === 'EXPIRED') {
+        updateData.status = 'OPEN';
       }
     }
 
