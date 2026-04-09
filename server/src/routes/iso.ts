@@ -107,6 +107,7 @@ router.get('/my', validateQuery(isoQuerySchema), async (req: Request, res: Respo
     res.json({
       items: items.map((iso) => ({
         ...iso,
+        isOwner: true,
         responseCount: iso._count.responses,
         _count: undefined,
       })),
