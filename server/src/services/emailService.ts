@@ -50,7 +50,7 @@ function wrap(title: string, content: string, footerExtra?: string): string {
 <tr><td align="center">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
 <!-- Header -->
-<tr><td style="background-color:#265463;padding:24px 32px;text-align:center;">
+<tr><td style="background-color:#207AD5;padding:24px 32px;text-align:center;">
 <div style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">Harvex</div>
 </td></tr>
 <!-- Content -->
@@ -60,7 +60,7 @@ ${content}
 <!-- Footer -->
 <tr><td style="padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center;">
 <p style="margin:0 0 8px;font-size:12px;color:#9ca3af;">Harvex &mdash; B2B Cannabis Marketplace</p>
-${footerExtra || `<a href="${FRONTEND_URL}/settings" style="font-size:12px;color:#265463;text-decoration:underline;">Manage email preferences</a>`}
+${footerExtra || `<a href="${FRONTEND_URL}/settings" style="font-size:12px;color:#207AD5;text-decoration:underline;">Manage email preferences</a>`}
 </td></tr>
 </table>
 </td></tr>
@@ -70,7 +70,7 @@ ${footerExtra || `<a href="${FRONTEND_URL}/settings" style="font-size:12px;color
 
 function btn(href: string, label: string): string {
   return `<table cellpadding="0" cellspacing="0" style="margin:24px 0;">
-<tr><td style="background-color:#265463;border-radius:8px;padding:12px 28px;">
+<tr><td style="background-color:#207AD5;border-radius:8px;padding:12px 28px;">
 <a href="${href}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;">${label}</a>
 </td></tr></table>`;
 }
