@@ -13,6 +13,7 @@ import { logAudit, getRequestIp } from '../services/auditService';
 import { createNotification } from '../services/notificationService';
 import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 import { hashPassword } from '../utils/auth';
+import { isEmailConfigured, sendAccountApprovedEmail, sendAccountRejectedEmail } from '../services/emailService';
 import { pushProductUpdate, downloadZohoFile } from '../services/zohoApi';
 import { createNotificationBatch } from '../services/notificationService';
 import fs from 'fs';
@@ -327,6 +328,11 @@ router.post('/users/:userId/approve', validate(approveUserSchema), async (req: R
   logger.info({ userEmail: updated.email, approvedBy: req.user?.email }, '[ADMIN] User approved');
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.approve', targetType: 'User', targetId: userId, metadata: { userEmail: updated.email, contactType }, ip: getRequestIp(req) });
 
+  // Fire-and-forget: approval email
+  if (isEmailConfigured) {
+    sendAccountApprovedEmail(updated.email, updated.firstName);
+  }
+
   // Mark Zoho registration task as Completed (fire-and-forget)
   if (updated.zohoTaskId) {
     import('../services/zohoAuth').then(({ zohoRequest }) => {
@@ -383,6 +389,11 @@ router.post('/users/:userId/reject', async (req: Request<{ userId: string }>, re
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
+  }
+
+  // Fire-and-forget: rejection email (send before delete so we have user data)
+  if (isEmailConfigured) {
+    sendAccountRejectedEmail(user.email, user.firstName);
   }
 
   await prisma.user.delete({ where: { id: userId } });

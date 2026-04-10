@@ -63,6 +63,8 @@ model User {
   spotSalesCreated   SpotSale[]       @relation("SpotSaleCreator")
   isoRequests        IsoRequest[]     @relation("BuyerIsoRequests")
   isoResponses       IsoResponse[]    @relation("SellerIsoResponses")
+  passwordResetTokens PasswordResetToken[]
+  emailNotificationPrefs Json?        // Record<string, boolean> — controls email delivery per type
 }
 
 // ─── Products (synced from Zoho) ───
@@ -649,4 +651,19 @@ model SpotSale {
   @@index([active])
   @@index([expiresAt])
   @@index([createdById])
+}
+
+// ─── Password Reset Tokens ───
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique   // SHA-256 of raw token
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }

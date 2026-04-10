@@ -66,6 +66,11 @@ function SignInForm({ onSwitch }: { onSwitch: () => void }) {
             className={inputClass}
             autoComplete="current-password"
           />
+          <div className="mt-1 text-right">
+            <Link to="/forgot-password" className="text-xs text-white/50 hover:text-brand-yellow transition">
+              Forgot password?
+            </Link>
+          </div>
         </div>
         <button
           type="submit"

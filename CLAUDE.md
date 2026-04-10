@@ -64,6 +64,8 @@ See `.env.example`. Key vars:
 | `ENABLE_METRICS` | `true`/`false` — enables Prometheus `/metrics` endpoint |
 | `MARKETPLACE_COUPLED` | `true` follows Zoho Product_Active, `false` independent visibility (testing) |
 | `CSP_EXTRA_CONNECT_SRC` | Extra connect-src domains for CSP (comma-separated, optional) |
+| `RESEND_API_KEY` | Resend email API key (optional — disables email if unset) |
+| `SENDER_EMAIL` | From address for emails (default `noreply@harvex.ca`) |
 
 ---
 
@@ -81,7 +83,7 @@ gcis-marketplace-plan/
 │   ├── tsconfig.json
 │   ├── vitest.config.ts
 │   ├── prisma/
-│   │   ├── schema.prisma           # Full data model (21 models)
+│   │   ├── schema.prisma           # Full data model (22 models)
 │   │   └── migrations/             # Versioned migrations (baseline + incremental)
 │   └── src/
 │       ├── index.ts                # Express entry, middleware, route mounting, cron setup
@@ -89,7 +91,7 @@ gcis-marketplace-plan/
 │       │   └── auth.ts             # requireAuth, marketplaceAuth, requireSeller, requireAdmin
 │       ├── routes/
 │       │   ├── admin.ts            # User management, sync triggers, CoA queue, audit log
-│       │   ├── auth.ts             # Register, login, refresh, logout, upload-agreement
+│       │   ├── auth.ts             # Register, login, refresh, logout, upload-agreement, forgot/reset password
 │       │   ├── bids.ts             # Create bid, buyer/seller history, accept/reject/outcome
 │       │   ├── coa.ts              # Upload CoA, status, preview, confirm/dismiss
 │       │   ├── intelligence.ts     # Admin dashboard, matches, predictions, churn, market, scores
@@ -105,6 +107,7 @@ gcis-marketplace-plan/
 │       │   └── webhooks.ts         # Zoho webhook (product/contact updates)
 │       ├── services/
 │       │   ├── auditService.ts     # logAudit (fire-and-forget), getRequestIp
+│       │   ├── emailService.ts     # Resend client, email templates, fire-and-forget send
 │       │   ├── churnDetectionService.ts  # At-risk buyer detection
 │       │   ├── coaClient.ts        # Axios client for CoA backend API
 │       │   ├── coaEmailSync.ts     # Email-to-product pipeline (5-min cron)
@@ -224,7 +227,7 @@ gcis-marketplace-plan/
 
 ## Data Model (Prisma)
 
-21 models in `server/prisma/schema.prisma`:
+22 models in `server/prisma/schema.prisma`:
 
 | Model | Purpose |
 |-------|---------|
@@ -249,6 +252,7 @@ gcis-marketplace-plan/
 | **SpotSale** | Admin-curated limited-time deals with countdown timers |
 | **IsoRequest** | Buyer "In Search Of" demand posts (auto-expires 30 days) |
 | **IsoResponse** | Seller responses to ISO requests ("I have this") |
+| **PasswordResetToken** | Time-limited password reset tokens (SHA-256 hashed, 1h expiry) |
 
 ### Full-Text Search
 
@@ -273,6 +277,8 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 | POST | `/api/auth/login` | Sign in with email + password |
 | POST | `/api/auth/refresh` | Rotate refresh token, get new access token |
 | POST | `/api/auth/logout` | Clear refresh token cookie |
+| POST | `/api/auth/forgot-password` | Send password reset email (user-enumeration safe) |
+| POST | `/api/auth/reset-password` | Reset password via token |
 | POST | `/api/webhooks/zoho` | Zoho webhook (secret header verification) |
 | GET | `/api/shares/public/:token` | Public share catalog |
 | GET | `/api/shares/public/:token/:productId` | Public product detail |
@@ -296,6 +302,7 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 | GET | `/api/notifications/unread-count` | Unread count |
 | PATCH | `/api/notifications/read` | Mark read (by IDs or all) |
 | GET/PATCH | `/api/notifications/preferences` | Notification preferences |
+| GET/PATCH | `/api/notifications/email-preferences` | Email notification preferences |
 | GET | `/api/matches` | Buyer's match suggestions |
 | POST | `/api/matches/:id/dismiss` | Dismiss a match |
 | POST | `/api/shortlist/toggle` | Add/remove product from shortlist |
@@ -700,6 +707,7 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 | 17 | 21 | Marketplace visibility decoupling — independent marketplaceVisible flag, MARKETPLACE_COUPLED env |
 | 18 | 22 | Self-hosted auth — Replace Clerk with bcrypt + JWT, multi-step sign-up wizard |
 | 19 | 23 | ISO feature — buyer demand posts, seller responses, 7-factor auto-matching, expiry cron |
+| 20 | 25 | Resend email integration — password reset, notification emails, per-type email preferences |
 
 ### Production Hardening (cross-cutting)
 - Structured logging (pino) — replaced 130+ console.log/error calls
@@ -711,6 +719,7 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 - Rate limiting (4 tiers)
 - 404 tests across 23 files
 - Dark mode support across all pages
+- Email notifications via Resend (env-gated, fire-and-forget)
 - Sentry error tracking (backend + frontend) with pino log transport
 - Prometheus metrics (HTTP + cron) with `/metrics` endpoint
 

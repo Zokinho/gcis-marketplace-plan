@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import logger from '../utils/logger';
 import { prisma } from '../index';
-import { validate, registerSchema, loginSchema } from '../utils/validation';
+import { validate, registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../utils/validation';
 import {
   hashPassword,
   comparePassword,
@@ -13,6 +14,7 @@ import {
 } from '../utils/auth';
 import { zohoRequest } from '../services/zohoAuth';
 import { isAdmin } from '../middleware/auth';
+import { isEmailConfigured, sendWelcomeEmail, sendAdminNewUserAlert } from '../services/emailService';
 
 const router = Router();
 
@@ -120,6 +122,15 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
   }
 
   logger.info({ email }, '[AUTH] New user registered');
+
+  // Fire-and-forget: welcome email + admin alert
+  if (isEmailConfigured) {
+    sendWelcomeEmail(email, firstName);
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e: string) => e.trim()).filter(Boolean);
+    if (adminEmails.length > 0) {
+      sendAdminNewUserAlert(adminEmails, { email, firstName, lastName, companyName, contactType });
+    }
+  }
 
   res.status(201).json({
     user: {
@@ -397,6 +408,90 @@ router.post('/upload-agreement', async (req: Request, res: Response) => {
 
   logger.info({ email: user.email }, '[AUTH] Agreement uploaded');
   res.json({ message: 'Document upload recorded' });
+});
+
+/**
+ * POST /api/auth/forgot-password
+ * Send a password reset link via email.
+ * Always returns success to prevent user enumeration.
+ */
+router.post('/forgot-password', validate(forgotPasswordSchema), async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (user && isEmailConfigured) {
+      // Delete any existing reset tokens for this user
+      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+
+      // Generate token
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = hashRefreshToken(rawToken); // Reuse SHA-256 hasher
+
+      // Store hashed token with 1-hour expiry
+      await prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+        },
+      });
+
+      // Fire-and-forget email
+      const { sendPasswordResetEmail } = await import('../services/emailService');
+      sendPasswordResetEmail(user.email, rawToken);
+
+      logger.info({ email }, '[AUTH] Password reset requested');
+    }
+  } catch (err) {
+    // Log but don't expose error to user
+    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[AUTH] Forgot password error');
+  }
+
+  // Always return success
+  res.json({ message: 'If an account exists with that email, a reset link has been sent.' });
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password using a valid token.
+ */
+router.post('/reset-password', validate(resetPasswordSchema), async (req: Request, res: Response) => {
+  const { token, newPassword } = req.body;
+
+  const tokenHash = hashRefreshToken(token); // Reuse SHA-256 hasher
+
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+  });
+
+  if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+    return res.status(400).json({ error: 'Invalid or expired reset link' });
+  }
+
+  const passwordHashed = await hashPassword(newPassword);
+
+  // Transaction: update password, mark token used, clear sessions
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: resetToken.userId },
+      data: {
+        passwordHash: passwordHashed,
+        mustChangePassword: false,
+        refreshToken: null,
+        refreshTokenExpiresAt: null,
+      },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { usedAt: new Date() },
+    }),
+  ]);
+
+  logger.info({ userId: resetToken.userId }, '[AUTH] Password reset via token');
+
+  res.json({ message: 'Password reset successfully. You can now sign in.' });
 });
 
 export default router;

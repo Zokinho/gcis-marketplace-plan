@@ -33,6 +33,8 @@ import Guide from './pages/Guide';
 import CoaTool from './pages/CoaTool';
 import AccountSettings from './pages/AccountSettings';
 import ChangePassword from './pages/ChangePassword';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import { ShortlistProvider } from './lib/useShortlist';
 
 /**
@@ -155,6 +157,8 @@ export default function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Landing />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
         {/* Authenticated but pre-approval routes */}
         <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />

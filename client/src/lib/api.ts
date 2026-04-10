@@ -1196,6 +1196,35 @@ export async function changePassword(data: { currentPassword: string; newPasswor
   return res.data;
 }
 
+// ─── Password Reset API ───
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const res = await api.post('/auth/forgot-password', { email });
+  return res.data;
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  const res = await api.post('/auth/reset-password', { token, newPassword });
+  return res.data;
+}
+
+// ─── Email Preferences API ───
+
+export async function fetchEmailPreferences(): Promise<{
+  preferences: NotificationPreferences;
+  defaults: NotificationPreferences;
+}> {
+  const res = await api.get('/notifications/email-preferences');
+  return res.data;
+}
+
+export async function updateEmailPreferences(
+  updates: Partial<NotificationPreferences>,
+): Promise<{ preferences: NotificationPreferences }> {
+  const res = await api.patch('/notifications/email-preferences', updates);
+  return res.data;
+}
+
 export async function fetchShortlistCount(): Promise<number> {
   const res = await api.get<{ count: number }>('/shortlist/count');
   return res.data.count;

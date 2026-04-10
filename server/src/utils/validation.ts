@@ -340,6 +340,40 @@ export const recordSpotSaleSchema = z.object({
   quantity: z.coerce.number().positive('quantity must be positive'),
 });
 
+// ─── Password reset schemas ───
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(128),
+});
+
+// ─── Email notification preferences schema ───
+
+export const emailPrefsSchema = z.object({
+  BID_RECEIVED: z.boolean().optional(),
+  BID_ACCEPTED: z.boolean().optional(),
+  BID_REJECTED: z.boolean().optional(),
+  BID_COUNTERED: z.boolean().optional(),
+  BID_OUTCOME: z.boolean().optional(),
+  PRODUCT_APPROVED: z.boolean().optional(),
+  PRODUCT_NEW: z.boolean().optional(),
+  PRODUCT_PRICE: z.boolean().optional(),
+  PRODUCT_STOCK: z.boolean().optional(),
+  MATCH_SUGGESTION: z.boolean().optional(),
+  COA_PROCESSED: z.boolean().optional(),
+  PREDICTION_DUE: z.boolean().optional(),
+  SHORTLIST_PRICE_DROP: z.boolean().optional(),
+  ISO_MATCH_FOUND: z.boolean().optional(),
+  ISO_SELLER_RESPONSE: z.boolean().optional(),
+  EDIT_APPROVED: z.boolean().optional(),
+  EDIT_REJECTED: z.boolean().optional(),
+  SYSTEM_ANNOUNCEMENT: z.boolean().optional(),
+}).strict();
+
 // ─── Password change schema ───
 
 export const changePasswordSchema = z.object({

@@ -5,7 +5,9 @@ import { requireAdmin } from '../middleware/auth';
 import {
   getUnreadCount,
   getEffectivePrefs,
+  getEffectiveEmailPrefs,
   DEFAULT_NOTIFICATION_PREFS,
+  DEFAULT_EMAIL_PREFS,
   createNotification,
 } from '../services/notificationService';
 import {
@@ -14,6 +16,7 @@ import {
   notificationListSchema,
   markReadSchema,
   notificationPrefsSchema,
+  emailPrefsSchema,
   broadcastSchema,
 } from '../utils/validation';
 import { logAudit, getRequestIp } from '../services/auditService';
@@ -148,6 +151,58 @@ router.patch('/preferences', validate(notificationPrefsSchema), async (req: Requ
   } catch (err) {
     logger.error({ err }, '[NOTIFICATIONS] Failed to update preferences');
     res.status(500).json({ error: 'Failed to update preferences' });
+  }
+});
+
+/**
+ * GET /api/notifications/email-preferences
+ * Get effective email notification preferences for the current user.
+ */
+router.get('/email-preferences', async (req: Request, res: Response) => {
+  try {
+    const prefs = await getEffectiveEmailPrefs(req.user!.id);
+    res.json({ preferences: prefs, defaults: DEFAULT_EMAIL_PREFS });
+  } catch (err) {
+    logger.error({ err }, '[NOTIFICATIONS] Failed to get email preferences');
+    res.status(500).json({ error: 'Failed to get email preferences' });
+  }
+});
+
+/**
+ * PATCH /api/notifications/email-preferences
+ * Update email notification preferences (partial merge).
+ */
+router.patch('/email-preferences', validate(emailPrefsSchema), async (req: Request, res: Response) => {
+  const user = req.user!;
+  const updates = req.body as Record<string, boolean>;
+
+  const validTypes = Object.keys(DEFAULT_EMAIL_PREFS);
+  const filtered: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (validTypes.includes(key) && typeof value === 'boolean') {
+      if (key === 'SYSTEM_ANNOUNCEMENT') continue;
+      filtered[key] = value;
+    }
+  }
+
+  try {
+    const existing = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { emailNotificationPrefs: true },
+    });
+
+    const currentPrefs = (existing?.emailNotificationPrefs as Record<string, boolean> | null) ?? {};
+    const merged = { ...currentPrefs, ...filtered };
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailNotificationPrefs: merged },
+    });
+
+    res.json({ preferences: { ...DEFAULT_EMAIL_PREFS, ...merged } });
+  } catch (err) {
+    logger.error({ err }, '[NOTIFICATIONS] Failed to update email preferences');
+    res.status(500).json({ error: 'Failed to update email preferences' });
   }
 });
 

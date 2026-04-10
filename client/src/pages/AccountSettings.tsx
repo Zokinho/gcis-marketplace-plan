@@ -4,12 +4,14 @@ import {
   changePassword,
   fetchNotificationPreferences,
   updateNotificationPreferences,
+  fetchEmailPreferences,
+  updateEmailPreferences,
   NotificationPreferences,
   NotificationTypeEnum,
 } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
-type Section = 'password' | 'notifications';
+type Section = 'password' | 'notifications' | 'email';
 
 const MENU_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   {
@@ -30,6 +32,15 @@ const MENU_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    key: 'email',
+    label: 'Email',
+    icon: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+      </svg>
+    ),
+  },
 ];
 
 const TYPE_LABELS: Record<string, string> = {
@@ -45,12 +56,16 @@ const TYPE_LABELS: Record<string, string> = {
   COA_PROCESSED: 'CoA Processed',
   PREDICTION_DUE: 'Reorder Prediction',
   SHORTLIST_PRICE_DROP: 'Shortlist Price Drop',
+  ISO_MATCH_FOUND: 'ISO Match Found',
+  ISO_SELLER_RESPONSE: 'ISO Seller Response',
+  EDIT_APPROVED: 'Edit Approved',
+  EDIT_REJECTED: 'Edit Rejected',
   SYSTEM_ANNOUNCEMENT: 'System Announcement',
 };
 
 const BID_TYPES: NotificationTypeEnum[] = ['BID_RECEIVED', 'BID_ACCEPTED', 'BID_REJECTED', 'BID_COUNTERED', 'BID_OUTCOME'];
-const PRODUCT_TYPES: NotificationTypeEnum[] = ['PRODUCT_NEW', 'PRODUCT_PRICE', 'PRODUCT_STOCK', 'COA_PROCESSED', 'SHORTLIST_PRICE_DROP'];
-const MATCH_TYPES: NotificationTypeEnum[] = ['MATCH_SUGGESTION', 'PREDICTION_DUE'];
+const PRODUCT_TYPES: NotificationTypeEnum[] = ['PRODUCT_NEW', 'PRODUCT_PRICE', 'PRODUCT_STOCK', 'COA_PROCESSED', 'SHORTLIST_PRICE_DROP', 'EDIT_APPROVED', 'EDIT_REJECTED'];
+const MATCH_TYPES: NotificationTypeEnum[] = ['MATCH_SUGGESTION', 'PREDICTION_DUE', 'ISO_MATCH_FOUND', 'ISO_SELLER_RESPONSE'];
 const SYSTEM_TYPES: NotificationTypeEnum[] = ['SYSTEM_ANNOUNCEMENT'];
 
 const PREF_GROUPS = [
@@ -290,6 +305,117 @@ function NotificationsSection() {
   );
 }
 
+// ─── Email Notifications Section ───
+
+function EmailSection() {
+  const { data: userData } = useUserStatus();
+  const isSeller = userData?.user?.contactType?.includes('Seller') ?? false;
+
+  const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetchEmailPreferences();
+        setPrefs(res.preferences);
+      } catch { /* ignore */ }
+      setLoading(false);
+    })();
+  }, []);
+
+  async function togglePref(type: NotificationTypeEnum) {
+    if (!prefs || type === 'SYSTEM_ANNOUNCEMENT') return;
+    setError('');
+    const oldVal = prefs[type];
+    const newVal = !oldVal;
+
+    setPrefs(prev => prev ? { ...prev, [type]: newVal } : prev);
+
+    try {
+      const res = await updateEmailPreferences({ [type]: newVal });
+      setPrefs(res.preferences);
+    } catch (err: any) {
+      setPrefs(prev => prev ? { ...prev, [type]: oldVal } : prev);
+      const msg = err?.response?.data?.error || 'Failed to update preference';
+      setError(msg);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-teal border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!prefs) {
+    return <p className="text-sm text-muted">Failed to load email preferences.</p>;
+  }
+
+  return (
+    <div>
+      <h2 className="mb-1 text-lg font-semibold text-primary">Email Notifications</h2>
+      <p className="mb-5 text-sm text-muted">Choose which notifications also send you an email.</p>
+
+      {error && (
+        <div className="mb-4 max-w-md rounded-lg bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      <div className="max-w-md space-y-6">
+        {PREF_GROUPS.map((group) => {
+          const visibleTypes = group.types.filter(
+            (t) => isSeller || !SELLER_ONLY_TYPES.has(t),
+          );
+          if (visibleTypes.length === 0) return null;
+          return (
+            <div key={group.label}>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+                {group.label}
+              </h3>
+              <div className="rounded-lg surface border border-default divide-y divide-default">
+                {visibleTypes.map((type) => {
+                  const isSystem = type === 'SYSTEM_ANNOUNCEMENT';
+                  return (
+                    <div
+                      key={type}
+                      className="flex items-center justify-between px-4 py-3"
+                    >
+                      <span className="text-sm text-primary">{TYPE_LABELS[type] || type}</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={prefs[type]}
+                        onClick={() => togglePref(type)}
+                        disabled={isSystem}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
+                          prefs[type] ? 'bg-brand-teal' : 'bg-gray-300 dark:bg-gray-600'
+                        } ${isSystem ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        title={isSystem ? 'System announcements always send email' : undefined}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform ${
+                            prefs[type] ? 'translate-x-[21px]' : 'translate-x-0.5'
+                          }`}
+                          style={{ marginTop: '2px' }}
+                        />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Settings Page ───
 
 export default function AccountSettings() {
@@ -325,6 +451,7 @@ export default function AccountSettings() {
         <div className="min-w-0 flex-1 rounded-lg surface p-6 shadow-sm">
           {section === 'password' && <PasswordSection />}
           {section === 'notifications' && <NotificationsSection />}
+          {section === 'email' && <EmailSection />}
         </div>
       </div>
     </Layout>
