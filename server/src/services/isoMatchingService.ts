@@ -12,7 +12,7 @@ interface MatchResult {
 
 /**
  * Score all active marketplace products against one ISO request.
- * Returns top 5 matches above the threshold (score >= 60).
+ * Returns top 5 matches above the threshold (score >= 70).
  */
 export async function matchIsoToProducts(isoRequestId: string): Promise<MatchResult[]> {
   const iso = await prisma.isoRequest.findUnique({
@@ -113,7 +113,7 @@ export async function matchIsoToProducts(isoRequestId: string): Promise<MatchRes
 
     const score = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
 
-    if (score >= 60) {
+    if (score >= 70) {
       results.push({ productId: p.id, productName: p.name, score, breakdown });
     }
   }
@@ -125,7 +125,8 @@ export async function matchIsoToProducts(isoRequestId: string): Promise<MatchRes
 
 /**
  * Called when a new product is synced or listed — score against all OPEN ISOs.
- * Fires ISO_MATCH_FOUND notifications to ISO buyers for matches above threshold.
+ * Fires notifications to buyer + admins for matches above threshold.
+ * Does NOT change ISO status — only seller responses ("I have this") set MATCHED.
  * Returns count of matches found.
  */
 export async function matchProductToOpenIsos(productId: string): Promise<number> {
@@ -160,16 +161,8 @@ export async function matchProductToOpenIsos(productId: string): Promise<number>
   for (const iso of openIsos) {
     const score = scoreProductAgainstIso(product, iso);
 
-    if (score >= 60) {
+    if (score >= 70) {
       matchCount++;
-
-      // Update the ISO's matched product if this is the top match
-      if (!iso.matchedProductId) {
-        await prisma.isoRequest.update({
-          where: { id: iso.id },
-          data: { matchedProductId: product.id, status: 'MATCHED' },
-        }).catch(() => {}); // Fire-and-forget
-      }
 
       // Notify the ISO buyer
       createNotification({

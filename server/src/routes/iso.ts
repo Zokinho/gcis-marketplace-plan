@@ -531,6 +531,17 @@ router.post('/:id/respond', writeLimiter, validateParams(idParams), validate(iso
       },
     });
 
+    // Mark ISO as MATCHED now that a seller has responded
+    if (iso.status === 'OPEN') {
+      await prisma.isoRequest.update({
+        where: { id },
+        data: {
+          status: 'MATCHED',
+          ...(productId ? { matchedProductId: productId } : {}),
+        },
+      }).catch(() => {}); // Fire-and-forget
+    }
+
     // Notify admins
     const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean);
     if (adminEmails.length > 0) {
