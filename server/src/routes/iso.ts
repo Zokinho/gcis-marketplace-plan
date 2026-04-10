@@ -233,8 +233,8 @@ router.get('/', validateQuery(isoQuerySchema), async (req: Request, res: Respons
   if (status) {
     where.status = status;
   } else if (mine !== 'true') {
-    // Default: only show OPEN ISOs on the public board (including those with no expiry)
-    where.status = 'OPEN';
+    // Default: show OPEN and MATCHED ISOs on the public board (including those with no expiry)
+    where.status = { in: ['OPEN', 'MATCHED'] };
     where.OR = [{ expiresAt: null }, { expiresAt: { gt: new Date() } }];
   }
   if (category) where.category = category;

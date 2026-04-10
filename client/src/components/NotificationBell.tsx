@@ -17,6 +17,7 @@ function timeAgo(dateStr: string): string {
 function getNotificationLink(n: NotificationRecord): string | null {
   const data = n.data;
   if (!data) return null;
+  if (data.isoRequestId) return '/iso';
   if (data.productId) return `/marketplace/${data.productId}`;
   if (data.matchId) return '/my-matches';
   if (data.bidId) return '/orders';

@@ -179,6 +179,39 @@ export async function matchProductToOpenIsos(productId: string): Promise<number>
         body: `A product matching your request may be available: ${product.name}`,
         data: { isoRequestId: iso.id, productId: product.id, score },
       });
+
+      // Notify admins with buyer + product details so they can facilitate
+      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean);
+      if (adminEmails.length > 0) {
+        const [buyer, adminUsers] = await Promise.all([
+          prisma.user.findUnique({
+            where: { id: iso.buyerId },
+            select: { email: true, firstName: true, lastName: true, companyName: true, phone: true },
+          }),
+          prisma.user.findMany({
+            where: { email: { in: adminEmails } },
+            select: { id: true },
+          }),
+        ]);
+
+        for (const admin of adminUsers) {
+          createNotification({
+            userId: admin.id,
+            type: 'ISO_MATCH_FOUND',
+            title: 'ISO Auto-Match Found',
+            body: `${buyer?.companyName || buyer?.email || 'A buyer'} wants "${iso.title || iso.category}" — matched to ${product.name} (score ${score})`,
+            data: {
+              isoRequestId: iso.id,
+              productId: product.id,
+              score,
+              buyerEmail: buyer?.email,
+              buyerName: [buyer?.firstName, buyer?.lastName].filter(Boolean).join(' ') || undefined,
+              buyerCompany: buyer?.companyName,
+              buyerPhone: buyer?.phone,
+            },
+          });
+        }
+      }
     }
   }
 
