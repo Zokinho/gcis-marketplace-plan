@@ -5,7 +5,9 @@ import logger from '../utils/logger';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const SENDER_EMAIL = process.env.SENDER_EMAIL || 'noreply@harvex.ca';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const SENDER_FROM = `Harvex <${SENDER_EMAIL}>`;
+// FRONTEND_URL may be comma-separated (for CORS) — take the first value for email links
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
 
 export const isEmailConfigured = !!RESEND_API_KEY;
 
@@ -24,15 +26,19 @@ interface SendEmailInput {
 }
 
 async function sendEmail(input: SendEmailInput): Promise<void> {
-  if (!resend) return;
+  if (!resend) {
+    logger.warn({ to: input.to, subject: input.subject }, '[EMAIL] Resend not configured — skipping');
+    return;
+  }
   try {
-    await resend.emails.send({
-      from: SENDER_EMAIL,
+    const result = await resend.emails.send({
+      from: SENDER_FROM,
       to: input.to,
       subject: input.subject,
       html: input.html,
       text: input.text,
     });
+    logger.info({ to: input.to, subject: input.subject, id: (result as any)?.data?.id }, '[EMAIL] Sent');
   } catch (err) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) }, to: input.to, subject: input.subject }, '[EMAIL] Failed to send');
   }
