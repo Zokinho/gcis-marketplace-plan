@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
   changePassword,
@@ -419,7 +420,10 @@ function EmailSection() {
 // ─── Main Settings Page ───
 
 export default function AccountSettings() {
-  const [section, setSection] = useState<Section>('password');
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const initialSection: Section = tabParam === 'email' ? 'email' : tabParam === 'notifications' ? 'notifications' : 'password';
+  const [section, setSection] = useState<Section>(initialSection);
 
   return (
     <Layout>
