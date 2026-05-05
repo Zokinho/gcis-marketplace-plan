@@ -32,23 +32,23 @@ const CONTACT_FIELDS = [
  */
 export async function fetchAllProducts(): Promise<any[]> {
   const allProducts: any[] = [];
-  let page = 1;
-  let hasMore = true;
+  let pageToken: string | undefined;
+  let firstPage = true;
 
-  while (hasMore) {
+  while (firstPage || pageToken) {
+    firstPage = false;
     try {
-      const response = await zohoRequest('GET', '/Products', {
-        params: {
-          fields: PRODUCT_FIELDS,
-          page,
-          per_page: 200,
-        },
-      });
+      const params: Record<string, any> = {
+        fields: PRODUCT_FIELDS,
+        per_page: 200,
+      };
+      if (pageToken) params.page_token = pageToken;
+
+      const response = await zohoRequest('GET', '/Products', { params });
 
       const products = response?.data || [];
       allProducts.push(...products);
-      hasMore = response?.info?.more_records || false;
-      page++;
+      pageToken = response?.info?.next_page_token || undefined;
     } catch (err: any) {
       // 204 = no records
       if (err?.response?.status === 204) break;
@@ -64,24 +64,24 @@ export async function fetchAllProducts(): Promise<any[]> {
  */
 export async function fetchMarketplaceContacts(): Promise<any[]> {
   const allContacts: any[] = [];
-  let page = 1;
-  let hasMore = true;
+  let pageToken: string | undefined;
+  let firstPage = true;
 
   // Fetch all contacts — match to marketplace users by Zoho ID, legacy UID, or email.
-  while (hasMore) {
+  while (firstPage || pageToken) {
+    firstPage = false;
     try {
-      const response = await zohoRequest('GET', '/Contacts', {
-        params: {
-          fields: CONTACT_FIELDS,
-          page,
-          per_page: 200,
-        },
-      });
+      const params: Record<string, any> = {
+        fields: CONTACT_FIELDS,
+        per_page: 200,
+      };
+      if (pageToken) params.page_token = pageToken;
+
+      const response = await zohoRequest('GET', '/Contacts', { params });
 
       const contacts = response?.data || [];
       allContacts.push(...contacts);
-      hasMore = response?.info?.more_records || false;
-      page++;
+      pageToken = response?.info?.next_page_token || undefined;
     } catch (err: any) {
       if (err?.response?.status === 204) break;
       throw err;
