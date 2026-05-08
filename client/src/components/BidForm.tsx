@@ -63,7 +63,7 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
   }
 
   return (
-    <form onSubmit={handleSubmit} className="overflow-hidden rounded-lg border border-default surface">
+    <form onSubmit={handleSubmit} className="overflow-hidden rounded-lg border border-default surface" data-tour="bid-form">
       <div className="bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue px-5 py-3">
         <h3 className="text-lg font-semibold text-white">Place a Bid</h3>
       </div>
@@ -81,6 +81,7 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
             placeholder="0.00"
             required
             className="w-full rounded-lg input-field"
+            data-tour="bid-price"
           />
         </div>
 
@@ -108,7 +109,9 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
         )}
 
         {/* Live proximity score */}
-        <ProximityIndicator bidPrice={price} sellerPrice={sellerPrice} />
+        <div data-tour="bid-proximity">
+          <ProximityIndicator bidPrice={price} sellerPrice={sellerPrice} />
+        </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-secondary">Notes (optional)</label>
@@ -128,6 +131,7 @@ export default function BidForm({ productId, productName, sellerPrice, minQty }:
         type="submit"
         disabled={price <= 0 || qty <= 0 || submitting}
         className="w-full rounded-lg bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+        data-tour="bid-submit"
       >
         {submitting ? 'Submitting...' : 'Submit Bid'}
       </button>

@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
 import OutcomeForm from '../components/OutcomeForm';
-import ContactModal from '../components/ContactModal';
 import { fetchMyBids, fetchSellerBids, acceptBid, rejectBid, type BidRecord, type BidStatusType, type SellerBidRecord } from '../lib/api';
 import { useUserStatus } from '../lib/useUserStatus';
 
@@ -36,8 +34,6 @@ export default function Orders() {
   const { data: userStatus } = useUserStatus();
   const isSeller = userStatus?.user?.contactType?.includes('Seller') ?? false;
   const [tab, setTab] = useState<'buyer' | 'seller'>('buyer');
-  const [contactOpen, setContactOpen] = useState(false);
-  const { user } = useAuth();
 
   // Auto-select seller tab if user is a seller
   useEffect(() => {
@@ -47,7 +43,7 @@ export default function Orders() {
   return (
     <Layout>
       {/* Tab switcher + need help */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between" data-tour="orders-tabs">
         {isSeller ? (
           <div className="flex gap-1 rounded-lg bg-brand-gray dark:bg-slate-900 p-1 sm:w-fit border border-transparent dark:border-slate-700">
             <button
@@ -66,24 +62,11 @@ export default function Orders() {
         ) : (
           <div />
         )}
-        <button
-          onClick={() => setContactOpen(true)}
-          className="flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-teal/10 px-3 py-1 text-sm font-medium text-brand-teal transition hover:bg-brand-teal/20 dark:bg-brand-yellow/15 dark:text-brand-yellow dark:hover:bg-brand-yellow/25 teal:bg-white/20 teal:text-brand-yellow teal:hover:bg-white/30"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-          </svg>
-          Need help?
-        </button>
       </div>
 
-      {tab === 'buyer' ? <BuyerBidsView /> : <SellerBidsView />}
-      <ContactModal
-        open={contactOpen}
-        onClose={() => setContactOpen(false)}
-        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''}
-        userEmail={user?.email || ''}
-      />
+      <div data-tour="orders-content">
+        {tab === 'buyer' ? <BuyerBidsView /> : <SellerBidsView />}
+      </div>
     </Layout>
   );
 }
@@ -133,7 +116,7 @@ function BuyerBidsView() {
           <div className="mt-2 h-1 w-12 rounded-full bg-brand-blue dark:bg-gradient-to-r dark:from-brand-teal dark:to-brand-blue teal:bg-gradient-to-r teal:from-brand-yellow teal:to-brand-coral" />
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5" data-tour="orders-status-filters">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.value}
@@ -188,8 +171,8 @@ function BuyerBidsView() {
       {!loading && !error && bids.length > 0 && (
         <>
           <div className="space-y-3">
-            {bids.map((bid) => (
-              <BidCard key={bid.id} bid={bid} />
+            {bids.map((bid, i) => (
+              <BidCard key={bid.id} bid={bid} isFirst={i === 0} />
             ))}
           </div>
 
@@ -329,7 +312,7 @@ function SellerBidsView() {
                       {new Date(bid.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
                     {bid.status === 'PENDING' && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2" data-tour="seller-bid-actions">
                         <button
                           onClick={() => handleAccept(bid.id)}
                           disabled={actioningId === bid.id}
@@ -379,12 +362,12 @@ function SellerBidsView() {
   );
 }
 
-function BidCard({ bid }: { bid: BidRecord }) {
+function BidCard({ bid, isFirst }: { bid: BidRecord; isFirst?: boolean }) {
   const statusCfg = STATUS_CONFIG[bid.status];
   const proximityColor = getProximityColor(bid.proximityScore);
 
   return (
-    <div className={`rounded-lg border card-blue border-l-4 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
+    <div data-tour={isFirst ? 'first-bid-card' : undefined} className={`rounded-lg border card-blue border-l-4 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
       bid.status === 'ACCEPTED' ? 'border-l-brand-teal' :
       bid.status === 'REJECTED' ? 'border-l-brand-coral' :
       bid.status === 'PENDING' ? 'border-l-brand-blue' :

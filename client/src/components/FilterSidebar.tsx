@@ -30,6 +30,7 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
           value={filters.search || ''}
           onChange={(e) => update({ search: e.target.value || undefined })}
           className="w-full rounded-lg input-field"
+          data-tour="filter-search"
         />
       </div>
 
@@ -133,7 +134,7 @@ export default function FilterSidebar({ filters, onChange }: FilterSidebarProps)
       )}
 
       {/* Desktop sidebar — sticky, snug height */}
-      <aside className="hidden w-64 shrink-0 self-start sticky top-[4.5rem] max-h-[calc(100vh-5.5rem)] overflow-y-auto rounded-lg border card-blue shadow-md backdrop-blur-sm lg:block">
+      <aside className="hidden w-64 shrink-0 self-start sticky top-[4.5rem] max-h-[calc(100vh-5.5rem)] overflow-y-auto rounded-lg border card-blue shadow-md backdrop-blur-sm lg:block" data-tour="filter-sidebar">
         <div className="bg-brand-teal px-4 py-3 sticky top-0 z-10">
           <h3 className="text-sm font-bold uppercase tracking-wide text-white">Filters</h3>
         </div>

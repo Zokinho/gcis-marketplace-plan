@@ -137,6 +137,19 @@
   background-color: var(--on-surface-faint);
 }
 
+/* ── Tour overlay adjustments ─────────────────────────────────── */
+.react-joyride__spotlight {
+  border-radius: 8px !important;
+}
+
+.dark .react-joyride__overlay {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+.theme-gradient .react-joyride__overlay {
+  background-color: rgba(0, 0, 0, 0.55) !important;
+}
+
 @theme {
   --color-brand-teal: #265463;
   --color-brand-teal-light: #2d6a7a;

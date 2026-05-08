@@ -62,15 +62,17 @@ function formatRange(min: number | null, max: number | null): string {
 export default function SpotSaleCard({
   spotSale,
   onContact,
+  isFirst,
 }: {
   spotSale: SpotSaleRecord;
   onContact: (spotSale: SpotSaleRecord) => void;
+  isFirst?: boolean;
 }) {
   const { product } = spotSale;
   const countdown = useCountdown(spotSale.expiresAt);
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-lg border card-blue shadow-md backdrop-blur-sm">
+    <div className="group relative flex flex-col overflow-hidden rounded-lg border card-blue shadow-md backdrop-blur-sm" data-tour={isFirst ? 'first-spot-sale' : undefined}>
       {/* Discount badge */}
       <div className="absolute right-3 top-3 z-10 rounded-full bg-brand-coral px-2.5 py-1 text-xs font-bold text-white shadow-md">
         -{Math.round(spotSale.discountPercent)}% OFF
@@ -144,7 +146,7 @@ export default function SpotSaleCard({
         </div>
 
         {/* Countdown */}
-        <div className="mb-3 flex items-center gap-1.5 text-xs">
+        <div className="mb-3 flex items-center gap-1.5 text-xs" data-tour={isFirst ? 'spot-sale-countdown' : undefined}>
           <svg className="h-4 w-4 text-amber-500 dark:text-brand-yellow teal:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>

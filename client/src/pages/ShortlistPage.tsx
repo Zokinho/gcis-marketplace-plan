@@ -86,7 +86,7 @@ export default function ShortlistPage() {
       )}
 
       {/* Sort bar */}
-      <div className="mb-4 flex items-center justify-between rounded-lg bg-brand-blue/5 dark:bg-brand-dark px-3 py-2 shadow-md">
+      <div className="mb-4 flex items-center justify-between rounded-lg bg-brand-blue/5 dark:bg-brand-dark px-3 py-2 shadow-md" data-tour="shortlist-sort">
         {pagination && (
           <span className="text-xs font-medium text-muted">
             {pagination.total} saved product{pagination.total !== 1 ? 's' : ''}

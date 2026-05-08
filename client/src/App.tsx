@@ -36,6 +36,7 @@ import ChangePassword from './pages/ChangePassword';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import { ShortlistProvider } from './lib/useShortlist';
+import { TourProvider } from './lib/TourContext';
 
 /**
  * Requires sign-in. Redirects unauthenticated users to landing page.
@@ -153,6 +154,7 @@ function NotFound() {
 export default function App() {
   return (
     <ShortlistProvider>
+    <TourProvider>
     <div className="min-h-screen surface-base text-primary">
       <Routes>
         {/* Public routes */}
@@ -261,6 +263,7 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
+    </TourProvider>
     </ShortlistProvider>
   );
 }

@@ -856,6 +856,7 @@ export default function IsoBoard() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
+          data-tour="iso-create"
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue transition"
         >
           Post Wanted
@@ -868,12 +869,14 @@ export default function IsoBoard() {
       <div className="mb-4 flex gap-1 rounded-lg border card-blue backdrop-blur-sm p-1">
         <button
           onClick={() => setTab('browse')}
+          data-tour="iso-browse-tab"
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${tab === 'browse' ? 'bg-brand-teal text-white' : 'text-muted hover:text-primary'}`}
         >
           Browse Wanted
         </button>
         <button
           onClick={() => setTab('my')}
+          data-tour="iso-my-tab"
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${tab === 'my' ? 'bg-brand-teal text-white' : 'text-muted hover:text-primary'}`}
         >
           My Requests

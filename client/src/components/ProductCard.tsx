@@ -19,7 +19,7 @@ const CERT_COLORS: Record<string, string> = {
   'IMC-GAP': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
 };
 
-export default function ProductCard({ product, large, onClick }: { product: ProductCardType; large?: boolean; onClick?: (productId: string) => void }) {
+export default function ProductCard({ product, large, onClick, isFirst }: { product: ProductCardType; large?: boolean; onClick?: (productId: string) => void; isFirst?: boolean }) {
   const available = (product.gramsAvailable ?? 0) > 0;
   const upcoming = (product.upcomingQty ?? 0) > 0;
 
@@ -58,7 +58,7 @@ export default function ProductCard({ product, large, onClick }: { product: Prod
           </div>
           <div className="flex flex-shrink-0 items-center gap-0.5">
             <ShareButton productId={product.id} productName={product.name} sellerId={product.sellerId} />
-            <ShortlistButton productId={product.id} />
+            <ShortlistButton productId={product.id} dataTour={isFirst ? 'shortlist-button' : undefined} />
           </div>
         </div>
 
@@ -104,14 +104,14 @@ export default function ProductCard({ product, large, onClick }: { product: Prod
 
   if (onClick) {
     return (
-      <div className={className + ' cursor-pointer'} onClick={() => onClick(product.id)}>
+      <div className={className + ' cursor-pointer'} onClick={() => onClick(product.id)} data-tour={isFirst ? 'first-product' : undefined}>
         {content}
       </div>
     );
   }
 
   return (
-    <Link to={`/marketplace/${product.id}`} className={className}>
+    <Link to={`/marketplace/${product.id}`} className={className} data-tour={isFirst ? 'first-product' : undefined}>
       {content}
     </Link>
   );

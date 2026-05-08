@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
 import SellerScoreCard from '../components/SellerScoreCard';
 import ShareModal from '../components/ShareModal';
-import ContactModal from '../components/ContactModal';
 import ProductImage from '../components/ProductImage';
 import ProductPlaceholder from '../components/ProductPlaceholder';
 import {
@@ -32,8 +30,6 @@ export default function MyListings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [contactOpen, setContactOpen] = useState(false);
-  const { user } = useAuth();
   const location = useLocation();
   const [successMsg, setSuccessMsg] = useState<string | null>(
     (location.state as any)?.created
@@ -102,6 +98,7 @@ export default function MyListings() {
         <div className="flex gap-2">
           <Link
             to="/create-listing"
+            data-tour="create-listing"
             className="flex items-center gap-1.5 rounded-lg bg-brand-teal px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-blue"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -112,6 +109,7 @@ export default function MyListings() {
           {listings.length > 0 && (
             <button
               onClick={() => setShowShareModal(true)}
+              data-tour="share-products"
               className="flex items-center gap-1.5 rounded-lg bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-teal"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -120,15 +118,6 @@ export default function MyListings() {
               Share Products
             </button>
           )}
-          <button
-            onClick={() => setContactOpen(true)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-teal/10 px-3 py-1 text-sm font-medium text-brand-teal transition hover:bg-brand-teal/20 dark:bg-brand-yellow/15 dark:text-brand-yellow dark:hover:bg-brand-yellow/25 teal:bg-white/20 teal:text-brand-yellow teal:hover:bg-white/30"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-            </svg>
-            Need help?
-          </button>
         </div>
       </div>
 
@@ -136,53 +125,49 @@ export default function MyListings() {
         <ShareModal listings={listings} onClose={() => setShowShareModal(false)} />
       )}
 
-      {loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
-          <p className="font-medium text-red-700">{error}</p>
-          <button onClick={load} className="mt-3 text-sm font-medium text-red-600 underline">Try again</button>
-        </div>
-      )}
-
-      {!loading && !error && listings.length === 0 && (
-        <div className="rounded-lg border border-brand-gray dark:border-slate-700 surface p-12 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-coral/10 dark:bg-brand-yellow/10 teal:bg-brand-yellow/15">
-            <svg className="h-8 w-8 text-brand-coral/50 dark:text-brand-yellow/50 teal:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-            </svg>
+      <div data-tour="listings-content">
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-teal border-t-transparent" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-secondary">No listings yet</h3>
-          <p className="mb-4 text-sm text-muted">Your products will appear here once they're synced from Zoho CRM or created manually.</p>
-          <Link
-            to="/create-listing"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-teal px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-blue"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Create Your First Listing
-          </Link>
-        </div>
-      )}
+        )}
 
-      {!loading && !error && listings.length > 0 && (
-        <div className="space-y-4">
-          {listings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} onUpdate={load} />
-          ))}
-        </div>
-      )}
-      <ContactModal
-        open={contactOpen}
-        onClose={() => setContactOpen(false)}
-        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''}
-        userEmail={user?.email || ''}
-      />
+        {error && !loading && (
+          <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+            <p className="font-medium text-red-700">{error}</p>
+            <button onClick={load} className="mt-3 text-sm font-medium text-red-600 underline">Try again</button>
+          </div>
+        )}
+
+        {!loading && !error && listings.length === 0 && (
+          <div className="rounded-lg border border-brand-gray dark:border-slate-700 surface p-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-coral/10 dark:bg-brand-yellow/10 teal:bg-brand-yellow/15">
+              <svg className="h-8 w-8 text-brand-coral/50 dark:text-brand-yellow/50 teal:text-brand-yellow" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+              </svg>
+            </div>
+            <h3 className="mb-2 text-lg font-semibold text-secondary">No listings yet</h3>
+            <p className="mb-4 text-sm text-muted">Your products will appear here once they're synced from Zoho CRM or created manually.</p>
+            <Link
+              to="/create-listing"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-teal px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-blue"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Create Your First Listing
+            </Link>
+          </div>
+        )}
+
+        {!loading && !error && listings.length > 0 && (
+          <div className="space-y-4">
+            {listings.map((listing, i) => (
+              <ListingCard key={listing.id} listing={listing} onUpdate={load} isFirst={i === 0} />
+            ))}
+          </div>
+        )}
+      </div>
     </Layout>
   );
 }
@@ -193,7 +178,7 @@ const SOURCE_BADGES: Record<string, { label: string; class: string }> = {
   'coa-email': { label: 'CoA Email', class: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-900/20 dark:text-cyan-300' },
 };
 
-function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: () => void }) {
+function ListingCard({ listing, onUpdate, isFirst }: { listing: SellerListing; onUpdate: () => void; isFirst?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -431,7 +416,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
       : null;
 
   return (
-    <div className={`rounded-lg border card-blue border-l-4 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
+    <div data-tour={isFirst ? 'first-listing' : undefined} className={`rounded-lg border card-blue border-l-4 shadow-md p-4 sm:p-5 transition hover:shadow-lg ${
       listing.requestPending ? 'border-l-amber-400' :
       listing.editPending ? 'border-l-orange-400' :
       isMarketplaceVisible ? 'border-l-brand-teal' :
@@ -699,6 +684,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
           <div className="flex shrink-0 gap-2">
             <button
               onClick={() => setEditing(true)}
+              data-tour={isFirst ? 'listing-edit' : undefined}
               className="rounded-lg border border-default px-3 py-1.5 text-xs font-medium text-secondary transition hover-surface-muted"
             >
               Edit
@@ -707,6 +693,7 @@ function ListingCard({ listing, onUpdate }: { listing: SellerListing; onUpdate: 
               <button
                 onClick={handleToggle}
                 disabled={toggling}
+                data-tour={isFirst ? 'listing-toggle' : undefined}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
                   isMarketplaceVisible
                     ? 'border border-amber-300 text-amber-700 hover:bg-amber-50'

@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../lib/AuthContext';
 import Layout from '../components/Layout';
 import ProductCard from '../components/ProductCard';
 import ProductListItem from '../components/ProductListItem';
 import ProductModal from '../components/ProductModal';
 import FilterSidebar from '../components/FilterSidebar';
-import ContactModal from '../components/ContactModal';
 import { fetchProducts, type ProductCard as ProductCardType, type ProductFilters, type Pagination } from '../lib/api';
 import { useShortlist } from '../lib/useShortlist';
 import MarketplaceTabs from '../components/MarketplaceTabs';
+import TourWelcomeModal from '../components/TourWelcomeModal';
 
 export default function Marketplace() {
   const [products, setProducts] = useState<ProductCardType[]>([]);
@@ -18,8 +17,6 @@ export default function Marketplace() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'grid' | 'grid-lg' | 'list'>('grid-lg');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [contactOpen, setContactOpen] = useState(false);
-  const { user } = useAuth();
   const { preload } = useShortlist();
 
   const loadProducts = useCallback(async (f: ProductFilters) => {
@@ -71,15 +68,6 @@ export default function Marketplace() {
           <p className="text-sm text-muted">Browse cannabis products from licensed Canadian producers</p>
           <div className="mt-2 h-1 w-12 rounded-full bg-gradient-to-r from-brand-teal to-brand-blue teal:from-brand-yellow teal:to-brand-coral" />
         </div>
-        <button
-          onClick={() => setContactOpen(true)}
-          className="flex cursor-pointer items-center gap-1.5 rounded-full bg-brand-teal/10 px-3 py-1 text-sm font-medium text-brand-teal transition hover:bg-brand-teal/20 dark:bg-brand-yellow/15 dark:text-brand-yellow dark:hover:bg-brand-yellow/25 teal:bg-white/20 teal:text-brand-yellow teal:hover:bg-white/30"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-          </svg>
-          Need help?
-        </button>
       </div>
 
       <MarketplaceTabs />
@@ -89,7 +77,7 @@ export default function Marketplace() {
           {/* Sort bar + view toggle */}
           <div className="mb-4 relative flex items-center justify-between rounded-lg border card-blue backdrop-blur-sm px-3 py-2 shadow-md sticky top-[4.5rem] z-20">
             {/* View toggle */}
-            <div className="flex rounded-lg border border-subtle p-0.5">
+            <div className="flex rounded-lg border border-subtle p-0.5" data-tour="view-toggle">
               {/* Large grid (2 cols) */}
               <button
                 onClick={() => setView('grid-lg')}
@@ -133,6 +121,7 @@ export default function Marketplace() {
             <div className="flex items-center gap-2">
               <label className="hidden text-xs font-medium text-secondary sm:inline">Sort by</label>
               <select
+                data-tour="sort-dropdown"
                 value={`${filters.sort || 'name'}_${filters.order || 'asc'}`}
                 onChange={(e) => {
                   const [sort, order] = e.target.value.split('_');
@@ -187,14 +176,14 @@ export default function Marketplace() {
           {!loading && !error && products.length > 0 && (
             view === 'grid-lg' ? (
               <div className="grid gap-6 sm:grid-cols-2">
-                {products.map((product) => (
-                  <ProductCard key={product.id} product={product} large onClick={setSelectedProductId} />
+                {products.map((product, i) => (
+                  <ProductCard key={product.id} product={product} large onClick={setSelectedProductId} isFirst={i === 0} />
                 ))}
               </div>
             ) : view === 'grid' ? (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {products.map((product) => (
-                  <ProductCard key={product.id} product={product} onClick={setSelectedProductId} />
+                {products.map((product, i) => (
+                  <ProductCard key={product.id} product={product} onClick={setSelectedProductId} isFirst={i === 0} />
                 ))}
               </div>
             ) : (
@@ -250,12 +239,7 @@ export default function Marketplace() {
       </div>
 
       <ProductModal productId={selectedProductId} onClose={() => setSelectedProductId(null)} />
-      <ContactModal
-        open={contactOpen}
-        onClose={() => setContactOpen(false)}
-        userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''}
-        userEmail={user?.email || ''}
-      />
+      <TourWelcomeModal />
     </Layout>
   );
 }

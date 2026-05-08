@@ -4,9 +4,10 @@ import { useShortlist } from '../lib/useShortlist';
 interface ShortlistButtonProps {
   productId: string;
   size?: 'sm' | 'md';
+  dataTour?: string;
 }
 
-export default function ShortlistButton({ productId, size = 'sm' }: ShortlistButtonProps) {
+export default function ShortlistButton({ productId, size = 'sm', dataTour }: ShortlistButtonProps) {
   const { isShortlisted, toggle } = useShortlist();
   const [animating, setAnimating] = useState(false);
   const active = isShortlisted(productId);
@@ -24,6 +25,7 @@ export default function ShortlistButton({ productId, size = 'sm' }: ShortlistBut
   return (
     <button
       onClick={handleClick}
+      data-tour={dataTour}
       className={`rounded-full p-1.5 transition-colors ${
         animating ? 'scale-125' : ''
       } ${

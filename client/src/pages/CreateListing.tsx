@@ -347,7 +347,7 @@ export default function CreateListing() {
         )}
 
         {/* CoA Quick-Scan — top of page */}
-        <div className="mb-6 rounded-lg border border-brand-teal/20 dark:border-brand-sage/20 bg-gradient-to-br from-brand-teal/5 to-brand-blue/5 dark:from-brand-teal/10 dark:to-brand-blue/10 p-5">
+        <div className="mb-6 rounded-lg border border-brand-teal/20 dark:border-brand-sage/20 bg-gradient-to-br from-brand-teal/5 to-brand-blue/5 dark:from-brand-teal/10 dark:to-brand-blue/10 p-5" data-tour="coa-scan">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 rounded-lg bg-brand-teal/10 dark:bg-brand-sage/15 p-2">
               <svg className="h-5 w-5 text-brand-teal dark:text-brand-sage" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -448,9 +448,9 @@ export default function CreateListing() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" data-tour="listing-form">
           {/* Category selector — prominently above all sections */}
-          <div className="rounded-lg border card-blue shadow-md p-5">
+          <div className="rounded-lg border card-blue shadow-md p-5" data-tour="listing-category">
             <div className={autoFilledFields.has('category') ? 'rounded-lg border-l-2 border-brand-teal dark:border-brand-sage pl-2' : ''}>
               <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-primary">
                 Product Category
@@ -620,7 +620,7 @@ export default function CreateListing() {
           )}
 
           {/* Section 6: Media */}
-          <Section title="Media">
+          <Section title="Media" dataTour="listing-media">
             <Field label={`Cover Photo${optionalSuffix('images')}`} required={isRequired('images')}>
               <input
                 type="file"
@@ -696,7 +696,7 @@ export default function CreateListing() {
             </div>
           )}
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4" data-tour="listing-submit">
             <button
               type="submit"
               disabled={submitting}
@@ -718,9 +718,9 @@ export default function CreateListing() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, dataTour }: { title: string; children: React.ReactNode; dataTour?: string }) {
   return (
-    <div className="rounded-lg border card-blue shadow-md p-5">
+    <div className="rounded-lg border card-blue shadow-md p-5" data-tour={dataTour}>
       <h3 className="mb-4 border-l-2 border-brand-teal dark:border-brand-yellow pl-3 text-base font-semibold text-primary">{title}</h3>
       <div className="space-y-4">{children}</div>
     </div>

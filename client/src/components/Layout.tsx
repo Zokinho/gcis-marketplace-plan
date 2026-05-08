@@ -6,14 +6,16 @@ import { useTheme } from '../lib/useTheme';
 import HarvexLogo from './HarvexLogo';
 import ThemeToggle from './ThemeToggle';
 import NotificationBell from './NotificationBell';
+import HelpModal from './HelpModal';
 
-function NavLink({ to, children, onClick, exact }: { to: string; children: React.ReactNode; onClick?: () => void; exact?: boolean }) {
+function NavLink({ to, children, onClick, exact, dataTour }: { to: string; children: React.ReactNode; onClick?: () => void; exact?: boolean; dataTour?: string }) {
   const { pathname } = useLocation();
   const active = exact ? pathname === to : pathname.startsWith(to);
   return (
     <Link
       to={to}
       onClick={onClick}
+      data-tour={dataTour}
       className={`text-sm font-medium transition ${active ? 'text-brand-yellow' : 'text-white/80 hover:text-white'}`}
     >
       {children}
@@ -21,20 +23,6 @@ function NavLink({ to, children, onClick, exact }: { to: string; children: React
   );
 }
 
-function GuideNavLink({ onClick }: { onClick?: () => void }) {
-  const { pathname } = useLocation();
-  const active = pathname.startsWith('/guide');
-  return (
-    <Link
-      to="/guide"
-      onClick={onClick}
-      className={`flex items-center gap-2 text-sm font-medium transition ${active ? 'text-brand-yellow' : 'text-white/80 hover:text-white'}`}
-    >
-      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-yellow/25 text-xs font-bold text-brand-yellow">?</span>
-      Guide
-    </Link>
-  );
-}
 
 const ADMIN_LINKS = [
   { to: '/pending-products', label: 'Pending Products' },
@@ -190,15 +178,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isSeller = data?.user?.contactType?.includes('Seller') ?? false;
   const isAdmin = data?.user?.isAdmin ?? false;
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const navLinks = (
     <>
-      <NavLink to="/marketplace" onClick={() => setMobileOpen(false)}>Marketplace</NavLink>
-      <NavLink to="/shortlist" onClick={() => setMobileOpen(false)}>Shortlist</NavLink>
+      <NavLink to="/marketplace" onClick={() => setMobileOpen(false)} dataTour="nav-marketplace">Marketplace</NavLink>
+      <NavLink to="/shortlist" onClick={() => setMobileOpen(false)} dataTour="nav-shortlist">Shortlist</NavLink>
       <NavLink to="/my-matches" onClick={() => setMobileOpen(false)}>My Matches</NavLink>
-      {isSeller && <NavLink to="/my-listings" onClick={() => setMobileOpen(false)}>My Listings</NavLink>}
-      <NavLink to="/orders" onClick={() => setMobileOpen(false)}>Orders</NavLink>
-      <GuideNavLink onClick={() => setMobileOpen(false)} />
+      {isSeller && <NavLink to="/my-listings" onClick={() => setMobileOpen(false)} dataTour="nav-my-listings">My Listings</NavLink>}
+      <NavLink to="/orders" onClick={() => setMobileOpen(false)} dataTour="nav-orders">Orders</NavLink>
     </>
   );
 
@@ -269,6 +257,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
+
+      {/* Floating help button */}
+      <button
+        onClick={() => setHelpOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex h-12 items-center gap-2 rounded-full bg-brand-teal px-5 text-white shadow-lg transition hover:bg-brand-blue hover:shadow-xl hover:scale-105 active:scale-95"
+        aria-label="Need help?"
+        title="Need help?"
+      >
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+        </svg>
+        <span className="text-sm font-semibold">Need Help?</span>
+      </button>
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
