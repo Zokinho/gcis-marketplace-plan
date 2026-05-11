@@ -47,7 +47,8 @@ describe('withCronLock', () => {
   // 2. Skips fn when lock not acquired
   it('skips the job function when lock is not acquired', async () => {
     vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }]);
+      .mockResolvedValueOnce([{ acquired: false }])  // lock not acquired
+      .mockResolvedValueOnce([]);                     // no stale sessions
 
     const jobFn = vi.fn().mockResolvedValue('done');
 
@@ -99,7 +100,8 @@ describe('withCronLock', () => {
 
   it('returns undefined when lock is not acquired', async () => {
     vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }]);
+      .mockResolvedValueOnce([{ acquired: false }])  // lock not acquired
+      .mockResolvedValueOnce([]);                     // no stale sessions
 
     const jobFn = vi.fn();
 
@@ -111,7 +113,8 @@ describe('withCronLock', () => {
   // 7. Logs skip message when lock held
   it('logs an info message when skipping due to held lock', async () => {
     vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }]);
+      .mockResolvedValueOnce([{ acquired: false }])  // lock not acquired
+      .mockResolvedValueOnce([]);                     // no stale sessions
 
     const jobFn = vi.fn();
 
@@ -144,11 +147,32 @@ describe('withCronLock', () => {
   // 9. Does not release lock when lock was never acquired
   it('does not call unlock when lock was not acquired', async () => {
     vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }]);
+      .mockResolvedValueOnce([{ acquired: false }])  // lock not acquired
+      .mockResolvedValueOnce([]);                     // no stale sessions
 
     await withCronLock(100001, 'test-job', vi.fn());
 
-    // Only 1 call for the lock attempt, no unlock call
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    // 2 calls: lock attempt + stale check, no unlock call
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  // 10. Recovers from stale lock by terminating the stale session
+  it('terminates stale session and retries lock acquisition', async () => {
+    vi.mocked(prisma.$queryRaw)
+      .mockResolvedValueOnce([{ acquired: false }])                        // lock not acquired
+      .mockResolvedValueOnce([{ pid: 12345, held_ms: 3600000 }])           // stale session (1h)
+      .mockResolvedValueOnce(undefined as any)                             // pg_terminate_backend
+      .mockResolvedValueOnce([{ acquired: true }])                         // retry lock acquired
+      .mockResolvedValueOnce(undefined as any);                            // unlock
+
+    const jobFn = vi.fn().mockResolvedValue('done');
+
+    await withCronLock(100001, 'test-job', jobFn);
+
+    expect(jobFn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ stalePid: 12345 }),
+      expect.stringContaining('stale session'),
+    );
   });
 });
