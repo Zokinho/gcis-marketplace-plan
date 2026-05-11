@@ -62,8 +62,15 @@ router.post('/analyze', analyzeLimiter, upload.single('coaPdf'), async (req: Req
     return res.status(503).json({ error: 'CoA analysis not configured' });
   }
 
+  const fileSizeKb = Math.round(req.file.buffer.length / 1024);
+  const userId = (req as any).authUserId || 'unknown';
+  logger.info({ userId, fileSizeKb, fileName: req.file.originalname }, '[COA-ANALYZE] Starting Anthropic API call');
+
   try {
+    const startMs = Date.now();
     const extracted = await extractCoaData(req.file.buffer);
+    const durationSec = ((Date.now() - startMs) / 1000).toFixed(1);
+    logger.info({ userId, fileSizeKb, durationSec, fieldsExtracted: Object.values(extracted).filter(v => v !== null).length }, '[COA-ANALYZE] Anthropic API call complete');
     const fields = mapExtractedToFormFields(extracted);
 
     // Check for a saved redaction template for this lab
@@ -125,7 +132,7 @@ router.post('/analyze', analyzeLimiter, upload.single('coaPdf'), async (req: Req
 
     res.json({ fields, redactionRegions, templateUsed });
   } catch (err: any) {
-    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[COA] Analysis failed');
+    logger.error({ err: err instanceof Error ? err : { message: String(err) }, userId, fileSizeKb }, '[COA-ANALYZE] Anthropic API call failed');
     res.status(502).json({
       error: 'CoA analysis failed',
       details: err?.message,
