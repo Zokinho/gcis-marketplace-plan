@@ -428,9 +428,14 @@ export const createListingSchema = z.object({
   budSizeLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeLarge must be a number'),
   budSizeXLarge: z.string().optional().refine((v) => !v || !isNaN(Number(v)), 'budSizeXLarge must be a number'),
   highestTerpenes: z.string().max(2000).optional(),
+  lotNumber: z.string().max(200).optional(),
   testResults: z.string().max(100000).optional(),
   redactionRegions: z.string().max(500000).optional(), // JSON array of redaction regions from CoA scan
 }).passthrough(); // Allow extra form fields (multer adds _fieldname etc.)
+
+// ─── Reuse listing params schema ───
+
+export const reuseListingParamsSchema = z.object({ id: z.string().min(1) });
 
 // ─── ISO schemas ───
 

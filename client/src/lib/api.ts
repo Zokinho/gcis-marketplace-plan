@@ -241,6 +241,7 @@ export interface SellerListing {
   editPending: boolean;
   pendingEdits: Record<string, any> | null;
   imageSource: string;
+  productCode: string | null;
   pricePerUnit: number | null;
   gramsAvailable: number | null;
   upcomingQty: number | null;
@@ -259,6 +260,37 @@ export interface SellerListing {
 export async function fetchMyListings(): Promise<SellerListing[]> {
   const res = await api.get('/my-listings');
   return res.data.listings;
+}
+
+export interface ReusableListing {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  type: string | null;
+  licensedProducer: string | null;
+  lineage: string | null;
+  growthMedium: string | null;
+  harvestDate: string | null;
+  certification: string | null;
+  thcMin: number | null;
+  cbdMin: number | null;
+  dominantTerpene: string | null;
+  highestTerpenes: string | null;
+  totalTerpenePercent: number | null;
+  minQtyRequest: number | null;
+  productCode: string | null;
+  budSizePopcorn: number | null;
+  budSizeSmall: number | null;
+  budSizeMedium: number | null;
+  budSizeLarge: number | null;
+  budSizeXLarge: number | null;
+  testResults: any | null;
+}
+
+export async function fetchListingForReuse(id: string): Promise<ReusableListing> {
+  const res = await api.get<ReusableListing>(`/my-listings/${id}/reuse`);
+  return res.data;
 }
 
 export async function updateMyListing(

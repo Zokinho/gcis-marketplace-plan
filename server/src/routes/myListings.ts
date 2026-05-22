@@ -5,7 +5,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
-import { validate, validateParams, updateListingSchema, createSellerShareSchema, createListingSchema, imageReorderSchema, shareAnalyticsParamsSchema } from '../utils/validation';
+import { validate, validateParams, updateListingSchema, createSellerShareSchema, createListingSchema, imageReorderSchema, shareAnalyticsParamsSchema, reuseListingParamsSchema } from '../utils/validation';
 import { prisma } from '../index';
 import { pushProductUpdate, createZohoProduct, createProductReviewTask, uploadProductFiles } from '../services/zohoApi';
 import { zohoRequest } from '../services/zohoAuth';
@@ -66,7 +66,8 @@ router.post(
       thc, cbd, dominantTerpene, totalTerpenePercent,
       gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
       budSizePopcorn, budSizeSmall, budSizeMedium, budSizeLarge, budSizeXLarge,
-      highestTerpenes, testResults: testResultsStr,
+      highestTerpenes, lotNumber,
+      testResults: testResultsStr,
       redactionRegions: redactionRegionsStr,
     } = parsed.data as Record<string, string>;
 
@@ -130,6 +131,7 @@ router.post(
         growthMedium: growthMedium?.trim() || null,
         harvestDate: harvestDate ? new Date(harvestDate) : null,
         certification: certification || null,
+        productCode: lotNumber?.trim() || null,
         thcMin: thcVal != null && !isNaN(thcVal) ? thcVal : null,
         thcMax: thcVal != null && !isNaN(thcVal) ? thcVal : null,
         cbdMin: cbdVal != null && !isNaN(cbdVal) ? cbdVal : null,
@@ -163,6 +165,7 @@ router.post(
           growthMedium: growthMedium?.trim() || null,
           harvestDate: harvestDate ? new Date(harvestDate) : null,
           certification: certification || null,
+          productCode: lotNumber?.trim() || null,
           thcMin: thcVal != null && !isNaN(thcVal) ? thcVal : null,
           thcMax: thcVal != null && !isNaN(thcVal) ? thcVal : null,
           cbdMin: cbdVal != null && !isNaN(cbdVal) ? cbdVal : null,
@@ -371,6 +374,7 @@ router.get('/', async (req: Request, res: Response) => {
       editPending: true,
       pendingEdits: true,
       imageSource: true,
+      productCode: true,
       pricePerUnit: true,
       gramsAvailable: true,
       upcomingQty: true,
@@ -408,6 +412,54 @@ router.get('/', async (req: Request, res: Response) => {
   }));
 
   res.json({ listings });
+});
+
+/**
+ * GET /api/my-listings/:id/reuse
+ * Returns all form-relevant fields from a seller's listing for reuse in a new listing.
+ * Must be defined before PATCH /:id to avoid route param collision.
+ */
+router.get('/:id/reuse', validateParams(reuseListingParamsSchema), async (req: Request<{ id: string }>, res: Response) => {
+  const sellerId = req.user!.id;
+  const productId = req.params.id;
+
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      category: true,
+      type: true,
+      licensedProducer: true,
+      lineage: true,
+      growthMedium: true,
+      harvestDate: true,
+      certification: true,
+      thcMin: true,
+      cbdMin: true,
+      dominantTerpene: true,
+      highestTerpenes: true,
+      totalTerpenePercent: true,
+      minQtyRequest: true,
+      productCode: true,
+      budSizePopcorn: true,
+      budSizeSmall: true,
+      budSizeMedium: true,
+      budSizeLarge: true,
+      budSizeXLarge: true,
+      testResults: true,
+      sellerId: true,
+    },
+  });
+
+  if (!product || product.sellerId !== sellerId) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+
+  // Return reusable fields (excluding sellerId which is internal)
+  const { sellerId: _sid, ...reusableFields } = product;
+  res.json(reusableFields);
 });
 
 /**

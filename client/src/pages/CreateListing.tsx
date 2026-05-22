@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
 import TerpenePercentageTable from '../components/TerpenePercentageTable';
-import { createListing, analyzeCoaPdf, type AnalyzedCoaFields, type RedactionRegion } from '../lib/api';
+import { createListing, analyzeCoaPdf, fetchMyListings, fetchListingForReuse, type AnalyzedCoaFields, type RedactionRegion, type SellerListing } from '../lib/api';
 import { getFieldConfig, getGroupLabels, type ConditionalField } from '../lib/categoryConfig';
 
 const FORM_CACHE_KEY = 'create-listing-draft';
@@ -15,6 +15,7 @@ interface FormDraft {
   terpenes: string[]; terpenePercentages: Record<string, string>; totalTerpenePercent: string;
   gramsAvailable: string; upcomingQty: string; minQtyRequest: string; pricePerUnit: string;
   budPopcorn: string; budSmall: string; budMedium: string; budLarge: string; budXLarge: string;
+  lotNumber: string;
   scanResult: AnalyzedCoaFields | null; scanFileName: string | null;
   autoFilledFields: string[];
 }
@@ -106,6 +107,93 @@ export default function CreateListing() {
   const [budLarge, setBudLarge] = useState(draft?.budLarge ?? '');
   const [budXLarge, setBudXLarge] = useState(draft?.budXLarge ?? '');
 
+  // Lot number
+  const [lotNumber, setLotNumber] = useState(draft?.lotNumber ?? '');
+
+  // Reuse previous listing
+  const [previousListings, setPreviousListings] = useState<Pick<SellerListing, 'id' | 'name'>[]>([]);
+  const [reuseId, setReuseId] = useState('');
+  const [reuseLoading, setReuseLoading] = useState(false);
+  const [reusedFrom, setReusedFrom] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchMyListings()
+      .then((listings) => setPreviousListings(listings.map((l) => ({ id: l.id, name: l.name }))))
+      .catch(() => {}); // Non-critical — dropdown just won't appear
+  }, []);
+
+  async function handleReuseListing(id: string) {
+    if (!id) { setReuseId(''); return; }
+    setReuseId(id);
+    setReuseLoading(true);
+    try {
+      const data = await fetchListingForReuse(id);
+      // Populate form fields from the reused listing
+      if (data.name) setName(data.name);
+      if (data.description) setDescription(data.description);
+      if (data.category) setCategory(data.category);
+      if (data.type) setType(data.type);
+      if (data.licensedProducer) setLicensedProducer(data.licensedProducer);
+      if (data.lineage) setLineage(data.lineage);
+      if (data.growthMedium) setGrowthMedium(data.growthMedium);
+      if (data.harvestDate) setHarvestDate(new Date(data.harvestDate).toISOString().slice(0, 10));
+      if (data.certification) setCertifications(data.certification.split(', ').filter(Boolean));
+      if (data.thcMin != null) setThc(String(data.thcMin));
+      if (data.cbdMin != null) setCbd(String(data.cbdMin));
+      if (data.productCode) setLotNumber(data.productCode);
+
+      // Parse dominantTerpene back into terpenes array (reverse "; " join)
+      if (data.dominantTerpene) {
+        const parsed = data.dominantTerpene.split('; ').filter(Boolean);
+        setTerpenes(parsed);
+      }
+      // Parse highestTerpenes back into terpenePercentages Record (reverse "Name: X%\nName: Y%" format)
+      if (data.highestTerpenes) {
+        const pcts: Record<string, string> = {};
+        for (const line of data.highestTerpenes.split('\n')) {
+          const match = line.match(/^(.+?):\s*([\d.]+)%?$/);
+          if (match) pcts[match[1].trim()] = match[2];
+        }
+        setTerpenePercentages(pcts);
+        // If dominantTerpene wasn't set, use names from highestTerpenes
+        if (!data.dominantTerpene) {
+          setTerpenes(Object.keys(pcts));
+        }
+      }
+      if (data.totalTerpenePercent != null) setTotalTerpenePercent(String(data.totalTerpenePercent));
+      if (data.minQtyRequest != null) setMinQtyRequest(String(data.minQtyRequest));
+
+      // Bud sizes
+      if (data.budSizePopcorn != null) setBudPopcorn(String(data.budSizePopcorn));
+      if (data.budSizeSmall != null) setBudSmall(String(data.budSizeSmall));
+      if (data.budSizeMedium != null) setBudMedium(String(data.budSizeMedium));
+      if (data.budSizeLarge != null) setBudLarge(String(data.budSizeLarge));
+      if (data.budSizeXLarge != null) setBudXLarge(String(data.budSizeXLarge));
+
+      // Reset fields that should NOT be copied
+      setGramsAvailable('');
+      setUpcomingQty('');
+      setPricePerUnit('');
+      setCoverPhoto(null);
+      setImages([]);
+      setCoaFiles([]);
+      setScanResult(null);
+      setScanError(null);
+      setAutoFilledFields(new Set());
+      setRedactionRegions([]);
+
+      // Clear draft and show notice
+      clearDraft();
+      const listingName = previousListings.find((l) => l.id === id)?.name || 'previous listing';
+      setReusedFrom(listingName);
+      formTopRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } catch {
+      setError('Failed to load listing for reuse');
+    } finally {
+      setReuseLoading(false);
+    }
+  }
+
   // Media (files can't be cached — user must re-select)
   const [coverPhoto, setCoverPhoto] = useState<File | null>(null);
   const [images, setImages] = useState<File[]>([]);
@@ -128,6 +216,7 @@ export default function CreateListing() {
       certifications, thc, cbd, terpenes, terpenePercentages, totalTerpenePercent,
       gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
       budPopcorn, budSmall, budMedium, budLarge, budXLarge,
+      lotNumber,
       scanResult, scanFileName,
       autoFilledFields: Array.from(autoFilledFields),
     };
@@ -137,6 +226,7 @@ export default function CreateListing() {
     certifications, thc, cbd, terpenes, terpenePercentages, totalTerpenePercent,
     gramsAvailable, upcomingQty, minQtyRequest, pricePerUnit,
     budPopcorn, budSmall, budMedium, budLarge, budXLarge,
+    lotNumber,
     scanResult, scanFileName, autoFilledFields,
   ]);
 
@@ -207,6 +297,7 @@ export default function CreateListing() {
         if (fields.totalTerpenePercent) setTotalTerpenePercent(fields.totalTerpenePercent);
         filled.push('Terpenes');
       }
+      if (fields.lotNumber && !lotNumber.trim()) { setLotNumber(fields.lotNumber); filled.push('Lot Number'); }
 
       setAutoFilledFields(new Set(filled.map((f) => f.toLowerCase())));
 
@@ -296,6 +387,8 @@ export default function CreateListing() {
     if (budLarge) formData.append('budSizeLarge', budLarge);
     if (budXLarge) formData.append('budSizeXLarge', budXLarge);
 
+    if (lotNumber.trim()) formData.append('lotNumber', lotNumber.trim());
+
     // Include CoA test results if scan was performed
     if (scanResult?.testResults) {
       formData.append('testResults', JSON.stringify(scanResult.testResults));
@@ -343,6 +436,35 @@ export default function CreateListing() {
             >
               Start fresh
             </button>
+          </div>
+        )}
+
+        {/* Reuse Previous Listing dropdown */}
+        {previousListings.length > 0 && (
+          <div className="mb-6 rounded-lg border border-default bg-surface p-4">
+            <label className="mb-1.5 block text-sm font-semibold text-primary">Reuse a Previous Listing</label>
+            <p className="mb-2 text-xs text-muted">
+              Pre-fill this form from an existing listing. Quantity, price, and media will be left blank for you to update.
+            </p>
+            <select
+              value={reuseId}
+              onChange={(e) => handleReuseListing(e.target.value)}
+              disabled={reuseLoading}
+              className="input-field"
+            >
+              <option value="">Select a listing to reuse...</option>
+              {previousListings.map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+            {reuseLoading && <p className="mt-2 text-xs text-muted">Loading listing details...</p>}
+          </div>
+        )}
+
+        {/* Reused-from notice */}
+        {reusedFrom && (
+          <div className="mb-4 rounded-lg border border-brand-sage/40 bg-brand-sage/10 dark:bg-brand-sage/5 px-4 py-2.5 text-sm text-brand-teal dark:text-brand-sage">
+            Pre-filled from <span className="font-semibold">{reusedFrom}</span> — review and update quantity, price, and media before submitting.
           </div>
         )}
 
@@ -522,25 +644,28 @@ export default function CreateListing() {
                   <input type="date" value={harvestDate} onChange={(e) => setHarvestDate(e.target.value)} className="input-field" />
                 </Field>
               )}
-              <Field label={`Certification${optionalSuffix('certifications')}`} required={isRequired('certifications')}>
-                <div className="flex flex-wrap gap-1.5">
-                  {CERTIFICATIONS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setCertifications((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c])}
-                      className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
-                        certifications.includes(c)
-                          ? 'border-brand-teal bg-brand-sage/20 text-brand-teal dark:bg-brand-sage/15 dark:text-brand-sage dark:border-brand-sage/40'
-                          : 'border-default text-secondary hover-surface-muted'
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
+              <Field label="Lot Number (Optional)" autoFilled={autoFilledFields.has('lot number')}>
+                <input type="text" value={lotNumber} onChange={(e) => { setLotNumber(e.target.value); clearAutoFill('lot number'); }} placeholder="e.g. LOT-2026-001" className="input-field" />
               </Field>
             </div>
+            <Field label={`Certification${optionalSuffix('certifications')}`} required={isRequired('certifications')}>
+              <div className="flex flex-wrap gap-1.5">
+                {CERTIFICATIONS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCertifications((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c])}
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+                      certifications.includes(c)
+                        ? 'border-brand-teal bg-brand-sage/20 text-brand-teal dark:bg-brand-sage/15 dark:text-brand-sage dark:border-brand-sage/40'
+                        : 'border-default text-secondary hover-surface-muted'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </Field>
           </Section>
 
           {/* Section 3: Potency & Terpenes */}
