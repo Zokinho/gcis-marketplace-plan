@@ -179,7 +179,7 @@ function IsoCard({
               Edit
             </button>
           )}
-          {iso.isOwner && iso.status === 'OPEN' && (
+          {(iso.isOwner || isAdmin) && iso.status === 'OPEN' && (
             <button
               onClick={() => onClose(iso.id)}
               className="rounded px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
@@ -187,7 +187,7 @@ function IsoCard({
               Close
             </button>
           )}
-          {iso.isOwner && (iso.status === 'EXPIRED' || iso.status === 'CLOSED') && (
+          {(iso.isOwner || isAdmin) && (iso.status === 'EXPIRED' || iso.status === 'CLOSED') && (
             <button
               onClick={() => onRenew(iso.id)}
               className="rounded px-3 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/10 transition"
