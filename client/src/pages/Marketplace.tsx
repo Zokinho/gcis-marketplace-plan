@@ -6,6 +6,7 @@ import ProductModal from '../components/ProductModal';
 import FilterSidebar from '../components/FilterSidebar';
 import { fetchProducts, type ProductCard as ProductCardType, type ProductFilters, type Pagination } from '../lib/api';
 import { useShortlist } from '../lib/useShortlist';
+import PaginationControls from '../components/PaginationControls';
 import MarketplaceTabs from '../components/MarketplaceTabs';
 import TourWelcomeModal from '../components/TourWelcomeModal';
 
@@ -76,38 +77,49 @@ export default function Marketplace() {
         <div className="min-w-0 flex-1">
           {/* Sort bar + view toggle */}
           <div className="mb-4 relative flex items-center justify-between rounded-lg border card-blue backdrop-blur-sm px-3 py-2 shadow-md sticky top-[4.5rem] z-20">
-            {/* View toggle */}
-            <div className="flex rounded-lg border border-subtle p-0.5" data-tour="view-toggle">
-              {/* Large grid (2 cols) */}
-              <button
-                onClick={() => setView('grid-lg')}
-                className={`rounded-md p-1.5 transition ${view === 'grid-lg' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
-                aria-label="Large grid view"
+            {/* View toggle + per-page */}
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-lg border border-subtle p-0.5" data-tour="view-toggle">
+                {/* Large grid (2 cols) */}
+                <button
+                  onClick={() => setView('grid-lg')}
+                  className={`rounded-md p-1.5 transition ${view === 'grid-lg' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
+                  aria-label="Large grid view"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h4.5A2.25 2.25 0 0 1 12.75 6v4.5a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 13.5a2.25 2.25 0 0 1 2.25-2.25H20.25A2.25 2.25 0 0 1 22.5 13.5V18a2.25 2.25 0 0 1-2.25 2.25h-4.5A2.25 2.25 0 0 1 13.5 18v-4.5Z" />
+                  </svg>
+                </button>
+                {/* Compact grid (3 cols) */}
+                <button
+                  onClick={() => setView('grid')}
+                  className={`rounded-md p-1.5 transition ${view === 'grid' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
+                  aria-label="Grid view"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+                  </svg>
+                </button>
+                {/* List view */}
+                <button
+                  onClick={() => setView('list')}
+                  className={`rounded-md p-1.5 transition ${view === 'list' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
+                  aria-label="List view"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+                  </svg>
+                </button>
+              </div>
+              <select
+                value={filters.limit || 20}
+                onChange={(e) => setFilters((prev) => ({ ...prev, limit: Number(e.target.value), page: 1 }))}
+                className="rounded border border-default surface-input px-2 py-1 text-xs text-primary"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h4.5A2.25 2.25 0 0 1 12.75 6v4.5a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 13.5a2.25 2.25 0 0 1 2.25-2.25H20.25A2.25 2.25 0 0 1 22.5 13.5V18a2.25 2.25 0 0 1-2.25 2.25h-4.5A2.25 2.25 0 0 1 13.5 18v-4.5Z" />
-                </svg>
-              </button>
-              {/* Compact grid (3 cols) */}
-              <button
-                onClick={() => setView('grid')}
-                className={`rounded-md p-1.5 transition ${view === 'grid' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
-                aria-label="Grid view"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
-                </svg>
-              </button>
-              {/* List view */}
-              <button
-                onClick={() => setView('list')}
-                className={`rounded-md p-1.5 transition ${view === 'list' ? 'bg-brand-teal text-white' : 'text-muted hover:text-secondary'}`}
-                aria-label="List view"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
-                </svg>
-              </button>
+                {[20, 40, 60, 100].map((n) => (
+                  <option key={n} value={n}>{n} / page</option>
+                ))}
+              </select>
             </div>
 
             {/* Product count — centered in the bar via absolute positioning */}
@@ -196,42 +208,14 @@ export default function Marketplace() {
           )}
 
           {/* Pagination */}
-          {pagination && pagination.totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <button
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page <= 1}
-                className="rounded-lg border border-default px-3 py-1.5 text-sm font-medium text-secondary transition hover-surface-muted disabled:opacity-40"
-              >
-                Previous
-              </button>
-
-              {generatePageNumbers(pagination.page, pagination.totalPages).map((p, i) =>
-                p === '...' ? (
-                  <span key={`dots-${i}`} className="px-1 text-faint">...</span>
-                ) : (
-                  <button
-                    key={p}
-                    onClick={() => handlePageChange(p as number)}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                      p === pagination.page
-                        ? 'bg-brand-teal text-white'
-                        : 'border border-default text-secondary hover-surface-muted'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ),
-              )}
-
-              <button
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page >= pagination.totalPages}
-                className="rounded-lg border border-default px-3 py-1.5 text-sm font-medium text-secondary transition hover-surface-muted disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
+          {pagination && (
+            <PaginationControls
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              limit={filters.limit || 20}
+              onPageChange={handlePageChange}
+            />
           )}
         </div>
 
@@ -242,22 +226,4 @@ export default function Marketplace() {
       <TourWelcomeModal />
     </Layout>
   );
-}
-
-function generatePageNumbers(current: number, total: number): (number | string)[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-
-  const pages: (number | string)[] = [1];
-
-  if (current > 3) pages.push('...');
-
-  const start = Math.max(2, current - 1);
-  const end = Math.min(total - 1, current + 1);
-
-  for (let i = start; i <= end; i++) pages.push(i);
-
-  if (current < total - 2) pages.push('...');
-
-  pages.push(total);
-  return pages;
 }

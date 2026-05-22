@@ -12,6 +12,7 @@ import {
   IsoStatusType,
   Pagination,
 } from '../lib/api';
+import PaginationControls from '../components/PaginationControls';
 
 const ALL_CATEGORIES = [
   'Cannabis flowers (mix sizes)',
@@ -793,6 +794,7 @@ export default function IsoBoard() {
   const [tab, setTab] = useState<'browse' | 'my'>('browse');
   const [items, setItems] = useState<IsoRequestRecord[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 12, total: 0, totalPages: 0 });
+  const [limit, setLimit] = useState(12);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
@@ -806,13 +808,13 @@ export default function IsoBoard() {
       if (tab === 'browse') {
         const res = await fetchIsoBoard({
           page,
-          limit: 12,
+          limit,
           category: categoryFilter || undefined,
         });
         setItems(res.items);
         setPagination(res.pagination);
       } else {
-        const res = await fetchMyIsos({ page, limit: 12, visibility: visibilityFilter !== 'all' ? visibilityFilter : undefined });
+        const res = await fetchMyIsos({ page, limit, visibility: visibilityFilter !== 'all' ? visibilityFilter : undefined });
         setItems(res.items);
         setPagination(res.pagination);
       }
@@ -821,7 +823,7 @@ export default function IsoBoard() {
     } finally {
       setLoading(false);
     }
-  }, [tab, categoryFilter, visibilityFilter]);
+  }, [tab, categoryFilter, visibilityFilter, limit]);
 
   useEffect(() => {
     loadData(1);
@@ -884,7 +886,7 @@ export default function IsoBoard() {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         {tab === 'browse' && (
           <select
             value={categoryFilter}
@@ -906,6 +908,15 @@ export default function IsoBoard() {
             <option value="private">Private Only</option>
           </select>
         )}
+        <select
+          value={limit}
+          onChange={(e) => setLimit(Number(e.target.value))}
+          className="rounded border border-default surface-input px-2 py-2 text-sm text-primary"
+        >
+          {[12, 24, 48, 96].map((n) => (
+            <option key={n} value={n}>{n} / page</option>
+          ))}
+        </select>
       </div>
 
       {/* Content */}
@@ -949,28 +960,16 @@ export default function IsoBoard() {
             ))}
           </div>
 
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <button
-                onClick={() => loadData(pagination.page - 1)}
-                disabled={pagination.page <= 1}
-                className="rounded px-3 py-1 text-sm text-muted hover:text-primary disabled:opacity-30 transition"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-muted">
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
-              <button
-                onClick={() => loadData(pagination.page + 1)}
-                disabled={pagination.page >= pagination.totalPages}
-                className="rounded px-3 py-1 text-sm text-muted hover:text-primary disabled:opacity-30 transition"
-              >
-                Next
-              </button>
-            </div>
-          )}
+          <PaginationControls
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            limit={limit}
+            onPageChange={(p) => {
+              loadData(p);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         </>
       )}
 
