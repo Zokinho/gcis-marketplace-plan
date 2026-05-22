@@ -167,5 +167,9 @@ export function createE2EApp(
   for (const [path, router] of Object.entries(routes)) {
     app.use(path, router);
   }
+  // Express 4 doesn't catch async rejections — add error handler to prevent hangs
+  app.use((err: any, _req: any, res: any, _next: any) => {
+    res.status(500).json({ error: err.message || 'Internal error' });
+  });
   return app;
 }

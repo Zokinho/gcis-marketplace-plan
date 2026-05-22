@@ -29,6 +29,10 @@ function createTestApp(user?: { id: string; email: string; approved: boolean; co
 async function mountShortlistRoutes(app: express.Express) {
   const shortlistRoutes = (await import('../routes/shortlist')).default;
   app.use('/api/shortlist', shortlistRoutes);
+  // Express 4 doesn't catch async rejections — add error handler to prevent hangs
+  app.use((err: any, _req: any, res: any, _next: any) => {
+    res.status(500).json({ error: err.message || 'Internal error' });
+  });
 }
 
 const testUser = { id: 'buyer1', email: 'buyer@test.com', approved: true, contactType: 'Buyer' };

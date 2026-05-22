@@ -156,6 +156,11 @@ vi.mock('@anthropic-ai/sdk', () => {
   return { default: MockAnthropic };
 });
 
+// Mock rate limiters to avoid timeouts in tests
+vi.mock('../utils/rateLimiters', () => ({
+  writeLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 // Mock Sentry to avoid SDK initialization in tests
 vi.mock('../utils/sentry', () => ({
   initSentry: vi.fn(),

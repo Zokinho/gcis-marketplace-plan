@@ -443,18 +443,24 @@ describe('ISO Routes', () => {
       expect(res.status).toBe(403);
     });
 
-    it('should reject content edits on CLOSED ISO (without expiresAt reopen)', async () => {
+    it('should auto-reopen CLOSED ISO when content edits are submitted', async () => {
       const app = createTestApp(testBuyer);
       await mountIsoRoutes(app);
 
-      mockPrisma.isoRequest.findUnique.mockResolvedValue({ ...sampleIso, status: 'CLOSED' } as any);
+      const closedIso = { ...sampleIso, status: 'CLOSED' };
+      mockPrisma.isoRequest.findUnique.mockResolvedValue(closedIso as any);
+      mockPrisma.isoRequest.update.mockResolvedValue({ ...closedIso, title: 'New title', status: 'OPEN' } as any);
 
       const res = await request(app)
         .patch('/api/iso/iso1')
         .send({ title: 'New title' });
 
-      expect(res.status).toBe(400);
-      expect(res.body.error).toBe('Cannot edit content on a closed or expired ISO request');
+      expect(res.status).toBe(200);
+      expect(mockPrisma.isoRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: 'New title', status: 'OPEN' }),
+        }),
+      );
     });
 
     it('should reject invalid field values (thcMin > 100)', async () => {

@@ -1,12 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { PDFDocument } from 'pdf-lib';
 
-// Mock pdf2pic (ESM dynamic import)
+// We need a real valid PNG buffer for pdf-lib's embedPng to work.
+// Generate it once using the real sharp module before mocking.
+let VALID_PNG: Buffer;
+
+beforeAll(async () => {
+  const realSharp = (await vi.importActual<{ default: typeof import('sharp') }>('sharp')).default;
+  VALID_PNG = await realSharp({
+    create: { width: 100, height: 100, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+  }).png().toBuffer();
+});
+
+// Mock pdf2pic (ESM dynamic import) — returns valid PNG buffer
 vi.mock('pdf2pic', () => ({
   fromBuffer: vi.fn().mockReturnValue(
-    vi.fn().mockResolvedValue({ buffer: Buffer.from('fake-png') }),
+    vi.fn().mockImplementation(async () => ({ buffer: VALID_PNG })),
   ),
 }));
+
+// Mock sharp so tests don't depend on real image processing
+vi.mock('sharp', () => {
+  const mockSharpInstance = {
+    metadata: vi.fn().mockResolvedValue({ width: 1600, height: 2200 }),
+    composite: vi.fn().mockReturnThis(),
+    png: vi.fn().mockReturnThis(),
+    toBuffer: vi.fn().mockImplementation(async () => VALID_PNG),
+  };
+  const mockSharp = vi.fn().mockReturnValue(mockSharpInstance);
+  (mockSharp as any)._instance = mockSharpInstance;
+  return { default: mockSharp };
+});
 
 // Import after mocks
 import { isDigitalPdf, applyRedactions, generatePageImages } from '../services/coaRedactor';
