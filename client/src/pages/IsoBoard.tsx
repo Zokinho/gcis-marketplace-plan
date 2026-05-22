@@ -885,7 +885,7 @@ export default function IsoBoard() {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Filters + top pagination */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {tab === 'browse' && (
           <select
@@ -917,6 +917,19 @@ export default function IsoBoard() {
             <option key={n} value={n}>{n} / page</option>
           ))}
         </select>
+        <div className="ml-auto">
+          <PaginationControls
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            limit={limit}
+            onPageChange={(p) => {
+              loadData(p);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            compact
+          />
+        </div>
       </div>
 
       {/* Content */}
