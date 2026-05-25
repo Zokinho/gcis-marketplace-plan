@@ -156,6 +156,46 @@ export function sendAdminNewUserAlert(adminEmails: string[], newUser: { email: s
   sendEmail({ to: adminEmails, subject: `New user pending approval: ${name}`, html });
 }
 
+export function sendOnboardingReminderEmail(
+  email: string,
+  firstName: string | null,
+  missingSteps: { eula: boolean; doc: boolean },
+): void {
+  const name = firstName || 'there';
+
+  let stepsHtml = '';
+  if (missingSteps.eula && missingSteps.doc) {
+    stepsHtml = `
+      <ul style="margin:0 0 16px;padding-left:20px;font-size:14px;color:#6b7280;line-height:1.8;">
+        <li>Accept the End User License Agreement (EULA)</li>
+        <li>Upload your required documentation</li>
+      </ul>`;
+  } else if (missingSteps.eula) {
+    stepsHtml = `
+      <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.6;">
+        You still need to <strong>accept the End User License Agreement (EULA)</strong> to continue.
+      </p>`;
+  } else if (missingSteps.doc) {
+    stepsHtml = `
+      <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.6;">
+        You still need to <strong>upload your required documentation</strong> to continue.
+      </p>`;
+  }
+
+  const html = wrap('Complete Your Harvex Registration', `
+    <h2 style="margin:0 0 8px;font-size:20px;color:#111827;">Hi ${name}, you're almost there!</h2>
+    <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.6;">
+      We noticed you haven't finished setting up your Harvex account. Please complete the following to get started:
+    </p>
+    ${stepsHtml}
+    <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.6;">
+      Once completed, our team will review your account and you'll be ready to access the marketplace.
+    </p>
+    ${btn(FRONTEND_URL, 'Complete Registration')}
+  `);
+  sendEmail({ to: email, subject: 'Complete your Harvex registration', html });
+}
+
 // ─── Notification Emails ───
 
 interface NotificationEmailInput {

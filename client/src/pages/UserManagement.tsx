@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { fetchAdminUsers, approveUser, rejectUser, promoteUser, demoteUser, adminResetPassword, type AdminUser } from '../lib/api';
+import { fetchAdminUsers, approveUser, rejectUser, promoteUser, demoteUser, adminResetPassword, sendOnboardingReminder, type AdminUser } from '../lib/api';
 
 type FilterTab = 'pending' | 'approved' | 'all';
 
@@ -92,6 +92,21 @@ export default function UserManagement() {
     } catch (err) {
       console.error('Failed to reset password:', err);
       alert('Failed to reset password. Please try again.');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleSendReminder(userId: string) {
+    setActionLoading(userId);
+    try {
+      await sendOnboardingReminder(userId);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, reminderSentAt: new Date().toISOString() } : u)),
+      );
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Failed to send reminder.';
+      alert(msg);
     } finally {
       setActionLoading(null);
     }
@@ -217,11 +232,18 @@ export default function UserManagement() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      {getStatusBadge(user)}
-                      {user.isAdmin && (
-                        <span className="inline-block rounded-full bg-brand-blue/15 px-2.5 py-0.5 text-xs font-medium text-brand-blue dark:bg-brand-blue/25">
-                          Admin
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5">
+                        {getStatusBadge(user)}
+                        {user.isAdmin && (
+                          <span className="inline-block rounded-full bg-brand-blue/15 px-2.5 py-0.5 text-xs font-medium text-brand-blue dark:bg-brand-blue/25">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      {user.reminderSentAt && !user.approved && (
+                        <span className="text-[11px] text-muted" title={`Reminder sent ${new Date(user.reminderSentAt).toLocaleString()}`}>
+                          Reminded {new Date(user.reminderSentAt).toLocaleDateString()}
                         </span>
                       )}
                     </div>
@@ -238,6 +260,15 @@ export default function UserManagement() {
                           className="rounded bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 transition"
                         >
                           {actionLoading === user.id ? '...' : 'Approve'}
+                        </button>
+                      )}
+                      {!user.approved && (!user.eulaAcceptedAt || !user.docUploaded) && (
+                        <button
+                          onClick={() => handleSendReminder(user.id)}
+                          disabled={actionLoading === user.id}
+                          className="rounded bg-brand-blue/10 px-3 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/20 disabled:opacity-50 transition"
+                        >
+                          {actionLoading === user.id ? '...' : 'Remind'}
                         </button>
                       )}
                       {user.approved && (

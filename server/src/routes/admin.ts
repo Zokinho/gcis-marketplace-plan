@@ -13,7 +13,7 @@ import { logAudit, getRequestIp } from '../services/auditService';
 import { createNotification } from '../services/notificationService';
 import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 import { hashPassword } from '../utils/auth';
-import { isEmailConfigured, sendAccountApprovedEmail, sendAccountRejectedEmail } from '../services/emailService';
+import { isEmailConfigured, sendAccountApprovedEmail, sendAccountRejectedEmail, sendOnboardingReminderEmail } from '../services/emailService';
 import { pushProductUpdate, downloadZohoFile } from '../services/zohoApi';
 import { createNotificationBatch } from '../services/notificationService';
 import fs from 'fs';
@@ -291,6 +291,7 @@ router.get('/users', validateQuery(adminUsersQuerySchema), async (req: Request, 
       docUploaded: true,
       approved: true,
       isAdmin: true,
+      reminderSentAt: true,
       createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
@@ -401,6 +402,46 @@ router.post('/users/:userId/reject', async (req: Request<{ userId: string }>, re
   logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.reject', targetType: 'User', targetId: userId, metadata: { userEmail: user.email }, ip: getRequestIp(req) });
 
   res.json({ message: 'User rejected and removed' });
+});
+
+/**
+ * POST /api/admin/users/:userId/send-reminder
+ * Send an onboarding reminder email to a pending user.
+ */
+router.post('/users/:userId/send-reminder', async (req: Request<{ userId: string }>, res: Response) => {
+  const { userId } = req.params;
+
+  if (!isEmailConfigured) {
+    return res.status(503).json({ error: 'Email service is not configured' });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (user.approved) {
+    return res.status(400).json({ error: 'User is already approved' });
+  }
+
+  const missingSteps = {
+    eula: !user.eulaAcceptedAt,
+    doc: !user.docUploaded,
+  };
+
+  if (!missingSteps.eula && !missingSteps.doc) {
+    return res.status(400).json({ error: 'User has completed all onboarding steps — approve or reject instead' });
+  }
+
+  sendOnboardingReminderEmail(user.email, user.firstName, missingSteps);
+
+  const now = new Date();
+  await prisma.user.update({ where: { id: userId }, data: { reminderSentAt: now } });
+
+  logger.info({ userEmail: user.email, sentBy: req.user?.email, missingSteps }, '[ADMIN] Onboarding reminder sent');
+  logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'user.send_reminder', targetType: 'User', targetId: userId, metadata: { userEmail: user.email, missingSteps }, ip: getRequestIp(req) });
+
+  res.json({ message: 'Reminder email sent', reminderSentAt: now.toISOString() });
 });
 
 /**

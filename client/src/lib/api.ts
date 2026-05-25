@@ -585,6 +585,7 @@ export interface AdminUser {
   docUploaded: boolean;
   approved: boolean;
   isAdmin: boolean;
+  reminderSentAt: string | null;
   createdAt: string;
 }
 
@@ -614,6 +615,10 @@ export async function demoteUser(userId: string): Promise<void> {
 export async function adminResetPassword(userId: string, password?: string): Promise<{ message: string; temporaryPassword: string }> {
   const res = await api.post(`/admin/users/${userId}/reset-password`, password ? { password } : {});
   return res.data;
+}
+
+export async function sendOnboardingReminder(userId: string): Promise<void> {
+  await api.post(`/admin/users/${userId}/send-reminder`);
 }
 
 // ─── Pending Product Approval ───
