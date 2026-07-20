@@ -92,7 +92,7 @@ export async function marketplaceAuth(req: Request, res: Response, next: NextFun
  * Seller-only route guard.
  */
 export function requireSeller(req: Request, res: Response, next: NextFunction) {
-  if (!req.user?.contactType?.includes('Seller')) {
+  if (!req.user?.contactType?.includes('Seller') && !req.user?.isAdmin) {
     return res.status(403).json({ error: 'Seller access required' });
   }
   next();

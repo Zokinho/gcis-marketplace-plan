@@ -271,6 +271,39 @@ describe('requireSeller', () => {
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('calls next() when user is admin without seller contactType', () => {
+    const req = mockReq({ user: { contactType: 'Buyer', isAdmin: true } });
+    const res = mockRes();
+    const next = createMockNext();
+
+    requireSeller(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('calls next() when user is admin with null contactType', () => {
+    const req = mockReq({ user: { contactType: null, isAdmin: true } });
+    const res = mockRes();
+    const next = createMockNext();
+
+    requireSeller(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when user is not admin and not seller', () => {
+    const req = mockReq({ user: { contactType: 'Buyer', isAdmin: false } });
+    const res = mockRes();
+    const next = createMockNext();
+
+    requireSeller(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
 });
 
 // ─── requireAdmin ───

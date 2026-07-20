@@ -32,7 +32,8 @@ const STATUS_FILTERS: { value: '' | BidStatusType; label: string }[] = [
 
 export default function Orders() {
   const { data: userStatus } = useUserStatus();
-  const isSeller = userStatus?.user?.contactType?.includes('Seller') ?? false;
+  const isAdmin = userStatus?.user?.isAdmin ?? false;
+  const isSeller = (userStatus?.user?.contactType?.includes('Seller') ?? false) || isAdmin;
   const [tab, setTab] = useState<'buyer' | 'seller'>('buyer');
 
   // Auto-select seller tab if user is a seller

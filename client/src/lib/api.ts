@@ -458,6 +458,8 @@ export interface SellerOption {
   companyName: string | null;
   firstName: string | null;
   lastName: string | null;
+  isAdmin?: boolean;
+  contactType?: string | null;
 }
 
 // ─── CoA Analysis Types ───

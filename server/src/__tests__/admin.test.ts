@@ -25,6 +25,8 @@ vi.mock('../services/notificationService', () => ({
 
 vi.mock('../services/zohoApi', () => ({
   pushProductUpdate: vi.fn().mockResolvedValue(undefined),
+  createZohoProduct: vi.fn().mockResolvedValue('zoho-product-123'),
+  uploadProductFiles: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../utils/s3', () => ({
@@ -351,10 +353,10 @@ describe('GET /sellers', () => {
     vi.clearAllMocks();
   });
 
-  it('returns seller list', async () => {
+  it('returns sellers and admin users', async () => {
     const sellers = [
-      { id: 'seller-1', email: 'seller@example.com', companyName: 'Seller Corp', firstName: 'John', lastName: 'Seller' },
-      { id: 'seller-2', email: 'seller2@example.com', companyName: 'Another Corp', firstName: 'Jane', lastName: 'Seller' },
+      { id: 'seller-1', email: 'seller@example.com', companyName: 'Seller Corp', firstName: 'John', lastName: 'Seller', isAdmin: false, contactType: 'Seller' },
+      { id: 'admin-1', email: 'admin@example.com', companyName: 'Admin Corp', firstName: 'Admin', lastName: 'User', isAdmin: true, contactType: null },
     ];
     vi.mocked(prisma.user.findMany).mockResolvedValue(sellers as any);
 
@@ -365,8 +367,29 @@ describe('GET /sellers', () => {
     expect(res.body.sellers).toHaveLength(2);
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { contactType: { contains: 'Seller' } },
+        where: {
+          OR: [
+            { contactType: { contains: 'Seller' } },
+            { isAdmin: true },
+          ],
+        },
         orderBy: { companyName: 'asc' },
+      }),
+    );
+  });
+
+  it('includes isAdmin and contactType in select', async () => {
+    vi.mocked(prisma.user.findMany).mockResolvedValue([]);
+
+    const app = createTestApp(adminRouter);
+    await request(app).get('/sellers');
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          isAdmin: true,
+          contactType: true,
+        }),
       }),
     );
   });
@@ -429,6 +452,159 @@ describe('GET /coa-email-queue', () => {
     expect(res.body.queue[0].suggestedSeller).toBeNull();
     // user.findUnique should not be called since suggestedSellerId is null
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /coa-email-confirm — Zoho push', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const syncRecord = {
+    id: 'sync-1',
+    status: 'ready',
+    coaJobId: 'job-1',
+    coaProductId: 'cprod-1',
+    suggestedSellerId: null,
+    createdAt: new Date(),
+  };
+
+  const mockProduct = {
+    id: 'product-1',
+    name: 'Test Strain',
+    description: 'A fine strain',
+    category: 'Flower',
+    type: 'Indica',
+    licensedProducer: 'LP Co',
+    lineage: null,
+    growthMedium: null,
+    harvestDate: null,
+    certification: null,
+    thcMin: 20,
+    thcMax: 25,
+    cbdMin: null,
+    cbdMax: null,
+    dominantTerpene: null,
+    gramsAvailable: 500,
+    upcomingQty: null,
+    minQtyRequest: null,
+    pricePerUnit: 5.0,
+    budSizePopcorn: null,
+    budSizeSmall: null,
+    budSizeMedium: null,
+    budSizeLarge: null,
+    budSizeXLarge: null,
+    zohoProductId: 'coa_email_job-1',
+  };
+
+  it('pushes product to Zoho when seller has zohoContactId', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: 'zoho-contact-1',
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue(mockProduct as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+    vi.mocked(prisma.product.update).mockResolvedValue({} as any);
+
+    const { createZohoProduct } = await import('../services/zohoApi');
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.product).toBeDefined();
+
+    // Wait for fire-and-forget to complete
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(createZohoProduct).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Test Strain',
+        sellerZohoContactId: 'zoho-contact-1',
+      }),
+    );
+  });
+
+  it('skips Zoho push when seller lacks zohoContactId', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue(mockProduct as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const { createZohoProduct } = await import('../services/zohoApi');
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    expect(res.status).toBe(200);
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(createZohoProduct).not.toHaveBeenCalled();
+  });
+
+  it('still creates local product if Zoho push fails', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: 'zoho-contact-1',
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue(mockProduct as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const { createZohoProduct } = await import('../services/zohoApi');
+    vi.mocked(createZohoProduct).mockRejectedValue(new Error('Zoho API down'));
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    // Local product creation succeeds even though Zoho will fail
+    expect(res.status).toBe(200);
+    expect(res.body.product).toBeDefined();
+    expect(res.body.product.id).toBe('product-1');
   });
 });
 

@@ -46,11 +46,14 @@ export default function SellerPicker({ value, onChange, suggestedSeller }: Selle
 
   const selected = sellers.find((s) => s.id === value);
 
+  const isAdminOnly = (s: SellerOption) => s.isAdmin && !s.contactType?.includes('Seller');
+
   const displayName = (s: SellerOption) => {
     const parts = [];
     if (s.companyName) parts.push(s.companyName);
     if (s.firstName || s.lastName) parts.push(`(${[s.firstName, s.lastName].filter(Boolean).join(' ')})`);
-    return parts.join(' ') || s.email;
+    const name = parts.join(' ') || s.email;
+    return isAdminOnly(s) ? `${name} (Admin)` : name;
   };
 
   return (
@@ -112,8 +115,15 @@ export default function SellerPicker({ value, onChange, suggestedSeller }: Selle
                 onClick={() => { onChange(s.id); setOpen(false); setSearch(''); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover-surface-muted"
               >
-                <div>
-                  <p className="font-medium text-primary">{displayName(s)}</p>
+                <div className="flex-1">
+                  <p className="font-medium text-primary">
+                    {displayName(s)}
+                    {isAdminOnly(s) && (
+                      <span className="ml-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                        ADMIN
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-faint">{s.email}</p>
                 </div>
               </button>

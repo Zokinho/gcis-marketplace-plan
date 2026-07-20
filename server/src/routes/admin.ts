@@ -14,7 +14,8 @@ import { createNotification } from '../services/notificationService';
 import { marketplaceVisibleWhere } from '../utils/marketplaceVisibility';
 import { hashPassword } from '../utils/auth';
 import { isEmailConfigured, sendAccountApprovedEmail, sendAccountRejectedEmail, sendOnboardingReminderEmail } from '../services/emailService';
-import { pushProductUpdate, downloadZohoFile } from '../services/zohoApi';
+import { pushProductUpdate, downloadZohoFile, createZohoProduct, uploadProductFiles } from '../services/zohoApi';
+import axios from 'axios';
 import { createNotificationBatch } from '../services/notificationService';
 import fs from 'fs';
 import path from 'path';
@@ -145,7 +146,10 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
   }
 
   // Verify seller exists
-  const seller = await prisma.user.findUnique({ where: { id: sellerId } });
+  const seller = await prisma.user.findUnique({
+    where: { id: sellerId },
+    select: { id: true, zohoContactId: true, companyName: true },
+  });
   if (!seller) {
     return res.status(404).json({ error: 'Seller not found' });
   }
@@ -194,6 +198,66 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     });
 
     logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'coa.confirm', targetType: 'Product', targetId: product.id, metadata: { syncRecordId, sellerId }, ip: getRequestIp(req) });
+
+    // Fire-and-forget: push product to Zoho CRM
+    if (seller.zohoContactId) {
+      (async () => {
+        try {
+          const zohoProductId = await createZohoProduct({
+            name: product.name,
+            description: product.description,
+            category: product.category,
+            type: product.type,
+            licensedProducer: product.licensedProducer,
+            lineage: product.lineage,
+            growthMedium: product.growthMedium,
+            harvestDate: product.harvestDate,
+            certification: product.certification,
+            thcMin: product.thcMin,
+            thcMax: product.thcMax,
+            cbdMin: product.cbdMin,
+            cbdMax: product.cbdMax,
+            dominantTerpene: product.dominantTerpene,
+            gramsAvailable: product.gramsAvailable,
+            upcomingQty: product.upcomingQty,
+            minQtyRequest: product.minQtyRequest,
+            pricePerUnit: product.pricePerUnit,
+            budSizePopcorn: product.budSizePopcorn,
+            budSizeSmall: product.budSizeSmall,
+            budSizeMedium: product.budSizeMedium,
+            budSizeLarge: product.budSizeLarge,
+            budSizeXLarge: product.budSizeXLarge,
+            sellerZohoContactId: seller.zohoContactId!,
+          });
+          await prisma.product.update({
+            where: { id: product.id },
+            data: { zohoProductId },
+          });
+          logger.info({ productId: product.id, zohoProductId }, '[ADMIN] CoA email product pushed to Zoho');
+
+          // Upload CoA PDF to Zoho product record
+          if (product.coaPdfUrl) {
+            try {
+              const pdfResponse = await axios.get(product.coaPdfUrl, { responseType: 'arraybuffer', timeout: 30_000 });
+              const pdfBuffer = Buffer.from(pdfResponse.data);
+              await uploadProductFiles(zohoProductId, [], [{
+                buffer: pdfBuffer,
+                originalname: `${product.name || 'coa'}.pdf`,
+                mimetype: 'application/pdf',
+              }]);
+              logger.info({ productId: product.id, zohoProductId }, '[ADMIN] CoA PDF uploaded to Zoho product');
+            } catch (pdfErr) {
+              logger.error({ err: pdfErr instanceof Error ? pdfErr : { message: String(pdfErr) }, productId: product.id }, '[ADMIN] CoA PDF upload to Zoho failed (non-critical)');
+            }
+          }
+        } catch (err) {
+          logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId: product.id }, '[ADMIN] CoA email Zoho push failed (non-critical)');
+        }
+      })();
+    } else {
+      logger.warn({ productId: product.id, sellerId }, '[ADMIN] CoA email product not pushed to Zoho — seller has no zohoContactId');
+    }
+
     res.json({ product });
   } catch (err: any) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] CoA email confirm failed');
@@ -224,7 +288,10 @@ router.post('/coa-email-dismiss', validate(adminCoaDismissSchema), async (req: R
 router.get('/sellers', async (_req: Request, res: Response) => {
   const sellers = await prisma.user.findMany({
     where: {
-      contactType: { contains: 'Seller' },
+      OR: [
+        { contactType: { contains: 'Seller' } },
+        { isAdmin: true },
+      ],
     },
     select: {
       id: true,
@@ -232,6 +299,8 @@ router.get('/sellers', async (_req: Request, res: Response) => {
       companyName: true,
       firstName: true,
       lastName: true,
+      isAdmin: true,
+      contactType: true,
     },
     orderBy: { companyName: 'asc' },
   });

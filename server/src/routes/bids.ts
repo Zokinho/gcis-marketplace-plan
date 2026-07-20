@@ -198,7 +198,7 @@ router.get('/', validateQuery(bidListQuerySchema), async (req: Request, res: Res
 router.get('/seller', validateQuery(bidListQuerySchema), async (req: Request, res: Response) => {
   const seller = req.user!;
 
-  if (!seller.contactType?.includes('Seller')) {
+  if (!seller.contactType?.includes('Seller') && !seller.isAdmin) {
     return res.status(403).json({ error: 'Seller access required' });
   }
 

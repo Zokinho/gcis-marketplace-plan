@@ -64,7 +64,7 @@ See `.env.example`. Key vars:
 | `ENABLE_METRICS` | `true`/`false` — enables Prometheus `/metrics` endpoint |
 | `MARKETPLACE_COUPLED` | `true` follows Zoho Product_Active, `false` independent visibility (testing) |
 | `CSP_EXTRA_CONNECT_SRC` | Extra connect-src domains for CSP (comma-separated, optional) |
-| `RESEND_API_KEY` | Resend email API key (optional — disables email if unset) |
+| `RESEND_API_KEY` | Resend email API key (optional — disables email if unset). Powers: password reset, welcome, approval/rejection, onboarding reminder, notification emails |
 | `SENDER_EMAIL` | From address for emails (default `noreply@harvex.ca`) |
 
 ---
@@ -107,7 +107,7 @@ gcis-marketplace-plan/
 │       │   └── webhooks.ts         # Zoho webhook (product/contact updates)
 │       ├── services/
 │       │   ├── auditService.ts     # logAudit (fire-and-forget), getRequestIp
-│       │   ├── emailService.ts     # Resend client, email templates, fire-and-forget send
+│       │   ├── emailService.ts     # Resend client, email templates (welcome, approval, rejection, onboarding reminder, notifications), fire-and-forget send
 │       │   ├── churnDetectionService.ts  # At-risk buyer detection
 │       │   ├── coaClient.ts        # Axios client for CoA backend API
 │       │   ├── coaEmailSync.ts     # Email-to-product pipeline (5-min cron)
@@ -231,7 +231,7 @@ gcis-marketplace-plan/
 
 | Model | Purpose |
 |-------|---------|
-| **User** | Marketplace user (buyer/seller/admin), optionally linked to Zoho Contact |
+| **User** | Marketplace user (buyer/seller/admin), optionally linked to Zoho Contact. `reminderSentAt` tracks last admin-sent onboarding reminder |
 | **Product** | Cannabis product (synced from Zoho, enriched with CoA) |
 | **Bid** | Buyer bid on a product (PENDING → ACCEPTED/REJECTED) |
 | **Transaction** | Created when bid accepted (tracks delivery outcome) |
@@ -334,6 +334,7 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 | GET | `/api/admin/users` | User list (filterable by status) |
 | PATCH | `/api/admin/users/:id/approve` | Approve user |
 | PATCH | `/api/admin/users/:id/reject` | Reject user |
+| POST | `/api/admin/users/:id/send-reminder` | Send onboarding reminder email |
 | GET | `/api/admin/sync-status` | Zoho sync status |
 | POST | `/api/admin/sync-now` | Trigger manual sync |
 | GET | `/api/admin/coa-queue` | CoA email queue |
@@ -499,7 +500,7 @@ All routes use **Zod schemas** via middleware:
 
 ## Audit Log
 
-Actions logged: `user.approve`, `user.reject`, `sync.trigger`, `coa.confirm`, `coa.dismiss`, `bid.accept`, `bid.reject`, `bid.outcome`, `notification.broadcast`, `spot-sale.create`, `spot-sale.update`, `spot-sale.delete`, `spot-sale.record`
+Actions logged: `user.approve`, `user.reject`, `user.send_reminder`, `sync.trigger`, `coa.confirm`, `coa.dismiss`, `bid.accept`, `bid.reject`, `bid.outcome`, `notification.broadcast`, `spot-sale.create`, `spot-sale.update`, `spot-sale.delete`, `spot-sale.record`
 
 `GET /api/admin/audit-log` — Paginated, filterable by action, actorId, targetType, date range.
 
@@ -708,6 +709,7 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 | 18 | 22 | Self-hosted auth — Replace Clerk with bcrypt + JWT, multi-step sign-up wizard |
 | 19 | 23 | ISO feature — buyer demand posts, seller responses, 7-factor auto-matching, expiry cron |
 | 20 | 25 | Resend email integration — password reset, notification emails, per-type email preferences |
+| 21 | 26 | Admin onboarding reminder email — contextual reminder for incomplete EULA/doc upload, `reminderSentAt` tracking, UI indicator |
 
 ### Production Hardening (cross-cutting)
 - Structured logging (pino) — replaced 130+ console.log/error calls

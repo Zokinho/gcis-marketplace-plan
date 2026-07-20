@@ -185,7 +185,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <NavLink to="/marketplace" onClick={() => setMobileOpen(false)} dataTour="nav-marketplace">Marketplace</NavLink>
       <NavLink to="/shortlist" onClick={() => setMobileOpen(false)} dataTour="nav-shortlist">Shortlist</NavLink>
       <NavLink to="/my-matches" onClick={() => setMobileOpen(false)}>My Matches</NavLink>
-      {isSeller && <NavLink to="/my-listings" onClick={() => setMobileOpen(false)} dataTour="nav-my-listings">My Listings</NavLink>}
+      {(isSeller || isAdmin) && <NavLink to="/my-listings" onClick={() => setMobileOpen(false)} dataTour="nav-my-listings">My Listings</NavLink>}
       <NavLink to="/orders" onClick={() => setMobileOpen(false)} dataTour="nav-orders">Orders</NavLink>
     </>
   );
