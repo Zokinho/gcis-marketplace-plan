@@ -17,7 +17,7 @@ B2B cannabis marketplace connecting licensed producers (sellers) with buyers. Pr
 | **CRM** | Zoho CRM API v7 (Canada region — zohocloud.ca) |
 | **CoA** | Proxy to CoA microservice (Python/FastAPI at localhost:8000) |
 | **Database** | PostgreSQL 16 via Docker on **port 5434** |
-| **Testing** | Vitest + Supertest (404 tests across 23 files) |
+| **Testing** | Vitest + Supertest (513 tests across 27 files) |
 | **Logging** | Pino (structured JSON) + pino-sentry-transport |
 | **Monitoring** | Sentry (backend + frontend) + Prometheus metrics |
 
@@ -83,7 +83,7 @@ gcis-marketplace-plan/
 │   ├── tsconfig.json
 │   ├── vitest.config.ts
 │   ├── prisma/
-│   │   ├── schema.prisma           # Full data model (22 models)
+│   │   ├── schema.prisma           # Full data model (25 models)
 │   │   └── migrations/             # Versioned migrations (baseline + incremental)
 │   └── src/
 │       ├── index.ts                # Express entry, middleware, route mounting, cron setup
@@ -134,23 +134,34 @@ gcis-marketplace-plan/
 │       │   └── validation.ts       # Zod schemas + validate/validateQuery/validateParams
 │       └── __tests__/
 │           ├── setup.ts            # Global Prisma + logger + metrics + sentry mocks
-│           ├── admin.test.ts       # 18 tests
-│           ├── auth.test.ts        # 20 tests
+│           ├── admin.test.ts       # 37 tests
+│           ├── auth.test.ts        # 23 tests
 │           ├── authRoutes.test.ts  # 19 tests
 │           ├── authUtils.test.ts   # 13 tests
 │           ├── bids.test.ts        # 22 tests
+│           ├── coaAnalyzeMapper.test.ts # 19 tests
+│           ├── coaExtractor.test.ts # 9 tests
 │           ├── coaMapper.test.ts   # 22 tests
-│           ├── cronLock.test.ts    # 11 tests
-│           ├── marketplace.test.ts # 32 tests
+│           ├── coaRedactor.test.ts # 13 tests
+│           ├── cronLock.test.ts    # 12 tests
+│           ├── marketplace.test.ts # 35 tests
 │           ├── matchingEngine.test.ts # 9 tests
-│           ├── myListings.test.ts  # 20 tests
+│           ├── myListings.test.ts  # 29 tests
 │           ├── notifications.test.ts  # 18 tests
 │           ├── proximity.test.ts   # 21 tests
+│           ├── redaction.test.ts   # 16 tests
 │           ├── sellerDetection.test.ts # 16 tests
-│           ├── shares.test.ts      # 19 tests
+│           ├── shares.test.ts      # 21 tests
 │           ├── shortlist.test.ts   # 16 tests
-│           ├── iso.test.ts        # 22 tests
-│           └── validation.test.ts  # 49 tests
+│           ├── iso.test.ts        # 34 tests
+│           ├── marketplaceVisibility.test.ts # 11 tests
+│           ├── validation.test.ts  # 49 tests
+│           └── e2e/
+│               ├── signup-onboarding.e2e.test.ts  # 9 tests
+│               ├── browse-and-bid.e2e.test.ts     # 10 tests
+│               ├── admin-operations.e2e.test.ts   # 12 tests
+│               ├── seller-bid-management.e2e.test.ts # 10 tests
+│               └── shortlist-notifications.e2e.test.ts # 8 tests
 │
 ├── client/
 │   ├── Dockerfile
@@ -227,7 +238,7 @@ gcis-marketplace-plan/
 
 ## Data Model (Prisma)
 
-22 models in `server/prisma/schema.prisma`:
+25 models in `server/prisma/schema.prisma`:
 
 | Model | Purpose |
 |-------|---------|
@@ -252,6 +263,9 @@ gcis-marketplace-plan/
 | **SpotSale** | Admin-curated limited-time deals with countdown timers |
 | **IsoRequest** | Buyer "In Search Of" demand posts (auto-expires 30 days) |
 | **IsoResponse** | Seller responses to ISO requests ("I have this") |
+| **ShareView** | Anonymous analytics for curated share link visits (IP-hashed) |
+| **RedactionRegion** | Per-product CoA PDF redaction regions (AI or manual, % coordinates) |
+| **RedactionTemplate** | Reusable per-lab redaction templates (auto-applied to new CoAs) |
 | **PasswordResetToken** | Time-limited password reset tokens (SHA-256 hashed, 1h expiry) |
 
 ### Full-Text Search
@@ -379,7 +393,7 @@ CREATE INDEX IF NOT EXISTS product_search_idx ON "Product" USING gin(search_vect
 1. **Self-hosted auth** — bcrypt passwords + JWT access/refresh tokens
 2. **`requireAuth()`** — Extracts Bearer token, verifies JWT, sets `authUserId`
 3. **`marketplaceAuth`** — Looks up user by ID, checks `approved: true`, EULA, doc upload
-4. **`requireSeller`** — Checks `contactType` includes "Seller"
+4. **`requireSeller`** — Checks `contactType` includes "Seller" OR `isAdmin` is true (admins can act as proxy sellers)
 5. **`requireAdmin`** — Checks email is in `ADMIN_EMAILS` env var
 
 ### Token Strategy
@@ -550,7 +564,7 @@ All monitoring is **env-gated** — without `SENTRY_DSN` / `ENABLE_METRICS`, beh
 
 ```bash
 cd server
-npm test              # Run all 404 tests
+npm test              # Run all 513 tests
 npm run test:watch    # Watch mode
 npm run test:coverage # With coverage report
 ```
@@ -558,24 +572,28 @@ npm run test:coverage # With coverage report
 | Test File | Count | Type |
 |-----------|-------|------|
 | validation.test.ts | 49 | Unit — Zod schema validation |
-| marketplace.test.ts | 32 | Integration — product listing/detail/filters |
+| admin.test.ts | 37 | Integration — user management + sync + queue + CoA Zoho push |
+| marketplace.test.ts | 35 | Integration — product listing/detail/filters |
+| iso.test.ts | 34 | Integration — ISO board CRUD, respond, anonymization |
+| myListings.test.ts | 29 | Integration — seller listings/shares |
+| auth.test.ts | 23 | Unit — auth middleware chain |
 | coaMapper.test.ts | 22 | Unit — CoA → Product field mapping |
 | bids.test.ts | 22 | Integration — bid CRUD + accept/reject/outcome |
+| shares.test.ts | 21 | Integration — curated share CRUD |
 | proximity.test.ts | 21 | Unit — proximity score calculation |
-| auth.test.ts | 20 | Unit — auth middleware chain |
-| myListings.test.ts | 20 | Integration — seller listings/shares |
+| coaAnalyzeMapper.test.ts | 19 | Unit — CoA analyze response mapping |
 | authRoutes.test.ts | 19 | Integration — register/login/refresh/logout |
-| shares.test.ts | 19 | Integration — curated share CRUD |
 | notifications.test.ts | 18 | Integration + Unit — routes + service logic |
-| admin.test.ts | 18 | Integration — user management + sync + queue |
+| redaction.test.ts | 16 | Unit — PII/sensitive data redaction |
 | sellerDetection.test.ts | 16 | Unit — email/company/producer matching |
 | shortlist.test.ts | 16 | Integration — toggle, list, check, count |
-| iso.test.ts | 22 | Integration — ISO board CRUD, respond, anonymization |
+| coaRedactor.test.ts | 13 | Unit — CoA data redaction pipeline |
 | authUtils.test.ts | 13 | Unit — JWT/bcrypt round-trip tests |
+| cronLock.test.ts | 12 | Unit — PostgreSQL advisory lock + stale recovery |
 | marketplaceVisibility.test.ts | 11 | Unit — visibility mode switching |
-| cronLock.test.ts | 11 | Unit — PostgreSQL advisory lock behavior |
+| coaExtractor.test.ts | 9 | Unit — CoA PDF field extraction |
 | matchingEngine.test.ts | 9 | Unit — 10-factor scoring algorithm |
-| e2e/*.test.ts | 46 | E2E — signup, bidding, admin ops, shortlist |
+| e2e/*.test.ts | 49 | E2E — signup, bidding, admin ops, shortlist |
 
 ### Test Patterns
 - Global mock setup in `__tests__/setup.ts` (Prisma + logger + metrics + sentry)
@@ -710,6 +728,7 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 | 19 | 23 | ISO feature — buyer demand posts, seller responses, 7-factor auto-matching, expiry cron |
 | 20 | 25 | Resend email integration — password reset, notification emails, per-type email preferences |
 | 21 | 26 | Admin onboarding reminder email — contextual reminder for incomplete EULA/doc upload, `reminderSentAt` tracking, UI indicator |
+| 22 | 27 | CoA→Zoho push + admin proxy sellers — CoA email confirm pushes product+PDF to Zoho CRM, admins act as proxy sellers (seller picker, My Listings, Orders) |
 
 ### Production Hardening (cross-cutting)
 - Structured logging (pino) — replaced 130+ console.log/error calls
@@ -719,7 +738,7 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 - Docker startup with `prisma migrate deploy`
 - Health check with detailed mode (DB, Zoho, CoA)
 - Rate limiting (4 tiers)
-- 404 tests across 23 files
+- 513 tests across 27 files
 - Dark mode support across all pages
 - Email notifications via Resend (env-gated, fire-and-forget)
 - Sentry error tracking (backend + frontend) with pino log transport
@@ -741,7 +760,7 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 
 ### P3 — Nice to have
 - [x] **CSRF protection** — Origin/Referer validation on mutating requests
-- [ ] **E2E tests** — Full signup → onboarding → marketplace → bid flow
+- [x] **E2E tests** — 49 tests across 5 suites (signup, browse+bid, admin ops, seller bids, shortlist+notifications)
 
 ---
 
