@@ -71,6 +71,13 @@ export interface CoaEmailIngestion {
   attachments: CoaEmailAttachment[];
 }
 
+export interface SharePointUploadResponse {
+  id: string;
+  name: string;
+  web_url: string;
+  size: number;
+}
+
 // ─── CoA Client ───
 
 class CoaClient {
@@ -188,6 +195,22 @@ class CoaClient {
   async getEmailIngestion(ingestionId: string): Promise<CoaEmailIngestion | null> {
     try {
       const res = await this.client.get<CoaEmailIngestion>(`/api/email/ingestions/${ingestionId}`);
+      return res.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /**
+   * Upload a CoA PDF to SharePoint via the CoA backend's default destination.
+   */
+  async uploadToSharePoint(jobId: string): Promise<SharePointUploadResponse | null> {
+    try {
+      const res = await this.client.post<SharePointUploadResponse>(
+        '/api/sharepoint/upload-by-job',
+        { job_id: jobId },
+      );
       return res.data;
     } catch (err: any) {
       if (err?.response?.status === 404) return null;

@@ -268,6 +268,7 @@ describe('E2E: Admin operations + audit trail', () => {
     vi.mocked(getCoaClient).mockReturnValue({
       getProductDetail: vi.fn().mockResolvedValue({ name: 'Extracted Product' }),
       getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf/cprod-1'),
+      uploadToSharePoint: vi.fn().mockResolvedValue(null),
     } as any);
 
     vi.mocked(prisma.product.create).mockResolvedValue({ id: 'new-prod-1' } as any);

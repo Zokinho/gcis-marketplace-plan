@@ -37,6 +37,7 @@ vi.mock('../services/coaClient', () => ({
   getCoaClient: vi.fn().mockReturnValue({
     getProductDetail: vi.fn().mockResolvedValue(null),
     getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+    uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
   }),
 }));
 
@@ -513,6 +514,7 @@ describe('POST /coa-email-confirm — Zoho push', () => {
     vi.mocked(getCoaClient).mockReturnValue({
       getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
       getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
     } as any);
 
     const { mapCoaToProductFields } = await import('../utils/coaMapper');
@@ -555,6 +557,7 @@ describe('POST /coa-email-confirm — Zoho push', () => {
     vi.mocked(getCoaClient).mockReturnValue({
       getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
       getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
     } as any);
 
     const { mapCoaToProductFields } = await import('../utils/coaMapper');
@@ -589,6 +592,7 @@ describe('POST /coa-email-confirm — Zoho push', () => {
     vi.mocked(getCoaClient).mockReturnValue({
       getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
       getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
     } as any);
 
     const { mapCoaToProductFields } = await import('../utils/coaMapper');
@@ -638,6 +642,7 @@ describe('POST /coa-email-confirm — destination branching', () => {
     vi.mocked(getCoaClient).mockReturnValue({
       getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
       getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
     } as any);
 
     const { mapCoaToProductFields } = await import('../utils/coaMapper');
@@ -686,6 +691,7 @@ describe('POST /coa-email-confirm — destination branching', () => {
     vi.mocked(getCoaClient).mockReturnValue({
       getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
       getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
     } as any);
 
     const { mapCoaToProductFields } = await import('../utils/coaMapper');
@@ -723,6 +729,123 @@ describe('POST /coa-email-confirm — destination branching', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Already confirmed');
+  });
+});
+
+describe('POST /coa-email-confirm — SharePoint upload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const syncRecord = {
+    id: 'sync-1',
+    status: 'ready',
+    coaJobId: 'job-1',
+    coaProductId: 'cprod-1',
+    suggestedSellerId: null,
+    createdAt: new Date(),
+  };
+
+  it('uploads to SharePoint on marketplace confirm', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    const mockUploadToSharePoint = vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 });
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: mockUploadToSharePoint,
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-1', name: 'Test Strain' } as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    expect(res.status).toBe(200);
+
+    // Wait for fire-and-forget to complete
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(mockUploadToSharePoint).toHaveBeenCalledWith('job-1');
+  });
+
+  it('uploads to SharePoint on airtable-only confirm', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    const mockUploadToSharePoint = vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 });
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: mockUploadToSharePoint,
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1', destination: 'airtable' });
+
+    expect(res.status).toBe(200);
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(mockUploadToSharePoint).toHaveBeenCalledWith('job-1');
+  });
+
+  it('SharePoint failure does not affect confirm response', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockRejectedValue(new Error('SharePoint down')),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-1', name: 'Test Strain' } as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    // Response should still be 200 despite SharePoint failure
+    expect(res.status).toBe(200);
+    expect(res.body.product).toBeDefined();
+
+    // Wait for fire-and-forget to settle
+    await new Promise((r) => setTimeout(r, 50));
   });
 });
 

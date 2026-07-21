@@ -204,6 +204,19 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         getPdfBuffer,
       });
 
+      // Fire-and-forget: upload CoA PDF to SharePoint
+      if (syncRecord.coaJobId) {
+        coaClient.uploadToSharePoint(syncRecord.coaJobId)
+          .then((result) => {
+            if (result) {
+              logger.info({ syncRecordId, jobId: syncRecord.coaJobId, sharePointId: result.id }, '[ADMIN] CoA PDF uploaded to SharePoint (airtable-only)');
+            }
+          })
+          .catch((err) => {
+            logger.error({ err: err instanceof Error ? err : { message: String(err) }, syncRecordId, jobId: syncRecord.coaJobId }, '[ADMIN] SharePoint upload failed (non-critical)');
+          });
+      }
+
       return res.json({ message: 'Added to Airtable', syncRecordId });
     }
 
@@ -304,6 +317,19 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       isHarvex: true,
       getPdfBuffer,
     });
+
+    // Fire-and-forget: upload CoA PDF to SharePoint
+    if (syncRecord.coaJobId) {
+      coaClient.uploadToSharePoint(syncRecord.coaJobId)
+        .then((result) => {
+          if (result) {
+            logger.info({ productId: product.id, jobId: syncRecord.coaJobId, sharePointId: result.id }, '[ADMIN] CoA PDF uploaded to SharePoint');
+          }
+        })
+        .catch((err) => {
+          logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId: product.id, jobId: syncRecord.coaJobId }, '[ADMIN] SharePoint upload failed (non-critical)');
+        });
+    }
 
     res.json({ product });
   } catch (err: any) {
