@@ -52,6 +52,10 @@ vi.mock('../utils/coaMapper', () => ({
   mapCoaToProductFields: vi.fn().mockReturnValue({ name: 'Mapped Product' }),
 }));
 
+vi.mock('../services/airtableService', () => ({
+  pushToAirtable: vi.fn(),
+}));
+
 // ─── Test fixtures ───
 
 const mockAdmin = {
@@ -605,6 +609,120 @@ describe('POST /coa-email-confirm — Zoho push', () => {
     expect(res.status).toBe(200);
     expect(res.body.product).toBeDefined();
     expect(res.body.product.id).toBe('product-1');
+  });
+});
+
+describe('POST /coa-email-confirm — destination branching', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const syncRecord = {
+    id: 'sync-1',
+    status: 'ready',
+    coaJobId: 'job-1',
+    coaProductId: 'cprod-1',
+    suggestedSellerId: null,
+    createdAt: new Date(),
+  };
+
+  it('destination=airtable does NOT create a marketplace Product', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1', destination: 'airtable' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Added to Airtable');
+    expect(res.body.syncRecordId).toBe('sync-1');
+    expect(res.body.product).toBeUndefined();
+
+    // Should NOT create a marketplace product
+    expect(prisma.product.create).not.toHaveBeenCalled();
+
+    // Should update sync record with confirmed_airtable status
+    expect(prisma.coaSyncRecord.update).toHaveBeenCalledWith({
+      where: { id: 'sync-1' },
+      data: {
+        status: 'confirmed_airtable',
+        confirmedSellerId: 'seller-1',
+      },
+    });
+
+    // Should call pushToAirtable with isHarvex: false
+    const { pushToAirtable } = await import('../services/airtableService');
+    expect(pushToAirtable).toHaveBeenCalledWith(
+      expect.objectContaining({ isHarvex: false }),
+    );
+  });
+
+  it('default destination creates product (unchanged behavior)', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-1', name: 'Test Strain' } as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.product).toBeDefined();
+    expect(prisma.product.create).toHaveBeenCalled();
+
+    // Should also call pushToAirtable with isHarvex: true
+    const { pushToAirtable } = await import('../services/airtableService');
+    expect(pushToAirtable).toHaveBeenCalledWith(
+      expect.objectContaining({ isHarvex: true }),
+    );
+  });
+
+  it('returns 400 for confirmed_airtable status', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue({
+      ...syncRecord,
+      status: 'confirmed_airtable',
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Already confirmed');
   });
 });
 

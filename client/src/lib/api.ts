@@ -554,8 +554,9 @@ export async function confirmCoaEmail(
   syncRecordId: string,
   sellerId: string,
   overrides?: Record<string, any>,
-): Promise<{ product: ProductDetail }> {
-  const res = await api.post('/admin/coa-email-confirm', { syncRecordId, sellerId, overrides });
+  destination: 'marketplace' | 'airtable' = 'marketplace',
+): Promise<{ product?: ProductDetail; message?: string }> {
+  const res = await api.post('/admin/coa-email-confirm', { syncRecordId, sellerId, overrides, destination });
   return res.data;
 }
 

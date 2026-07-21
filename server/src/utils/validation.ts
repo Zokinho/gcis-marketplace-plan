@@ -102,6 +102,7 @@ export const adminCoaConfirmSchema = z.object({
   syncRecordId: z.string().min(1, 'syncRecordId is required'),
   sellerId: z.string().min(1, 'sellerId is required'),
   overrides: z.record(z.string(), z.unknown()).optional(),
+  destination: z.enum(['marketplace', 'airtable']).default('marketplace'),
 });
 
 export const adminCoaDismissSchema = z.object({

@@ -84,8 +84,11 @@ export default function CoaEmailQueue() {
 function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () => void }) {
   const [sellerId, setSellerId] = useState<string | null>(item.suggestedSellerId);
   const [confirming, setConfirming] = useState(false);
+  const [addingToAirtable, setAddingToAirtable] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const busy = confirming || addingToAirtable || dismissing;
 
   const handleConfirm = async () => {
     if (!sellerId) return;
@@ -98,6 +101,19 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
       setError(err?.response?.data?.error || 'Failed to confirm');
     }
     setConfirming(false);
+  };
+
+  const handleAirtableOnly = async () => {
+    if (!sellerId) return;
+    setAddingToAirtable(true);
+    setError(null);
+    try {
+      await confirmCoaEmail(item.id, sellerId, undefined, 'airtable');
+      onUpdate();
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to add to Airtable');
+    }
+    setAddingToAirtable(false);
   };
 
   const handleDismiss = async () => {
@@ -176,14 +192,21 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
       <div className="flex gap-3">
         <button
           onClick={handleConfirm}
-          disabled={!sellerId || confirming}
+          disabled={!sellerId || busy}
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90 disabled:opacity-50"
         >
           {confirming ? 'Creating...' : 'Confirm & List'}
         </button>
         <button
+          onClick={handleAirtableOnly}
+          disabled={!sellerId || busy}
+          className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-medium text-white hover:bg-brand-blue/90 disabled:opacity-50"
+        >
+          {addingToAirtable ? 'Adding...' : 'Add to Airtable Only'}
+        </button>
+        <button
           onClick={handleDismiss}
-          disabled={dismissing}
+          disabled={busy}
           className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary hover-surface-muted disabled:opacity-50"
         >
           {dismissing ? 'Dismissing...' : 'Dismiss'}

@@ -21,6 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { deleteFile as s3Delete, uploadFile as s3Upload, getSignedFileUrl, isS3Configured } from '../utils/s3';
 import { applyRedactions, generatePageImages } from '../services/coaRedactor';
+import { pushToAirtable } from '../services/airtableService';
 
 const uploadsDir = path.join(__dirname, '../../../uploads');
 
@@ -133,7 +134,7 @@ router.get('/coa-email-queue', async (_req: Request, res: Response) => {
  * Confirm seller and create a marketplace Product from a CoaSyncRecord.
  */
 router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: Request, res: Response) => {
-  const { syncRecordId, sellerId, overrides } = req.body;
+  const { syncRecordId, sellerId, overrides, destination } = req.body;
 
   const syncRecord = await prisma.coaSyncRecord.findUnique({
     where: { id: syncRecordId },
@@ -141,7 +142,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
   if (!syncRecord) {
     return res.status(404).json({ error: 'Sync record not found' });
   }
-  if (syncRecord.status === 'confirmed') {
+  if (['confirmed', 'confirmed_airtable'].includes(syncRecord.status)) {
     return res.status(400).json({ error: 'Already confirmed' });
   }
 
@@ -170,7 +171,43 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     // Map fields
     const mappedFields = mapCoaToProductFields(coaProduct);
 
-    // Create marketplace product
+    // Helper: get PDF buffer from CoA backend (reused by both paths)
+    const getPdfBuffer = async (): Promise<Buffer | null> => {
+      try {
+        const pdfUrl = coaClient.getProductPdfUrl(coaProductId);
+        const pdfResponse = await axios.get(pdfUrl, { responseType: 'arraybuffer', timeout: 30_000 });
+        return Buffer.from(pdfResponse.data);
+      } catch {
+        return null;
+      }
+    };
+
+    if (destination === 'airtable') {
+      // ─── Airtable-only path: no marketplace product ───
+      await prisma.coaSyncRecord.update({
+        where: { id: syncRecordId },
+        data: {
+          status: 'confirmed_airtable',
+          confirmedSellerId: sellerId,
+        },
+      });
+
+      logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'coa.confirm_airtable', targetType: 'CoaSyncRecord', targetId: syncRecordId, metadata: { syncRecordId, sellerId }, ip: getRequestIp(req) });
+
+      // Fire-and-forget: push to Airtable with Harvex = false
+      pushToAirtable({
+        mappedFields,
+        overrides,
+        coaProductId,
+        companyName: seller.companyName,
+        isHarvex: false,
+        getPdfBuffer,
+      });
+
+      return res.json({ message: 'Added to Airtable', syncRecordId });
+    }
+
+    // ─── Marketplace path (default): create Product + Zoho + Airtable ───
     const product = await prisma.product.create({
       data: {
         ...mappedFields,
@@ -257,6 +294,16 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     } else {
       logger.warn({ productId: product.id, sellerId }, '[ADMIN] CoA email product not pushed to Zoho — seller has no zohoContactId');
     }
+
+    // Fire-and-forget: push to Airtable with Harvex = true
+    pushToAirtable({
+      mappedFields,
+      overrides,
+      coaProductId,
+      companyName: seller.companyName,
+      isHarvex: true,
+      getPdfBuffer,
+    });
 
     res.json({ product });
   } catch (err: any) {
