@@ -17,7 +17,7 @@ B2B cannabis marketplace connecting licensed producers (sellers) with buyers. Pr
 | **CRM** | Zoho CRM API v7 (Canada region — zohocloud.ca) |
 | **CoA** | Proxy to CoA microservice (Python/FastAPI at localhost:8000) |
 | **Database** | PostgreSQL 16 via Docker on **port 5434** |
-| **Testing** | Vitest + Supertest (513 tests across 27 files) |
+| **Testing** | Vitest + Supertest (544 tests across 28 files) |
 | **Logging** | Pino (structured JSON) + pino-sentry-transport |
 | **Monitoring** | Sentry (backend + frontend) + Prometheus metrics |
 
@@ -572,7 +572,7 @@ npm run test:coverage # With coverage report
 | Test File | Count | Type |
 |-----------|-------|------|
 | validation.test.ts | 49 | Unit — Zod schema validation |
-| admin.test.ts | 37 | Integration — user management + sync + queue + CoA Zoho push |
+| admin.test.ts | 43 | Integration — user management + sync + queue + CoA Zoho push + SharePoint upload |
 | marketplace.test.ts | 35 | Integration — product listing/detail/filters |
 | iso.test.ts | 34 | Integration — ISO board CRUD, respond, anonymization |
 | myListings.test.ts | 29 | Integration — seller listings/shares |
@@ -593,6 +593,7 @@ npm run test:coverage # With coverage report
 | marketplaceVisibility.test.ts | 11 | Unit — visibility mode switching |
 | coaExtractor.test.ts | 9 | Unit — CoA PDF field extraction |
 | matchingEngine.test.ts | 9 | Unit — 10-factor scoring algorithm |
+| airtableService.test.ts | 25 | Unit — Airtable field mapping + push logic |
 | e2e/*.test.ts | 49 | E2E — signup, bidding, admin ops, shortlist |
 
 ### Test Patterns
@@ -729,6 +730,7 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 | 20 | 25 | Resend email integration — password reset, notification emails, per-type email preferences |
 | 21 | 26 | Admin onboarding reminder email — contextual reminder for incomplete EULA/doc upload, `reminderSentAt` tracking, UI indicator |
 | 22 | 27 | CoA→Zoho push + admin proxy sellers — CoA email confirm pushes product+PDF to Zoho CRM, admins act as proxy sellers (seller picker, My Listings, Orders) |
+| 23 | 28 | CoA→Airtable + SharePoint — CoA email confirm pushes to Airtable, auto-uploads PDF to SharePoint via CoA microservice |
 
 ### Production Hardening (cross-cutting)
 - Structured logging (pino) — replaced 130+ console.log/error calls
@@ -738,7 +740,7 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 - Docker startup with `prisma migrate deploy`
 - Health check with detailed mode (DB, Zoho, CoA)
 - Rate limiting (4 tiers)
-- 513 tests across 27 files
+- 544 tests across 28 files
 - Dark mode support across all pages
 - Email notifications via Resend (env-gated, fire-and-forget)
 - Sentry error tracking (backend + frontend) with pino log transport
@@ -761,6 +763,48 @@ Vite's content-hashed `/assets/*` filenames (`index-CMlDj-EM.js`) naturally cach
 ### P3 — Nice to have
 - [x] **CSRF protection** — Origin/Referer validation on mutating requests
 - [x] **E2E tests** — 49 tests across 5 suites (signup, browse+bid, admin ops, seller bids, shortlist+notifications)
+
+---
+
+## Pending Production Configuration
+
+Environment variables that need to be set on the production server before the corresponding features go live. Remove entries from this list once configured.
+
+### Marketplace `.env` (on `159.203.20.213` at `~/gcis-marketplace-plan/.env`)
+
+| Variable | Value / How to get it | Blocker |
+|----------|-----------------------|---------|
+| `COA_API_URL` | `http://localhost:8000` | None — CoA service is deployed |
+| `COA_API_KEY` | Any shared secret (generate one, must match CoA service) | None |
+| `AIRTABLE_API_KEY` | Airtable Personal Access Token — create at airtable.com/create/tokens with `data.records:write` scope | Create a test copy of the Airtable base first |
+| `AIRTABLE_BASE_ID` | `appxvr5014FZdcmJd` (prod) — use test copy base ID until verified | Create test copy first |
+| `AIRTABLE_TABLE_ID` | `tbl11cIvNCqBc9F2W` (prod) — use test copy table ID until verified | Create test copy first |
+| `RESEND_API_KEY` | Resend API key — powers password reset, welcome, approval, reminder emails | Pending approval to activate email |
+
+### CoA service `.env` (on `159.203.20.213` at `~/gcis-coa-project/.env`)
+
+| Variable | Value / How to get it | Blocker |
+|----------|-----------------------|---------|
+| `COA_API_KEY` | Must match marketplace's `COA_API_KEY` | None |
+| `SP_DEFAULT_SITE_ID` | Browse via CoA admin `/api/sharepoint/sites` endpoint | None |
+| `SP_DEFAULT_DRIVE_ID` | Browse via `/api/sharepoint/sites/{site_id}/drives` | Need site ID first |
+| `SP_DEFAULT_FOLDER_ID` | Browse via `/api/sharepoint/sites/{site_id}/drives/{drive_id}/folders` | Need drive ID first |
+| `ANTHROPIC_API_KEY` | Already set — but Claude API usage incurs cost | Pending cost approval |
+
+### Activation blockers
+
+1. **Email (Resend)** — Awaiting approval to activate. Powers: password reset, welcome, approval/rejection, onboarding reminder, notification emails
+2. **Claude API (Anthropic)** — Key is set but CoA extraction costs need approval. Used by CoA microservice for PDF analysis via Claude Vision
+3. **Airtable** — Creating a test copy of the production base before enabling writes. Once writes verified clean, switch `AIRTABLE_BASE_ID` / `AIRTABLE_TABLE_ID` to production values
+
+### Post-activation steps
+
+After setting the above variables:
+1. Restart marketplace: `ssh root@159.203.20.213 "cd ~/gcis-marketplace-plan && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d server"`
+2. Restart CoA: `ssh root@159.203.20.213 "systemctl restart gcis-coa"`
+3. Verify CoA connection: check server logs for `[SYNC] CoA email sync` instead of `COA_API_URL not configured`
+4. Test Airtable write: confirm a CoA item via admin panel, check test Airtable base
+5. Test SharePoint upload: confirm a CoA item, check target SharePoint folder
 
 ---
 
