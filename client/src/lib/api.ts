@@ -443,6 +443,8 @@ export interface CoaEmailQueueItem {
   emailSubject: string | null;
   coaProductName: string | null;
   rawData: any;
+  sentToAirtable: boolean;
+  sentToMarketplace: boolean;
   createdAt: string;
   suggestedSeller: {
     id: string;

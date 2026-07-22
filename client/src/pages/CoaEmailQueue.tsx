@@ -36,6 +36,10 @@ export default function CoaEmailQueue() {
     setPolling(false);
   };
 
+  const handleItemDismissed = (id: string) => {
+    setQueue((prev) => prev.filter((item) => item.id !== id));
+  };
+
   return (
     <Layout>
       <div className="mb-6 flex items-center justify-between">
@@ -74,19 +78,91 @@ export default function CoaEmailQueue() {
 
       <div className="space-y-4">
         {queue.map((item) => (
-          <QueueCard key={item.id} item={item} onUpdate={loadQueue} />
+          <QueueCard key={item.id} item={item} onDismissed={() => handleItemDismissed(item.id)} />
         ))}
       </div>
     </Layout>
   );
 }
 
-function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () => void }) {
+function EditField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: 'text' | 'number';
+}) {
+  return (
+    <div>
+      <label className="block text-[10px] font-medium text-faint uppercase tracking-wide mb-0.5">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded border border-subtle bg-white dark:bg-gray-800 px-2 py-1 text-xs text-primary focus:border-brand-teal focus:outline-none"
+      />
+    </div>
+  );
+}
+
+function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed: () => void }) {
   const [sellerId, setSellerId] = useState<string | null>(item.suggestedSellerId);
   const [confirming, setConfirming] = useState(false);
   const [addingToAirtable, setAddingToAirtable] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Non-destructive: track sent state locally
+  const [localSentToMarketplace, setLocalSentToMarketplace] = useState(item.sentToMarketplace);
+  const [localSentToAirtable, setLocalSentToAirtable] = useState(item.sentToAirtable);
+
+  // Inline editing
+  const [editing, setEditing] = useState(false);
+  const mapped = item.rawData?.mappedFields || {};
+  const emailProduct = item.rawData?.rawEmailProduct || {};
+  const [editFields, setEditFields] = useState({
+    name: mapped.name || emailProduct.product_name || item.coaProductName || '',
+    licensedProducer: mapped.licensedProducer || emailProduct.producer || '',
+    type: mapped.type || emailProduct.strain_type || '',
+    category: mapped.category || '',
+    thcMax: mapped.thcMax != null ? String(mapped.thcMax) : (emailProduct.thc_percent != null ? String(emailProduct.thc_percent) : ''),
+    cbdMax: mapped.cbdMax != null ? String(mapped.cbdMax) : (emailProduct.cbd_percent != null ? String(emailProduct.cbd_percent) : ''),
+    pricePerUnit: mapped.pricePerUnit != null ? String(mapped.pricePerUnit) : '',
+    gramsAvailable: mapped.gramsAvailable != null ? String(mapped.gramsAvailable) : '',
+    description: mapped.description || '',
+  });
+
+  const updateField = (key: string, value: string) => {
+    setEditFields((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const buildOverrides = (): Record<string, any> => {
+    const overrides: Record<string, any> = {};
+    const origName = mapped.name || emailProduct.product_name || item.coaProductName || '';
+    if (editFields.name && editFields.name !== origName) overrides.name = editFields.name;
+    if (editFields.licensedProducer !== (mapped.licensedProducer || emailProduct.producer || '')) overrides.licensedProducer = editFields.licensedProducer || null;
+    if (editFields.type !== (mapped.type || emailProduct.strain_type || '')) overrides.type = editFields.type || null;
+    if (editFields.category !== (mapped.category || '')) overrides.category = editFields.category || null;
+    if (editFields.description !== (mapped.description || '')) overrides.description = editFields.description || null;
+
+    const origThc = mapped.thcMax != null ? String(mapped.thcMax) : (emailProduct.thc_percent != null ? String(emailProduct.thc_percent) : '');
+    if (editFields.thcMax !== origThc) overrides.thcMax = editFields.thcMax ? parseFloat(editFields.thcMax) : null;
+
+    const origCbd = mapped.cbdMax != null ? String(mapped.cbdMax) : (emailProduct.cbd_percent != null ? String(emailProduct.cbd_percent) : '');
+    if (editFields.cbdMax !== origCbd) overrides.cbdMax = editFields.cbdMax ? parseFloat(editFields.cbdMax) : null;
+
+    const origPrice = mapped.pricePerUnit != null ? String(mapped.pricePerUnit) : '';
+    if (editFields.pricePerUnit !== origPrice) overrides.pricePerUnit = editFields.pricePerUnit ? parseFloat(editFields.pricePerUnit) : null;
+
+    const origQty = mapped.gramsAvailable != null ? String(mapped.gramsAvailable) : '';
+    if (editFields.gramsAvailable !== origQty) overrides.gramsAvailable = editFields.gramsAvailable ? parseFloat(editFields.gramsAvailable) : null;
+
+    return overrides;
+  };
 
   const busy = confirming || addingToAirtable || dismissing;
   const isEmailExtracted = item.sourceType === 'email_body' || item.rawData?.emailExtracted;
@@ -96,8 +172,9 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
     setConfirming(true);
     setError(null);
     try {
-      await confirmCoaEmail(item.id, sellerId);
-      onUpdate();
+      const overrides = buildOverrides();
+      await confirmCoaEmail(item.id, sellerId, Object.keys(overrides).length > 0 ? overrides : undefined);
+      setLocalSentToMarketplace(true);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to confirm');
     }
@@ -109,8 +186,9 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
     setAddingToAirtable(true);
     setError(null);
     try {
-      await confirmCoaEmail(item.id, sellerId, undefined, 'airtable');
-      onUpdate();
+      const overrides = buildOverrides();
+      await confirmCoaEmail(item.id, sellerId, Object.keys(overrides).length > 0 ? overrides : undefined, 'airtable');
+      setLocalSentToAirtable(true);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to add to Airtable');
     }
@@ -121,7 +199,7 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
     setDismissing(true);
     try {
       await dismissCoaEmail(item.id);
-      onUpdate();
+      onDismissed();
     } catch {
       // ignore
     }
@@ -155,6 +233,16 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
           )}
         </div>
         <div className="flex items-center gap-2">
+          {localSentToAirtable && (
+            <span className="rounded-full bg-brand-blue/15 px-2 py-0.5 text-xs font-medium text-brand-blue">
+              Airtable
+            </span>
+          )}
+          {localSentToMarketplace && (
+            <span className="rounded-full bg-brand-teal/15 px-2 py-0.5 text-xs font-medium text-brand-teal">
+              In Pending
+            </span>
+          )}
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${confidenceColor}`}>
             {item.confidence ? `${item.confidence} confidence` : 'no match'}
           </span>
@@ -168,33 +256,71 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
         <p className="mb-3 text-xs text-faint">Match: {item.matchReason}</p>
       )}
 
-      {/* Extracted data preview */}
-      {item.rawData?.mappedFields && (
-        <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg surface-muted p-3 text-xs sm:grid-cols-4">
-          {item.rawData.mappedFields.labName && (
-            <div><span className="text-faint">Lab:</span> <span className="font-medium">{item.rawData.mappedFields.labName}</span></div>
-          )}
-          {item.rawData.mappedFields.licensedProducer && (
-            <div><span className="text-faint">Producer:</span> <span className="font-medium">{item.rawData.mappedFields.licensedProducer}</span></div>
-          )}
-          {item.rawData.mappedFields.type && (
-            <div><span className="text-faint">Type:</span> <span className="font-medium">{item.rawData.mappedFields.type}</span></div>
-          )}
-          {item.rawData.mappedFields.category && (
-            <div><span className="text-faint">Category:</span> <span className="font-medium">{item.rawData.mappedFields.category}</span></div>
-          )}
-          {item.rawData.mappedFields.thcMax != null && (
-            <div><span className="text-faint">THC:</span> <span className="font-medium">{item.rawData.mappedFields.thcMax}%</span></div>
-          )}
-          {item.rawData.mappedFields.cbdMax != null && (
-            <div><span className="text-faint">CBD:</span> <span className="font-medium">{item.rawData.mappedFields.cbdMax}%</span></div>
-          )}
-          {item.rawData.mappedFields.pricePerUnit != null && (
-            <div><span className="text-faint">Price:</span> <span className="font-medium">${item.rawData.mappedFields.pricePerUnit}/g</span></div>
-          )}
-          {item.rawData.mappedFields.gramsAvailable != null && (
-            <div><span className="text-faint">Qty:</span> <span className="font-medium">{item.rawData.mappedFields.gramsAvailable}g</span></div>
-          )}
+      {/* Data preview / inline editing */}
+      {!editing && (item.rawData?.mappedFields || isEmailExtracted) && (
+        <div className="mb-4 rounded-lg surface-muted p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-medium text-faint uppercase tracking-wide">Extracted Data</span>
+            <button
+              onClick={() => setEditing(true)}
+              className="text-[11px] font-medium text-brand-blue hover:underline"
+            >
+              Edit
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
+            {editFields.name && (
+              <div><span className="text-faint">Name:</span> <span className="font-medium">{editFields.name}</span></div>
+            )}
+            {editFields.licensedProducer && (
+              <div><span className="text-faint">Producer:</span> <span className="font-medium">{editFields.licensedProducer}</span></div>
+            )}
+            {editFields.type && (
+              <div><span className="text-faint">Type:</span> <span className="font-medium">{editFields.type}</span></div>
+            )}
+            {editFields.category && (
+              <div><span className="text-faint">Category:</span> <span className="font-medium">{editFields.category}</span></div>
+            )}
+            {editFields.thcMax && (
+              <div><span className="text-faint">THC:</span> <span className="font-medium">{editFields.thcMax}%</span></div>
+            )}
+            {editFields.cbdMax && (
+              <div><span className="text-faint">CBD:</span> <span className="font-medium">{editFields.cbdMax}%</span></div>
+            )}
+            {editFields.pricePerUnit && (
+              <div><span className="text-faint">Price:</span> <span className="font-medium">${editFields.pricePerUnit}/g</span></div>
+            )}
+            {editFields.gramsAvailable && (
+              <div><span className="text-faint">Qty:</span> <span className="font-medium">{editFields.gramsAvailable}g</span></div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <div className="mb-4 rounded-lg border border-brand-blue/30 bg-brand-blue/5 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-medium text-brand-blue uppercase tracking-wide">Editing</span>
+            <button
+              onClick={() => setEditing(false)}
+              className="text-[11px] font-medium text-faint hover:underline"
+            >
+              Done
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+            <EditField label="Product Name" value={editFields.name} onChange={(v) => updateField('name', v)} />
+            <EditField label="Producer" value={editFields.licensedProducer} onChange={(v) => updateField('licensedProducer', v)} />
+            <EditField label="Type" value={editFields.type} onChange={(v) => updateField('type', v)} />
+            <EditField label="Category" value={editFields.category} onChange={(v) => updateField('category', v)} />
+            <EditField label="THC %" value={editFields.thcMax} onChange={(v) => updateField('thcMax', v)} type="number" />
+            <EditField label="CBD %" value={editFields.cbdMax} onChange={(v) => updateField('cbdMax', v)} type="number" />
+            <EditField label="Price/g" value={editFields.pricePerUnit} onChange={(v) => updateField('pricePerUnit', v)} type="number" />
+            <EditField label="Quantity (g)" value={editFields.gramsAvailable} onChange={(v) => updateField('gramsAvailable', v)} type="number" />
+            <div className="col-span-2 sm:col-span-3">
+              <EditField label="Description" value={editFields.description} onChange={(v) => updateField('description', v)} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -215,17 +341,17 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
       <div className="flex gap-3">
         <button
           onClick={handleConfirm}
-          disabled={!sellerId || busy}
+          disabled={!sellerId || busy || localSentToMarketplace}
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90 disabled:opacity-50"
         >
-          {confirming ? 'Creating...' : 'Approve & Send to Pending'}
+          {confirming ? 'Creating...' : localSentToMarketplace ? 'Sent to Pending' : 'Approve & Send to Pending'}
         </button>
         <button
           onClick={handleAirtableOnly}
-          disabled={!sellerId || busy}
+          disabled={!sellerId || busy || localSentToAirtable}
           className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-medium text-white hover:bg-brand-blue/90 disabled:opacity-50"
         >
-          {addingToAirtable ? 'Adding...' : 'Add to Airtable Only'}
+          {addingToAirtable ? 'Adding...' : localSentToAirtable ? 'Sent to Airtable' : 'Add to Airtable Only'}
         </button>
         <button
           onClick={handleDismiss}

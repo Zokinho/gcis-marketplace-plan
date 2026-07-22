@@ -663,11 +663,11 @@ describe('POST /coa-email-confirm — destination branching', () => {
     // Should NOT create a marketplace product
     expect(prisma.product.create).not.toHaveBeenCalled();
 
-    // Should update sync record with confirmed_airtable status
+    // Should update sync record with sentToAirtable flag (non-destructive)
     expect(prisma.coaSyncRecord.update).toHaveBeenCalledWith({
       where: { id: 'sync-1' },
       data: {
-        status: 'confirmed_airtable',
+        sentToAirtable: true,
         confirmedSellerId: 'seller-1',
       },
     });
@@ -716,7 +716,7 @@ describe('POST /coa-email-confirm — destination branching', () => {
     );
   });
 
-  it('returns 400 for confirmed_airtable status', async () => {
+  it('returns 400 for legacy confirmed_airtable status', async () => {
     vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue({
       ...syncRecord,
       status: 'confirmed_airtable',
@@ -728,7 +728,163 @@ describe('POST /coa-email-confirm — destination branching', () => {
       .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Already confirmed');
+    expect(res.body.error).toBe('Already confirmed (legacy)');
+  });
+
+  it('returns 400 when already sent to Airtable (duplicate guard)', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue({
+      ...syncRecord,
+      sentToAirtable: true,
+      sentToMarketplace: false,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1', destination: 'airtable' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Already sent to Airtable');
+  });
+
+  it('returns 400 when already sent to Pending Products (duplicate guard)', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue({
+      ...syncRecord,
+      sentToAirtable: false,
+      sentToMarketplace: true,
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Already sent to Pending Products');
+  });
+
+  it('allows sending to Airtable when already sent to marketplace', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue({
+      ...syncRecord,
+      sentToAirtable: false,
+      sentToMarketplace: true,
+    } as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1', destination: 'airtable' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Added to Airtable');
+  });
+
+  it('returns 400 for dismissed records', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue({
+      ...syncRecord,
+      status: 'dismissed',
+    } as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Record has been dismissed');
+  });
+
+  it('passes overrides through to product creation', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-1', name: 'Custom Name' } as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1', overrides: { name: 'Custom Name', thcMax: 30 } });
+
+    expect(res.status).toBe(200);
+    expect(prisma.product.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: 'Custom Name',
+        thcMax: 30,
+      }),
+    });
+  });
+
+  it('marketplace confirm sets sentToMarketplace flag instead of status change', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    vi.mocked(getCoaClient).mockReturnValue({
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      uploadToSharePoint: vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 }),
+    } as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-1', name: 'Test Strain' } as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    expect(prisma.coaSyncRecord.update).toHaveBeenCalledWith({
+      where: { id: 'sync-1' },
+      data: expect.objectContaining({
+        sentToMarketplace: true,
+        marketplaceProductId: 'prod-1',
+      }),
+    });
+    // Should NOT change status
+    expect(prisma.coaSyncRecord.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'confirmed' }),
+      }),
+    );
   });
 });
 

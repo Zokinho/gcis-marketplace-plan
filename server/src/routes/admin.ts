@@ -142,8 +142,17 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
   if (!syncRecord) {
     return res.status(404).json({ error: 'Sync record not found' });
   }
+  if (syncRecord.status === 'dismissed') {
+    return res.status(400).json({ error: 'Record has been dismissed' });
+  }
   if (['confirmed', 'confirmed_airtable'].includes(syncRecord.status)) {
-    return res.status(400).json({ error: 'Already confirmed' });
+    return res.status(400).json({ error: 'Already confirmed (legacy)' });
+  }
+  if (destination === 'airtable' && syncRecord.sentToAirtable) {
+    return res.status(400).json({ error: 'Already sent to Airtable' });
+  }
+  if (destination !== 'airtable' && syncRecord.sentToMarketplace) {
+    return res.status(400).json({ error: 'Already sent to Pending Products' });
   }
 
   // Verify seller exists
@@ -210,7 +219,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       await prisma.coaSyncRecord.update({
         where: { id: syncRecordId },
         data: {
-          status: 'confirmed_airtable',
+          sentToAirtable: true,
           confirmedSellerId: sellerId,
         },
       });
@@ -265,7 +274,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     await prisma.coaSyncRecord.update({
       where: { id: syncRecordId },
       data: {
-        status: 'confirmed',
+        sentToMarketplace: true,
         marketplaceProductId: product.id,
         confirmedSellerId: sellerId,
       },
