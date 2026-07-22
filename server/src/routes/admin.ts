@@ -254,8 +254,9 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         coaProcessedAt: isEmailExtracted ? null : new Date(),
         source: isEmailExtracted ? 'email_body' : 'coa_email',
         sellerId,
-        isActive: true,
-        marketplaceVisible: true,
+        requestPending: true,
+        isActive: false,
+        marketplaceVisible: false,
         zohoProductId: syncRecord.coaJobId ? `coa_email_${syncRecord.coaJobId}` : `email_body_${syncRecord.id}`,
       },
     });

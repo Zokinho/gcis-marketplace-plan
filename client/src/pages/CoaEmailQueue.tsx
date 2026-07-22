@@ -218,7 +218,7 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
           disabled={!sellerId || busy}
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90 disabled:opacity-50"
         >
-          {confirming ? 'Creating...' : 'Confirm & List'}
+          {confirming ? 'Creating...' : 'Approve & Send to Pending'}
         </button>
         <button
           onClick={handleAirtableOnly}
