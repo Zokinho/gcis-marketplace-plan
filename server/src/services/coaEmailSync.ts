@@ -93,6 +93,57 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
 
           processed++;
         }
+        // Process email-body-extracted products (no CoA job)
+        if (ingestion.extracted_products?.length) {
+          for (let i = 0; i < ingestion.extracted_products.length; i++) {
+            const product = ingestion.extracted_products[i];
+            const productName = product.product_name || `Product ${i + 1}`;
+
+            // Check if already synced (dedup by emailIngestionId + coaProductName)
+            const existing = await prisma.coaSyncRecord.findFirst({
+              where: { emailIngestionId: ingestion.id, coaProductName: productName },
+            });
+            if (existing) continue;
+
+            // Run seller detection
+            const sellerMatch = await detectSeller({
+              senderEmail: ingestion.sender,
+              companyName: ingestion.suggested_client || ingestion.confirmed_client,
+              producerName: product.producer,
+            });
+
+            await prisma.coaSyncRecord.create({
+              data: {
+                coaJobId: null,
+                coaProductId: null,
+                emailIngestionId: ingestion.id,
+                sourceType: 'email_body',
+                status: 'ready',
+                suggestedSellerId: sellerMatch?.userId || null,
+                confidence: sellerMatch?.confidence || null,
+                matchReason: sellerMatch?.reason || null,
+                emailSender: ingestion.sender,
+                emailSubject: ingestion.subject,
+                coaProductName: productName,
+                rawData: {
+                  emailExtracted: true,
+                  mappedFields: {
+                    type: product.strain_type,
+                    thcMax: product.thc_percent,
+                    cbdMax: product.cbd_percent,
+                    licensedProducer: product.producer,
+                    category: product.category,
+                    pricePerUnit: product.price_per_gram,
+                    gramsAvailable: product.quantity_grams,
+                  },
+                  rawEmailProduct: product,
+                },
+              },
+            });
+
+            processed++;
+          }
+        }
       } catch (err: any) {
         logger.error({ err, ingestionId: ingestion.id }, '[COA-EMAIL] Error processing ingestion');
         errors++;
@@ -100,7 +151,7 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
     }
 
     if (processed > 0) {
-      logger.info({ processed, errors }, '[COA-EMAIL] Processed new email attachments');
+      logger.info({ processed, errors }, '[COA-EMAIL] Processed new email ingestions');
     }
   } catch (err: any) {
     logger.error({ err }, '[COA-EMAIL] Poll failed');

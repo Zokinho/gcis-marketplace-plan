@@ -429,10 +429,11 @@ model SyncLog {
 
 model CoaSyncRecord {
   id                   String   @id @default(cuid())
-  coaJobId             String   @unique
+  coaJobId             String?  @unique
   coaProductId         String?
   emailIngestionId     String?
   marketplaceProductId String?
+  sourceType           String   @default("coa_pdf") // "coa_pdf" | "email_body"
   status               String   @default("pending") // "pending" | "processing" | "ready" | "confirmed" | "dismissed"
   suggestedSellerId    String?
   confirmedSellerId    String?

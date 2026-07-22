@@ -56,6 +56,19 @@ export interface CoaEmailAttachment {
   job_id: string | null;
 }
 
+export interface CoaEmailExtractedProduct {
+  product_name?: string;
+  strain_type?: string;
+  producer?: string;
+  thc_percent?: number;
+  cbd_percent?: number;
+  price_per_gram?: number;
+  quantity_grams?: number;
+  lot_number?: string;
+  category?: string;
+  notes?: string;
+}
+
 export interface CoaEmailIngestion {
   id: string;
   message_id: string;
@@ -66,6 +79,7 @@ export interface CoaEmailIngestion {
   status: 'pending' | 'processing' | 'review' | 'completed' | 'error';
   suggested_client: string | null;
   confirmed_client: string | null;
+  extracted_products: CoaEmailExtractedProduct[] | null;
   error_message: string | null;
   created_at: string;
   attachments: CoaEmailAttachment[];

@@ -430,9 +430,10 @@ export interface CoaExtractedData {
 
 export interface CoaEmailQueueItem {
   id: string;
-  coaJobId: string;
+  coaJobId: string | null;
   coaProductId: string | null;
   emailIngestionId: string | null;
+  sourceType: string;
   status: string;
   suggestedSellerId: string | null;
   suggestedSellerName: string | null;

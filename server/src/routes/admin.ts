@@ -156,31 +156,50 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
   }
 
   try {
-    // Get CoA product data
     const coaClient = getCoaClient();
     const coaProductId = syncRecord.coaProductId;
-    if (!coaProductId) {
-      return res.status(400).json({ error: 'CoA product not yet extracted' });
-    }
+    const isEmailExtracted = syncRecord.sourceType === 'email_body';
 
-    const coaProduct = await coaClient.getProductDetail(coaProductId);
-    if (!coaProduct) {
-      return res.status(404).json({ error: 'CoA product not found in CoA backend' });
-    }
+    let mappedFields: Record<string, any>;
+    let getPdfBuffer: () => Promise<Buffer | null>;
 
-    // Map fields
-    const mappedFields = mapCoaToProductFields(coaProduct);
-
-    // Helper: get PDF buffer from CoA backend (reused by both paths)
-    const getPdfBuffer = async (): Promise<Buffer | null> => {
-      try {
-        const pdfUrl = coaClient.getProductPdfUrl(coaProductId);
-        const pdfResponse = await axios.get(pdfUrl, { responseType: 'arraybuffer', timeout: 30_000 });
-        return Buffer.from(pdfResponse.data);
-      } catch {
-        return null;
+    if (isEmailExtracted) {
+      // ─── Email-body-extracted: use rawData.mappedFields directly ───
+      const rawData = syncRecord.rawData as any;
+      const emailProduct = rawData?.rawEmailProduct || {};
+      mappedFields = {
+        name: emailProduct.product_name || syncRecord.coaProductName || 'Unnamed Product',
+        type: emailProduct.strain_type || null,
+        licensedProducer: emailProduct.producer || null,
+        thcMax: emailProduct.thc_percent || null,
+        cbdMax: emailProduct.cbd_percent || null,
+        pricePerUnit: emailProduct.price_per_gram || null,
+        gramsAvailable: emailProduct.quantity_grams || null,
+        category: emailProduct.category || null,
+        description: emailProduct.notes || null,
+        ...(rawData?.mappedFields || {}),
+      };
+      getPdfBuffer = async () => null; // no PDF for email-body items
+    } else {
+      // ─── CoA-extracted: fetch from CoA backend ───
+      if (!coaProductId) {
+        return res.status(400).json({ error: 'CoA product not yet extracted' });
       }
-    };
+      const coaProduct = await coaClient.getProductDetail(coaProductId);
+      if (!coaProduct) {
+        return res.status(404).json({ error: 'CoA product not found in CoA backend' });
+      }
+      mappedFields = mapCoaToProductFields(coaProduct);
+      getPdfBuffer = async (): Promise<Buffer | null> => {
+        try {
+          const pdfUrl = coaClient.getProductPdfUrl(coaProductId!);
+          const pdfResponse = await axios.get(pdfUrl, { responseType: 'arraybuffer', timeout: 30_000 });
+          return Buffer.from(pdfResponse.data);
+        } catch {
+          return null;
+        }
+      };
+    }
 
     if (destination === 'airtable') {
       // ─── Airtable-only path: no marketplace product ───
@@ -198,7 +217,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       pushToAirtable({
         mappedFields,
         overrides,
-        coaProductId,
+        coaProductId: coaProductId || null,
         companyName: seller.companyName,
         isHarvex: false,
         getPdfBuffer,
@@ -226,14 +245,14 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         ...mappedFields,
         ...overrides,
         testResults: mappedFields.testResults ?? Prisma.JsonNull,
-        coaJobId: syncRecord.coaJobId,
-        coaPdfUrl: coaClient.getProductPdfUrl(coaProductId),
-        coaProcessedAt: new Date(),
-        source: 'coa_email',
+        coaJobId: syncRecord.coaJobId || null,
+        coaPdfUrl: coaProductId ? coaClient.getProductPdfUrl(coaProductId) : null,
+        coaProcessedAt: isEmailExtracted ? null : new Date(),
+        source: isEmailExtracted ? 'email_body' : 'coa_email',
         sellerId,
         isActive: true,
         marketplaceVisible: true,
-        zohoProductId: `coa_email_${syncRecord.coaJobId}`,
+        zohoProductId: syncRecord.coaJobId ? `coa_email_${syncRecord.coaJobId}` : `email_body_${syncRecord.id}`,
       },
     });
 
@@ -312,7 +331,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     pushToAirtable({
       mappedFields,
       overrides,
-      coaProductId,
+      coaProductId: coaProductId || null,
       companyName: seller.companyName,
       isHarvex: true,
       getPdfBuffer,

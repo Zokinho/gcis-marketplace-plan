@@ -89,6 +89,7 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
   const [error, setError] = useState<string | null>(null);
 
   const busy = confirming || addingToAirtable || dismissing;
+  const isEmailExtracted = item.sourceType === 'email_body' || item.rawData?.emailExtracted;
 
   const handleConfirm = async () => {
     if (!sellerId) return;
@@ -134,14 +135,24 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
   }[item.confidence || ''] || 'surface-muted text-secondary';
 
   return (
-    <div className="rounded-lg border card-blue border-l-4 border-l-brand-teal shadow-md p-5">
+    <div className={`rounded-lg border card-blue border-l-4 shadow-md p-5 ${isEmailExtracted ? 'border-l-brand-blue' : 'border-l-brand-teal'}`}>
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-primary">{item.coaProductName || 'Untitled Product'}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-primary">{item.coaProductName || 'Untitled Product'}</h3>
+            {isEmailExtracted && (
+              <span className="rounded-full bg-brand-blue/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-blue">
+                Email
+              </span>
+            )}
+          </div>
           <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted">
             {item.emailSender && <span>From: {item.emailSender}</span>}
             {item.emailSubject && <span>Subject: {item.emailSubject}</span>}
           </div>
+          {isEmailExtracted && (
+            <p className="mt-1 text-[11px] text-faint">Extracted from email body — no CoA PDF attached</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${confidenceColor}`}>
@@ -163,14 +174,26 @@ function QueueCard({ item, onUpdate }: { item: CoaEmailQueueItem; onUpdate: () =
           {item.rawData.mappedFields.labName && (
             <div><span className="text-faint">Lab:</span> <span className="font-medium">{item.rawData.mappedFields.labName}</span></div>
           )}
+          {item.rawData.mappedFields.licensedProducer && (
+            <div><span className="text-faint">Producer:</span> <span className="font-medium">{item.rawData.mappedFields.licensedProducer}</span></div>
+          )}
           {item.rawData.mappedFields.type && (
             <div><span className="text-faint">Type:</span> <span className="font-medium">{item.rawData.mappedFields.type}</span></div>
+          )}
+          {item.rawData.mappedFields.category && (
+            <div><span className="text-faint">Category:</span> <span className="font-medium">{item.rawData.mappedFields.category}</span></div>
           )}
           {item.rawData.mappedFields.thcMax != null && (
             <div><span className="text-faint">THC:</span> <span className="font-medium">{item.rawData.mappedFields.thcMax}%</span></div>
           )}
           {item.rawData.mappedFields.cbdMax != null && (
             <div><span className="text-faint">CBD:</span> <span className="font-medium">{item.rawData.mappedFields.cbdMax}%</span></div>
+          )}
+          {item.rawData.mappedFields.pricePerUnit != null && (
+            <div><span className="text-faint">Price:</span> <span className="font-medium">${item.rawData.mappedFields.pricePerUnit}/g</span></div>
+          )}
+          {item.rawData.mappedFields.gramsAvailable != null && (
+            <div><span className="text-faint">Qty:</span> <span className="font-medium">{item.rawData.mappedFields.gramsAvailable}g</span></div>
           )}
         </div>
       )}
