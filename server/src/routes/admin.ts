@@ -6,7 +6,7 @@ import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, admi
 import { prisma } from '../index';
 import { runFullSync, syncProducts, syncContacts, syncProductsDelta, clearSellerCache } from '../services/zohoSync';
 import { getCoaClient } from '../services/coaClient';
-import { mapCoaToProductFields } from '../utils/coaMapper';
+import { mapCoaToProductFields, MappedProductFields } from '../utils/coaMapper';
 import { detectSeller } from '../services/sellerDetection';
 import { pollEmailIngestions } from '../services/coaEmailSync';
 import { logAudit, getRequestIp } from '../services/auditService';
@@ -160,7 +160,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     const coaProductId = syncRecord.coaProductId;
     const isEmailExtracted = syncRecord.sourceType === 'email_body';
 
-    let mappedFields: Record<string, any>;
+    let mappedFields: MappedProductFields;
     let getPdfBuffer: () => Promise<Buffer | null>;
 
     if (isEmailExtracted) {
@@ -169,15 +169,19 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       const emailProduct = rawData?.rawEmailProduct || {};
       mappedFields = {
         name: emailProduct.product_name || syncRecord.coaProductName || 'Unnamed Product',
+        labName: null,
+        testDate: null,
+        reportNumber: null,
         type: emailProduct.strain_type || null,
+        productCode: null,
         licensedProducer: emailProduct.producer || null,
+        thcMin: null,
         thcMax: emailProduct.thc_percent || null,
+        cbdMin: null,
         cbdMax: emailProduct.cbd_percent || null,
-        pricePerUnit: emailProduct.price_per_gram || null,
-        gramsAvailable: emailProduct.quantity_grams || null,
-        category: emailProduct.category || null,
-        description: emailProduct.notes || null,
-        ...(rawData?.mappedFields || {}),
+        dominantTerpene: null,
+        highestTerpenes: null,
+        testResults: null,
       };
       getPdfBuffer = async () => null; // no PDF for email-body items
     } else {

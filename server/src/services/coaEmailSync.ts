@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../index';
 import { getCoaClient } from './coaClient';
 import { detectSeller } from './sellerDetection';
@@ -125,7 +126,7 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
                 emailSender: ingestion.sender,
                 emailSubject: ingestion.subject,
                 coaProductName: productName,
-                rawData: {
+                rawData: JSON.parse(JSON.stringify({
                   emailExtracted: true,
                   mappedFields: {
                     type: product.strain_type,
@@ -137,7 +138,7 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
                     gramsAvailable: product.quantity_grams,
                   },
                   rawEmailProduct: product,
-                },
+                })) as Prisma.InputJsonValue,
               },
             });
 
