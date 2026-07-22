@@ -790,6 +790,10 @@ Environment variables that need to be set on the production server before the co
 | `SP_DEFAULT_DRIVE_ID` | Browse via `/api/sharepoint/sites/{site_id}/drives` | Need site ID first |
 | `SP_DEFAULT_FOLDER_ID` | Browse via `/api/sharepoint/sites/{site_id}/drives/{drive_id}/folders` | Need drive ID first |
 | `ANTHROPIC_API_KEY` | Already set — but Claude API usage incurs cost | Pending cost approval |
+| `IMAP_USE_OAUTH2` | `true` — **already configured and active** | Done |
+| `IMAP_HOST` | `outlook.office365.com` — **already configured** | Done |
+| `IMAP_USER` | `inventory@harvex.ca` — **already configured** | Done |
+| `EMAIL_INGESTION_ENABLED` | `true` — **already configured and active** | Done |
 
 ### Activation blockers
 
