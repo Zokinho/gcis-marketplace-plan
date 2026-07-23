@@ -32,14 +32,14 @@ const baseMappedFields = {
   thcMax: 25,
   cbdMin: null,
   cbdMax: 0.5,
-  dominantTerpene: 'Myrcene; Limonene; Caryophyllene',
+  dominantTerpene: 'Myrcene; Limonene; Trans-Caryophyllene',
   highestTerpenes: 'Myrcene: 1.2%\nLimonene: 0.8%',
   testResults: {
     terpenes: {
       data: {
         Myrcene: { result: '1.2', unit: '%' },
         Limonene: { result: '0.8', unit: '%' },
-        Caryophyllene: { result: '0.3', unit: '%' },
+        'Trans-Caryophyllene': { result: '0.3', unit: '%' },
       },
     },
   },
@@ -111,10 +111,10 @@ describe('formatCannabinoids', () => {
 
 describe('parseTerpenesMultiSelect', () => {
   it('splits semicolon-separated terpenes into name objects', () => {
-    expect(parseTerpenesMultiSelect('Myrcene; Limonene; Caryophyllene')).toEqual([
+    expect(parseTerpenesMultiSelect('Myrcene; Limonene; Trans-Caryophyllene')).toEqual([
       { name: 'Myrcene' },
       { name: 'Limonene' },
-      { name: 'Caryophyllene' },
+      { name: 'Trans-Caryophyllene' },
     ]);
   });
 
@@ -128,6 +128,17 @@ describe('parseTerpenesMultiSelect', () => {
 
   it('handles single terpene', () => {
     expect(parseTerpenesMultiSelect('Myrcene')).toEqual([{ name: 'Myrcene' }]);
+  });
+
+  it('filters out terpenes not in Airtable choices', () => {
+    expect(parseTerpenesMultiSelect('Myrcene; Alpha-Bergamotene; Limonene')).toEqual([
+      { name: 'Myrcene' },
+      { name: 'Limonene' },
+    ]);
+  });
+
+  it('returns null when all terpenes are unknown', () => {
+    expect(parseTerpenesMultiSelect('Alpha-Bergamotene; Aromadendrene')).toBeNull();
   });
 });
 
@@ -188,7 +199,7 @@ describe('buildAirtableFields', () => {
     expect(fields['fldkjZlN5F2sV0mz4']).toEqual([
       { name: 'Myrcene' },
       { name: 'Limonene' },
-      { name: 'Caryophyllene' },
+      { name: 'Trans-Caryophyllene' },
     ]); // Dominant Terpenes
     expect(fields['fldTLmirHlxhsEixX']).toBe('2.3'); // Terpene %
     expect(fields['fldjWwLYAjTTTIFNG']).toBe('5'); // Quantity Kg (5000g / 1000)

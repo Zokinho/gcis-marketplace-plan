@@ -51,10 +51,31 @@ export function formatCannabinoids(thcMax: number | null, cbdMax: number | null)
   return parts.length > 0 ? parts.join(' / ') : null;
 }
 
+/**
+ * Airtable "Dominant Terpenes" is a multipleSelects field with a fixed set of choices.
+ * Only terpene names matching an existing choice are accepted — unknown names cause a 422.
+ */
+const AIRTABLE_TERPENE_CHOICES = new Set([
+  'Myrcene', 'Terpinolene', 'Bisabolol', 'Trans-Caryophyllene', 'Limonene',
+  'Farnesene', 'Alpha-Humulene', 'Beta-Pinene', 'Linalool', 'Alpha-Terpineol',
+  'Alpha-Pinene', 'Camphene', 'Squalene', 'Phytol', 'Farnesol', 'Eugenol',
+  'Citral', 'Terpinen-4-ol', 'Isoborneol', 'Camphor', 'Nerol', 'Citronellol',
+  'Safranal', 'Thymol', 'Beta-Caryophyllene', 'Germacrene', 'Ocimene',
+  'Trans-Nerolidol', 'Valencene',
+]);
+
+/** Case-insensitive lookup for terpene choice matching */
+const TERPENE_LOOKUP: Map<string, string> = new Map(
+  [...AIRTABLE_TERPENE_CHOICES].map((name) => [name.toLowerCase(), name]),
+);
+
 export function parseTerpenesMultiSelect(dominantTerpene: string | null): Array<{ name: string }> | null {
   if (!dominantTerpene) return null;
   const names = dominantTerpene.split('; ').map((t) => t.trim()).filter(Boolean);
-  return names.length > 0 ? names.map((name) => ({ name })) : null;
+  const matched = names
+    .map((t) => TERPENE_LOOKUP.get(t.toLowerCase()))
+    .filter((n): n is string => n != null);
+  return matched.length > 0 ? matched.map((name) => ({ name })) : null;
 }
 
 export function computeTotalTerpenePercent(testResults: Record<string, any> | null): number | null {
