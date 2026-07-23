@@ -191,6 +191,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         dominantTerpene: null,
         highestTerpenes: null,
         testResults: null,
+        certification: emailProduct.certification || (rawData?.mappedFields?.certification as string) || null,
       };
       getPdfBuffer = async () => null; // no PDF for email-body items
     } else {

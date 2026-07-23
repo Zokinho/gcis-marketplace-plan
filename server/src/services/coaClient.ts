@@ -67,6 +67,8 @@ export interface CoaEmailExtractedProduct {
   lot_number?: string;
   category?: string;
   notes?: string;
+  harvest_date?: string;    // ISO date string from email body
+  certification?: string;   // e.g. "GACP", "GMP1", comma-delimited if multiple
 }
 
 export interface CoaEmailIngestion {

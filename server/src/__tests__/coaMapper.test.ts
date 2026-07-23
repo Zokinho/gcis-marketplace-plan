@@ -378,6 +378,48 @@ describe('mapCoaToProductFields', () => {
     });
   });
 
+  describe('tier to certification mapping', () => {
+    it('maps tier "gmp1" to certification "GMP1"', () => {
+      const result = mapCoaToProductFields(makeCoaProduct({ tier: 'gmp1' }));
+      expect(result.certification).toBe('GMP1');
+    });
+
+    it('maps tier "gmp2" to certification "GMP2"', () => {
+      const result = mapCoaToProductFields(makeCoaProduct({ tier: 'gmp2' }));
+      expect(result.certification).toBe('GMP2');
+    });
+
+    it('maps tier "gacp" to certification "GACP"', () => {
+      const result = mapCoaToProductFields(makeCoaProduct({ tier: 'gacp' }));
+      expect(result.certification).toBe('GACP');
+    });
+
+    it('maps tier "gacp-small" to certification "GACP"', () => {
+      const result = mapCoaToProductFields(makeCoaProduct({ tier: 'gacp-small' }));
+      expect(result.certification).toBe('GACP');
+    });
+
+    it('maps tier "gpp" to certification "GPP"', () => {
+      const result = mapCoaToProductFields(makeCoaProduct({ tier: 'gpp' }));
+      expect(result.certification).toBe('GPP');
+    });
+
+    it('maps tier "imc-gap" to certification "IMC-GAP"', () => {
+      const result = mapCoaToProductFields(makeCoaProduct({ tier: 'imc-gap' }));
+      expect(result.certification).toBe('IMC-GAP');
+    });
+
+    it('returns null certification for unknown tier', () => {
+      const result = mapCoaToProductFields(makeCoaProduct({ tier: 'standard' }));
+      expect(result.certification).toBeNull();
+    });
+
+    it('returns null certification for empty tier', () => {
+      const result = mapCoaToProductFields(makeCoaProduct({ tier: '' }));
+      expect(result.certification).toBeNull();
+    });
+  });
+
   describe('missing fields', () => {
     it('returns null for all optional fields when not present', () => {
       const coaProduct = makeCoaProduct({
@@ -407,6 +449,7 @@ describe('mapCoaToProductFields', () => {
       expect(result.dominantTerpene).toBeNull();
       expect(result.highestTerpenes).toBeNull();
       expect(result.testResults).toBeNull();
+      expect(result.certification).toBeNull();
     });
   });
 });

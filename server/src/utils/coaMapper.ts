@@ -20,6 +20,7 @@ export interface MappedProductFields {
   dominantTerpene: string | null;
   highestTerpenes: string | null;
   testResults: Record<string, any> | null;
+  certification: string | null;
 }
 
 /**
@@ -107,6 +108,23 @@ function extractTerpenes(terpeneData: Record<string, any>): {
 }
 
 /**
+ * Map CoA tier values to marketplace certification strings.
+ */
+function normalizeTier(tier: string | null | undefined): string | null {
+  if (!tier) return null;
+  const lower = tier.toLowerCase().trim();
+  const tierMap: Record<string, string> = {
+    'gacp-small': 'GACP',
+    'gacp': 'GACP',
+    'gmp1': 'GMP1',
+    'gmp2': 'GMP2',
+    'gpp': 'GPP',
+    'imc-gap': 'IMC-GAP',
+  };
+  return tierMap[lower] ?? null;
+}
+
+/**
  * Map strain_type values from CoA extraction to marketplace type field.
  * CoA may return various forms; normalize to Sativa/Indica/Hybrid.
  */
@@ -160,5 +178,6 @@ export function mapCoaToProductFields(coaProduct: CoaProductDetailResponse): Map
     ...potency,
     ...terpenes,
     testResults: buildTestResults(coaProduct.test_data),
+    certification: normalizeTier(coaProduct.tier),
   };
 }

@@ -861,6 +861,60 @@ describe('POST /coa-email-confirm — destination branching', () => {
     });
   });
 
+  it('email-body confirm passes certification from rawData to product', async () => {
+    const emailBodySyncRecord = {
+      id: 'sync-email-1',
+      status: 'ready',
+      coaJobId: null,
+      coaProductId: null,
+      sourceType: 'email_body',
+      suggestedSellerId: null,
+      coaProductName: 'Email Strain',
+      createdAt: new Date(),
+      rawData: {
+        emailExtracted: true,
+        mappedFields: {
+          type: 'Indica',
+          thcMax: 22,
+          cbdMax: null,
+          licensedProducer: 'LP Email',
+          certification: 'GACP',
+          harvestDate: '2026-06-01',
+        },
+        rawEmailProduct: {
+          product_name: 'Email Strain',
+          strain_type: 'Indica',
+          producer: 'LP Email',
+          thc_percent: 22,
+          certification: 'GACP',
+          harvest_date: '2026-06-01',
+        },
+      },
+    };
+
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(emailBodySyncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1',
+      zohoContactId: null,
+      companyName: 'Seller Corp',
+    } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-email-1', name: 'Email Strain' } as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-email-1', sellerId: 'seller-1' });
+
+    expect(res.status).toBe(200);
+    expect(prisma.product.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        certification: 'GACP',
+      }),
+    });
+  });
+
   it('marketplace confirm sets sentToMarketplace flag instead of status change', async () => {
     vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue({

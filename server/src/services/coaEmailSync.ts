@@ -136,6 +136,8 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
                     category: product.category,
                     pricePerUnit: product.price_per_gram,
                     gramsAvailable: product.quantity_grams,
+                    certification: product.certification || null,
+                    harvestDate: product.harvest_date || null,
                   },
                   rawEmailProduct: product,
                 })) as Prisma.InputJsonValue,
