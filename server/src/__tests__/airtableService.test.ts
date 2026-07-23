@@ -313,4 +313,49 @@ describe('pushToAirtable', () => {
       }),
     );
   });
+
+  it('retries without terpene fields on 422 terpene error', async () => {
+    process.env.AIRTABLE_API_KEY = 'pat123';
+    process.env.AIRTABLE_BASE_ID = 'appXYZ';
+    process.env.AIRTABLE_TABLE_ID = 'tblABC';
+
+    const axios = await import('axios');
+    const axiosError = Object.assign(new Error('422'), {
+      response: {
+        status: 422,
+        data: { error: { message: 'Cannot parse value for field Dominant Terpenes' } },
+      },
+    });
+    vi.mocked(axios.default.post)
+      .mockRejectedValueOnce(axiosError)
+      .mockResolvedValueOnce({ data: { records: [] } });
+
+    await pushToAirtable(makeInput());
+
+    // First call includes terpenes, second call (retry) omits them
+    expect(axios.default.post).toHaveBeenCalledTimes(2);
+    const retryPayload = vi.mocked(axios.default.post).mock.calls[1][1] as any;
+    const retryFields = retryPayload.records[0].fields;
+    expect(retryFields['fldkjZlN5F2sV0mz4']).toBeUndefined(); // Dominant Terpenes stripped
+    expect(retryFields['fldTLmirHlxhsEixX']).toBeUndefined(); // Terpene % stripped
+    expect(retryFields['fldJfRUUs0zokx62l']).toBe('Pink Kush'); // Other fields preserved
+  });
+
+  it('does not retry on non-terpene 422 errors', async () => {
+    process.env.AIRTABLE_API_KEY = 'pat123';
+    process.env.AIRTABLE_BASE_ID = 'appXYZ';
+    process.env.AIRTABLE_TABLE_ID = 'tblABC';
+
+    const axios = await import('axios');
+    const axiosError = Object.assign(new Error('422'), {
+      response: {
+        status: 422,
+        data: { error: { message: 'Invalid value for field Product Name' } },
+      },
+    });
+    vi.mocked(axios.default.post).mockRejectedValueOnce(axiosError);
+
+    await expect(pushToAirtable(makeInput())).resolves.toBeUndefined();
+    expect(axios.default.post).toHaveBeenCalledTimes(1); // No retry
+  });
 });

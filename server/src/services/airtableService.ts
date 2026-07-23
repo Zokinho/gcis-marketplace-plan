@@ -165,10 +165,30 @@ export function buildAirtableFields(input: AirtablePushInput): Record<string, an
   return fields;
 }
 
+// ─── Terpene-related field IDs (stripped on 422 retry) ───
+
+const TERPENE_FIELD_IDS = new Set([FIELD.DOMINANT_TERPENES, FIELD.TERPENE_PCT]);
+
 // ─── Push to Airtable (fire-and-forget) ───
+
+/** Extract Airtable error detail from axios error response */
+function getAirtableErrorDetail(err: unknown): string | null {
+  const resp = (err as any)?.response;
+  if (!resp?.data) return null;
+  try {
+    return JSON.stringify(resp.data);
+  } catch {
+    return String(resp.data);
+  }
+}
+
+function isAxios422(err: unknown): boolean {
+  return (err as any)?.response?.status === 422;
+}
 
 /**
  * Push a product record to Airtable. Logs errors but never throws.
+ * On 422 errors mentioning terpene fields, retries without them.
  * Designed for fire-and-forget usage.
  */
 export async function pushToAirtable(input: AirtablePushInput): Promise<void> {
@@ -202,23 +222,35 @@ export async function pushToAirtable(input: AirtablePushInput): Promise<void> {
     const baseId = process.env.AIRTABLE_BASE_ID!;
     const tableId = process.env.AIRTABLE_TABLE_ID!;
     const apiKey = process.env.AIRTABLE_API_KEY!;
+    const url = `https://api.airtable.com/v0/${baseId}/${tableId}`;
+    const headers = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    };
 
     const record: AirtableRecord = { fields };
 
-    await axios.post(
-      `https://api.airtable.com/v0/${baseId}/${tableId}`,
-      { records: [record] },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 30_000,
-      },
-    );
+    try {
+      await axios.post(url, { records: [record] }, { headers, timeout: 30_000 });
+      logger.info({ productName: fields[FIELD.PRODUCT_NAME], isHarvex: input.isHarvex }, '[AIRTABLE] Product pushed successfully');
+    } catch (firstErr) {
+      const detail = getAirtableErrorDetail(firstErr);
+      const is422 = isAxios422(firstErr);
 
-    logger.info({ productName: fields[FIELD.PRODUCT_NAME], isHarvex: input.isHarvex }, '[AIRTABLE] Product pushed successfully');
+      if (is422 && detail && /terpene/i.test(detail)) {
+        // Strip terpene fields and retry
+        logger.warn({ detail }, '[AIRTABLE] 422 on terpene field — retrying without terpenes');
+        for (const fid of TERPENE_FIELD_IDS) {
+          delete fields[fid];
+        }
+        await axios.post(url, { records: [{ fields }] }, { headers, timeout: 30_000 });
+        logger.info({ productName: fields[FIELD.PRODUCT_NAME], isHarvex: input.isHarvex }, '[AIRTABLE] Product pushed successfully (without terpenes)');
+      } else {
+        // Log full Airtable error detail for debugging
+        logger.error({ detail, err: firstErr instanceof Error ? firstErr : { message: String(firstErr) } }, '[AIRTABLE] Push failed (non-critical)');
+      }
+    }
   } catch (err) {
-    logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[AIRTABLE] Push failed (non-critical)');
+    logger.error({ detail: getAirtableErrorDetail(err), err: err instanceof Error ? err : { message: String(err) } }, '[AIRTABLE] Push failed (non-critical)');
   }
 }
