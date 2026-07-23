@@ -43,6 +43,7 @@ const baseMappedFields = {
       },
     },
   },
+  certification: null,
 };
 
 function makeInput(overrides?: Partial<AirtablePushInput>): AirtablePushInput {
