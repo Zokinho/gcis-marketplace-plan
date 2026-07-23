@@ -151,7 +151,7 @@ class CoaClient {
    */
   async getJobProduct(jobId: string): Promise<CoaProductDetailResponse | null> {
     try {
-      const res = await this.client.get<CoaProductResponse>(`/api/jobs/${jobId}/product`);
+      const res = await this.client.get<CoaProductDetailResponse>(`/api/jobs/${jobId}/product`);
       return res.data;
     } catch (err: any) {
       if (err?.response?.status === 404) return null;
