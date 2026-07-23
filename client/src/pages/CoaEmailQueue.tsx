@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import SellerPicker from '../components/SellerPicker';
+import TerpeneAutocomplete from '../components/TerpeneAutocomplete';
+import { getFieldConfig, type ConditionalField } from '../lib/categoryConfig';
 import {
   fetchCoaEmailQueue,
   confirmCoaEmail,
@@ -8,6 +10,31 @@ import {
   triggerCoaEmailPoll,
   type CoaEmailQueueItem,
 } from '../lib/api';
+
+const CATEGORIES = [
+  'Cannabis flowers (mix sizes)',
+  'Cannabis flowers (smalls only)',
+  'Cannabis flowers (fresh frozen)',
+  'Cannabis flowers (outdoor grown)',
+  'Cannabis flowers (outdoor fresh frozen)',
+  'Milled Flower',
+  'Cannabis trimmings',
+  'Cannabis kief',
+  'Cannabis cured rosins and cured resins',
+  'Cannabis hashish',
+  'Cannabis live rosin and live resin',
+  'Cannabinoid isolates',
+  'Cannabinoid distillates',
+  "Cannabis crude oils ('resins')",
+  'THCa flowers',
+  'THCa diamonds',
+  'Genetics',
+  'Chocolates',
+  'Gummies',
+  'Edibles (others)',
+];
+const TYPES = ['Sativa', 'Indica', 'Hybrid'];
+const CERTIFICATIONS = ['GACP', 'GMP1', 'GMP2', 'GPP', 'IMC-GAP'];
 
 export default function CoaEmailQueue() {
   const [queue, setQueue] = useState<CoaEmailQueueItem[]>([]);
@@ -109,6 +136,34 @@ function EditField({
   );
 }
 
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = 'Select...',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-[10px] font-medium text-faint uppercase tracking-wide mb-0.5">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded border border-subtle bg-white dark:bg-gray-800 px-2 py-1 text-xs text-primary focus:border-brand-teal focus:outline-none"
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
 function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed: () => void }) {
   const [sellerId, setSellerId] = useState<string | null>(item.suggestedSellerId);
   const [confirming, setConfirming] = useState(false);
@@ -134,9 +189,18 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
     pricePerUnit: mapped.pricePerUnit != null ? String(mapped.pricePerUnit) : '',
     gramsAvailable: mapped.gramsAvailable != null ? String(mapped.gramsAvailable) : '',
     description: mapped.description || '',
+    lineage: mapped.lineage || '',
+    growthMedium: mapped.growthMedium || '',
+    certification: (mapped.certification ? mapped.certification.split(', ').filter(Boolean) : []) as string[],
+    dominantTerpene: (mapped.dominantTerpene ? mapped.dominantTerpene.split('; ').filter(Boolean) : []) as string[],
+    harvestDate: mapped.harvestDate ? new Date(mapped.harvestDate).toISOString().slice(0, 10) : '',
   });
 
-  const updateField = (key: string, value: string) => {
+  // Category-aware field visibility
+  const fieldConfig = useMemo(() => getFieldConfig(editFields.category), [editFields.category]);
+  const isVisible = (field: ConditionalField) => !fieldConfig || fieldConfig[field] !== 'hidden';
+
+  const updateField = (key: string, value: any) => {
     setEditFields((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -160,6 +224,21 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
 
     const origQty = mapped.gramsAvailable != null ? String(mapped.gramsAvailable) : '';
     if (editFields.gramsAvailable !== origQty) overrides.gramsAvailable = editFields.gramsAvailable ? parseFloat(editFields.gramsAvailable) : null;
+
+    // New fields
+    if (editFields.lineage !== (mapped.lineage || '')) overrides.lineage = editFields.lineage || null;
+    if (editFields.growthMedium !== (mapped.growthMedium || '')) overrides.growthMedium = editFields.growthMedium || null;
+
+    const origCert = mapped.certification || '';
+    const newCert = editFields.certification.join(', ');
+    if (newCert !== origCert) overrides.certification = newCert || null;
+
+    const origTerpene = mapped.dominantTerpene || '';
+    const newTerpene = editFields.dominantTerpene.join('; ');
+    if (newTerpene !== origTerpene) overrides.dominantTerpene = newTerpene || null;
+
+    const origHarvestDate = mapped.harvestDate ? new Date(mapped.harvestDate).toISOString().slice(0, 10) : '';
+    if (editFields.harvestDate !== origHarvestDate) overrides.harvestDate = editFields.harvestDate || null;
 
     return overrides;
   };
@@ -293,6 +372,21 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
             {editFields.gramsAvailable && (
               <div><span className="text-faint">Qty:</span> <span className="font-medium">{editFields.gramsAvailable}g</span></div>
             )}
+            {editFields.lineage && (
+              <div><span className="text-faint">Lineage:</span> <span className="font-medium">{editFields.lineage}</span></div>
+            )}
+            {editFields.certification.length > 0 && (
+              <div><span className="text-faint">Certifications:</span> <span className="font-medium">{editFields.certification.join(', ')}</span></div>
+            )}
+            {editFields.dominantTerpene.length > 0 && (
+              <div><span className="text-faint">Terpenes:</span> <span className="font-medium">{editFields.dominantTerpene.join(', ')}</span></div>
+            )}
+            {editFields.harvestDate && (
+              <div><span className="text-faint">Harvest Date:</span> <span className="font-medium">{editFields.harvestDate}</span></div>
+            )}
+            {editFields.growthMedium && (
+              <div><span className="text-faint">Growth Medium:</span> <span className="font-medium">{editFields.growthMedium}</span></div>
+            )}
           </div>
         </div>
       )}
@@ -311,12 +405,68 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
             <EditField label="Product Name" value={editFields.name} onChange={(v) => updateField('name', v)} />
             <EditField label="Producer" value={editFields.licensedProducer} onChange={(v) => updateField('licensedProducer', v)} />
-            <EditField label="Type" value={editFields.type} onChange={(v) => updateField('type', v)} />
-            <EditField label="Category" value={editFields.category} onChange={(v) => updateField('category', v)} />
+            <SelectField label="Category" value={editFields.category} onChange={(v) => updateField('category', v)} options={CATEGORIES} placeholder="Select category..." />
+            {isVisible('type') && (
+              <SelectField label="Type" value={editFields.type} onChange={(v) => updateField('type', v)} options={TYPES} />
+            )}
             <EditField label="THC %" value={editFields.thcMax} onChange={(v) => updateField('thcMax', v)} type="number" />
             <EditField label="CBD %" value={editFields.cbdMax} onChange={(v) => updateField('cbdMax', v)} type="number" />
             <EditField label="Price/g" value={editFields.pricePerUnit} onChange={(v) => updateField('pricePerUnit', v)} type="number" />
             <EditField label="Quantity (g)" value={editFields.gramsAvailable} onChange={(v) => updateField('gramsAvailable', v)} type="number" />
+            {isVisible('lineage') && (
+              <EditField label="Lineage" value={editFields.lineage} onChange={(v) => updateField('lineage', v)} />
+            )}
+            {isVisible('growthMedium') && (
+              <EditField label="Growth Medium" value={editFields.growthMedium} onChange={(v) => updateField('growthMedium', v)} />
+            )}
+            {isVisible('harvestDate') && (
+              <div>
+                <label className="block text-[10px] font-medium text-faint uppercase tracking-wide mb-0.5">Harvest Date</label>
+                <input
+                  type="date"
+                  value={editFields.harvestDate}
+                  onChange={(e) => updateField('harvestDate', e.target.value)}
+                  className="w-full rounded border border-subtle bg-white dark:bg-gray-800 px-2 py-1 text-xs text-primary focus:border-brand-teal focus:outline-none"
+                />
+              </div>
+            )}
+
+            {/* Certifications — full row */}
+            <div className="col-span-2 sm:col-span-3">
+              <label className="block text-[10px] font-medium text-faint uppercase tracking-wide mb-1">Certifications</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CERTIFICATIONS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      const next = editFields.certification.includes(c)
+                        ? editFields.certification.filter((x) => x !== c)
+                        : [...editFields.certification, c];
+                      updateField('certification', next);
+                    }}
+                    className={`rounded-lg border px-2 py-0.5 text-[11px] font-medium transition ${
+                      editFields.certification.includes(c)
+                        ? 'border-brand-teal bg-brand-sage/20 text-brand-teal dark:bg-brand-sage/15 dark:text-brand-sage dark:border-brand-sage/40'
+                        : 'border-subtle text-secondary hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Terpenes — full row */}
+            {isVisible('terpenes') && (
+              <div className="col-span-2 sm:col-span-3">
+                <TerpeneAutocomplete
+                  selected={editFields.dominantTerpene}
+                  onChange={(next) => updateField('dominantTerpene', next)}
+                />
+              </div>
+            )}
+
             <div className="col-span-2 sm:col-span-3">
               <EditField label="Description" value={editFields.description} onChange={(v) => updateField('description', v)} />
             </div>

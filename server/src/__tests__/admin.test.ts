@@ -835,13 +835,28 @@ describe('POST /coa-email-confirm — destination branching', () => {
     const app = createTestApp(adminRouter);
     const res = await request(app)
       .post('/coa-email-confirm')
-      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1', overrides: { name: 'Custom Name', thcMax: 30 } });
+      .send({
+        syncRecordId: 'sync-1',
+        sellerId: 'seller-1',
+        overrides: {
+          name: 'Custom Name',
+          thcMax: 30,
+          lineage: 'OG Kush x Purple Haze',
+          certification: 'GACP, GMP1',
+          dominantTerpene: 'Myrcene; Limonene',
+          harvestDate: '2026-06-15',
+        },
+      });
 
     expect(res.status).toBe(200);
     expect(prisma.product.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         name: 'Custom Name',
         thcMax: 30,
+        lineage: 'OG Kush x Purple Haze',
+        certification: 'GACP, GMP1',
+        dominantTerpene: 'Myrcene; Limonene',
+        harvestDate: '2026-06-15',
       }),
     });
   });
