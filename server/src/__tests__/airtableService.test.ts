@@ -179,21 +179,21 @@ describe('computeTotalTerpenePercent', () => {
 });
 
 describe('formatProductOffering', () => {
-  it('combines type and name', () => {
-    expect(formatProductOffering('Indica', 'Pink Kush')).toBe('Indica - Pink Kush');
+  it('returns category string', () => {
+    expect(formatProductOffering('Flower indoor')).toBe('Flower indoor');
   });
 
-  it('returns name only when type is null', () => {
-    expect(formatProductOffering(null, 'Pink Kush')).toBe('Pink Kush');
+  it('returns null when category is null', () => {
+    expect(formatProductOffering(null)).toBeNull();
   });
 });
 
 describe('buildAirtableFields', () => {
   it('maps all available fields', () => {
-    const input = makeInput({ overrides: { gramsAvailable: 5000, pricePerUnit: 4.5 } });
+    const input = makeInput({ overrides: { gramsAvailable: 5000, pricePerUnit: 4.5, category: 'Flower indoor' } });
     const fields = buildAirtableFields(input);
 
-    expect(fields['fldK33FSV91BPtOfR']).toBe('Indica - Pink Kush'); // Product Offering
+    expect(fields['fldK33FSV91BPtOfR']).toBe('Flower indoor'); // Product Offering (category)
     expect(fields['fldJfRUUs0zokx62l']).toBe('Pink Kush'); // Product Name
     expect(fields['fldQjPHhOecYy3xT7']).toBe('THC: 25% / CBD: 0.5%'); // Cannabinoids
     expect(fields['fldkjZlN5F2sV0mz4']).toEqual([
@@ -236,12 +236,12 @@ describe('buildAirtableFields', () => {
 
   it('uses overrides over mapped fields', () => {
     const input = makeInput({
-      overrides: { name: 'Override Name', type: 'Sativa', thcMax: 30 },
+      overrides: { name: 'Override Name', category: 'Concentrates', thcMax: 30 },
     });
     const fields = buildAirtableFields(input);
 
     expect(fields['fldJfRUUs0zokx62l']).toBe('Override Name');
-    expect(fields['fldK33FSV91BPtOfR']).toBe('Sativa - Override Name');
+    expect(fields['fldK33FSV91BPtOfR']).toBe('Concentrates');
     expect(fields['fldQjPHhOecYy3xT7']).toBe('THC: 30% / CBD: 0.5%');
   });
 

@@ -100,8 +100,8 @@ export function computeTotalTerpenePercent(testResults: Record<string, any> | nu
   return found ? Math.round(total * 100) / 100 : null;
 }
 
-export function formatProductOffering(type: string | null, name: string): string {
-  return type ? `${type} - ${name}` : name;
+export function formatProductOffering(category: string | null): string | null {
+  return category || null;
 }
 
 /**
@@ -113,12 +113,13 @@ export function buildAirtableFields(input: AirtablePushInput): Record<string, an
 
   const fields: Record<string, any> = {};
 
-  // Product Offering — "type - name"
-  const productName = (overrides?.name as string) || mappedFields.name;
-  const productType = (overrides?.type as string) || mappedFields.type;
-  fields[FIELD.PRODUCT_OFFERING] = formatProductOffering(productType, productName);
+  // Product Offering — category only (e.g. "Flower indoor", "Cannabinoid isolates")
+  const category = (overrides?.category as string) || null;
+  const productOffering = formatProductOffering(category);
+  if (productOffering) fields[FIELD.PRODUCT_OFFERING] = productOffering;
 
   // Product Name
+  const productName = (overrides?.name as string) || mappedFields.name;
   fields[FIELD.PRODUCT_NAME] = productName;
 
   // Cannabinoids %
