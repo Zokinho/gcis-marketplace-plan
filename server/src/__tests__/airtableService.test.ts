@@ -189,9 +189,9 @@ describe('buildAirtableFields', () => {
       { name: 'Limonene' },
       { name: 'Caryophyllene' },
     ]); // Dominant Terpenes
-    expect(fields['fldTLmirHlxhsEixX']).toBe(2.3); // Terpene %
-    expect(fields['fldjWwLYAjTTTIFNG']).toBe(5); // Quantity Kg (5000g / 1000)
-    expect(fields['fldd3zHJk5y3iSasd']).toBe(4.5); // Price
+    expect(fields['fldTLmirHlxhsEixX']).toBe('2.3'); // Terpene %
+    expect(fields['fldjWwLYAjTTTIFNG']).toBe('5'); // Quantity Kg (5000g / 1000)
+    expect(fields['fldd3zHJk5y3iSasd']).toBe('4.5'); // Price
     expect(fields['fldQ1PK4FJOpIujtt']).toBe('LP Corp'); // Company (from LP)
     expect(fields['fldLwTB4iTcvjHzQe']).toMatch(/^\d{4}-\d{2}-\d{2}$/); // Date Uploaded
     expect(fields['fldvfLVPzv7y0uK1f']).toBe('2025-03-15'); // Harvest Date
@@ -245,7 +245,7 @@ describe('buildAirtableFields', () => {
   it('converts grams to kg', () => {
     const input = makeInput({ overrides: { gramsAvailable: 2500 } });
     const fields = buildAirtableFields(input);
-    expect(fields['fldjWwLYAjTTTIFNG']).toBe(2.5);
+    expect(fields['fldjWwLYAjTTTIFNG']).toBe('2.5');
   });
 });
 

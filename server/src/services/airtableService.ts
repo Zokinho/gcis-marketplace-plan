@@ -113,15 +113,15 @@ export function buildAirtableFields(input: AirtablePushInput): Record<string, an
 
   // Terpene % (total)
   const terpenePct = computeTotalTerpenePercent(mappedFields.testResults);
-  if (terpenePct != null) fields[FIELD.TERPENE_PCT] = terpenePct;
+  if (terpenePct != null) fields[FIELD.TERPENE_PCT] = String(terpenePct);
 
   // Quantity (Kg) — gramsAvailable / 1000
   const grams = overrides?.gramsAvailable as number | undefined;
-  if (grams != null) fields[FIELD.QUANTITY_KG] = grams / 1000;
+  if (grams != null) fields[FIELD.QUANTITY_KG] = String(grams / 1000);
 
   // Price ($)
   const price = overrides?.pricePerUnit as number | undefined;
-  if (price != null) fields[FIELD.PRICE] = price;
+  if (price != null) fields[FIELD.PRICE] = String(price);
 
   // Company
   const company = (overrides?.licensedProducer as string) || mappedFields.licensedProducer || companyName;
