@@ -149,7 +149,7 @@ class CoaClient {
   /**
    * Get the extracted product from a completed job.
    */
-  async getJobProduct(jobId: string): Promise<CoaProductResponse | null> {
+  async getJobProduct(jobId: string): Promise<CoaProductDetailResponse | null> {
     try {
       const res = await this.client.get<CoaProductResponse>(`/api/jobs/${jobId}/product`);
       return res.data;

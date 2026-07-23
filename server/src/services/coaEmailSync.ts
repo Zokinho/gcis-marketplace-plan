@@ -46,7 +46,11 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
           let rawData: Record<string, any> | null = null;
 
           if (job.product_id) {
-            const productDetail = await coaClient.getProductDetail(job.product_id);
+            // Try published product endpoint first, fall back to job product endpoint
+            // (review-status products are only accessible via /jobs/{id}/product)
+            const productDetail =
+              await coaClient.getProductDetail(job.product_id)
+              ?? await coaClient.getJobProduct(attachment.job_id);
             if (productDetail) {
               coaProductName = productDetail.name;
               producerName = productDetail.producer || null;
