@@ -1001,7 +1001,7 @@ describe('POST /coa-email-confirm — destination branching', () => {
   });
 });
 
-describe('POST /coa-email-confirm — SharePoint upload', () => {
+describe('POST /coa-email-confirm — external distribution is deferred', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -1015,24 +1015,31 @@ describe('POST /coa-email-confirm — SharePoint upload', () => {
     createdAt: new Date(),
   };
 
-  it('uploads to SharePoint on marketplace confirm', async () => {
+  function mockCoaClient(overrides: Record<string, any> = {}) {
+    return {
+      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain', lab: 'Eurofins' }),
+      getJobProduct: vi.fn().mockResolvedValue(null),
+      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
+      getJobOriginalPdf: vi.fn().mockResolvedValue(null),
+      getJobRedactions: vi.fn().mockResolvedValue([]),
+      uploadToSharePoint: vi.fn().mockResolvedValue(null),
+      uploadApprovedPdfToSharePoint: vi.fn().mockResolvedValue(null),
+      ...overrides,
+    };
+  }
+
+  it('does not push the CoA to SharePoint on marketplace confirm', async () => {
     vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
-      id: 'seller-1',
-      zohoContactId: null,
-      companyName: 'Seller Corp',
+      id: 'seller-1', zohoContactId: null, companyName: 'Seller Corp',
     } as any);
 
     const { getCoaClient } = await import('../services/coaClient');
-    const mockUploadToSharePoint = vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 });
-    vi.mocked(getCoaClient).mockReturnValue({
-      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
-      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
-      uploadToSharePoint: mockUploadToSharePoint,
-    } as any);
+    const client = mockCoaClient();
+    vi.mocked(getCoaClient).mockReturnValue(client as any);
 
     const { mapCoaToProductFields } = await import('../utils/coaMapper');
-    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain', labName: 'Eurofins' } as any);
 
     vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-1', name: 'Test Strain' } as any);
     vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
@@ -1043,32 +1050,25 @@ describe('POST /coa-email-confirm — SharePoint upload', () => {
       .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
 
     expect(res.status).toBe(200);
-
-    // Wait for fire-and-forget to complete
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(mockUploadToSharePoint).toHaveBeenCalledWith('job-1');
+    // The PDF leaves only after an admin approves the redaction zones
+    expect(client.uploadToSharePoint).not.toHaveBeenCalled();
+    expect(client.uploadApprovedPdfToSharePoint).not.toHaveBeenCalled();
   });
 
-  it('uploads to SharePoint on airtable-only confirm', async () => {
+  it('does not push the CoA anywhere on the airtable-only path', async () => {
     vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
-      id: 'seller-1',
-      zohoContactId: null,
-      companyName: 'Seller Corp',
+      id: 'seller-1', zohoContactId: null, companyName: 'Seller Corp',
     } as any);
 
     const { getCoaClient } = await import('../services/coaClient');
-    const mockUploadToSharePoint = vi.fn().mockResolvedValue({ id: 'sp-file-1', name: 'coa.pdf', web_url: 'https://sp/coa.pdf', size: 1024 });
-    vi.mocked(getCoaClient).mockReturnValue({
-      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
-      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
-      uploadToSharePoint: mockUploadToSharePoint,
-    } as any);
+    const client = mockCoaClient();
+    vi.mocked(getCoaClient).mockReturnValue(client as any);
 
     const { mapCoaToProductFields } = await import('../utils/coaMapper');
     vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
-
     vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
 
     const app = createTestApp(adminRouter);
@@ -1077,29 +1077,31 @@ describe('POST /coa-email-confirm — SharePoint upload', () => {
       .send({ syncRecordId: 'sync-1', sellerId: 'seller-1', destination: 'airtable' });
 
     expect(res.status).toBe(200);
-
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(mockUploadToSharePoint).toHaveBeenCalledWith('job-1');
+    // This path creates no marketplace product, so there is no redaction gate at
+    // all — nothing may be distributed from it.
+    expect(client.uploadToSharePoint).not.toHaveBeenCalled();
+    expect(client.uploadApprovedPdfToSharePoint).not.toHaveBeenCalled();
+    expect(prisma.product.create).not.toHaveBeenCalled();
   });
 
-  it('SharePoint failure does not affect confirm response', async () => {
+  it('falls back to the job product endpoint for review-status CoA products', async () => {
     vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
-      id: 'seller-1',
-      zohoContactId: null,
-      companyName: 'Seller Corp',
+      id: 'seller-1', zohoContactId: null, companyName: 'Seller Corp',
     } as any);
 
     const { getCoaClient } = await import('../services/coaClient');
-    vi.mocked(getCoaClient).mockReturnValue({
-      getProductDetail: vi.fn().mockResolvedValue({ name: 'Test Strain' }),
-      getProductPdfUrl: vi.fn().mockReturnValue('http://coa/pdf'),
-      uploadToSharePoint: vi.fn().mockRejectedValue(new Error('SharePoint down')),
-    } as any);
+    // /api/products/{id} is gated on published status and 404s for review products
+    const client = mockCoaClient({
+      getProductDetail: vi.fn().mockResolvedValue(null),
+      getJobProduct: vi.fn().mockResolvedValue({ name: 'Test Strain', lab: 'Eurofins' }),
+    });
+    vi.mocked(getCoaClient).mockReturnValue(client as any);
 
     const { mapCoaToProductFields } = await import('../utils/coaMapper');
-    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain' } as any);
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain', labName: 'Eurofins' } as any);
 
     vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-1', name: 'Test Strain' } as any);
     vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
@@ -1109,12 +1111,36 @@ describe('POST /coa-email-confirm — SharePoint upload', () => {
       .post('/coa-email-confirm')
       .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
 
-    // Response should still be 200 despite SharePoint failure
+    expect(res.status).toBe(200);
+    expect(client.getJobProduct).toHaveBeenCalledWith('job-1');
+  });
+
+  it('still confirms when redaction seeding cannot find a source PDF', async () => {
+    vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue(syncRecord as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'seller-1', zohoContactId: null, companyName: 'Seller Corp',
+    } as any);
+
+    const { getCoaClient } = await import('../services/coaClient');
+    const client = mockCoaClient({
+      getJobOriginalPdf: vi.fn().mockRejectedValue(new Error('CoA service down')),
+    });
+    vi.mocked(getCoaClient).mockReturnValue(client as any);
+
+    const { mapCoaToProductFields } = await import('../utils/coaMapper');
+    vi.mocked(mapCoaToProductFields).mockReturnValue({ name: 'Test Strain', labName: 'Eurofins' } as any);
+
+    vi.mocked(prisma.product.create).mockResolvedValue({ id: 'prod-1', name: 'Test Strain' } as any);
+    vi.mocked(prisma.coaSyncRecord.update).mockResolvedValue({} as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app)
+      .post('/coa-email-confirm')
+      .send({ syncRecordId: 'sync-1', sellerId: 'seller-1' });
+
+    // Seeding is best-effort — it must not fail the confirm
     expect(res.status).toBe(200);
     expect(res.body.product).toBeDefined();
-
-    // Wait for fire-and-forget to settle
-    await new Promise((r) => setTimeout(r, 50));
   });
 });
 

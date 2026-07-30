@@ -87,6 +87,18 @@ export interface CoaEmailIngestion {
   attachments: CoaEmailAttachment[];
 }
 
+export interface CoaRedactionRegion {
+  id: string;
+  page: number;
+  x_pct: number;
+  y_pct: number;
+  w_pct: number;
+  h_pct: number;
+  reason: string;
+  confidence: string;
+  approved: boolean;
+}
+
 export interface SharePointUploadResponse {
   id: string;
   name: string;
@@ -152,6 +164,68 @@ class CoaClient {
   async getJobProduct(jobId: string): Promise<CoaProductDetailResponse | null> {
     try {
       const res = await this.client.get<CoaProductDetailResponse>(`/api/jobs/${jobId}/product`);
+      return res.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /**
+   * Download a job's unredacted source PDF.
+   * Used to seed local redaction review — the published/preview PDF has the AI
+   * blackouts burned in, so a reviewer could only add regions, never reject one.
+   */
+  async getJobOriginalPdf(jobId: string): Promise<Buffer | null> {
+    try {
+      const res = await this.client.get(`/api/jobs/${jobId}/original-pdf`, {
+        responseType: 'arraybuffer',
+      });
+      return Buffer.from(res.data);
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /**
+   * Get the AI-detected redaction regions for a job, to seed local review.
+   */
+  async getJobRedactions(jobId: string): Promise<CoaRedactionRegion[]> {
+    try {
+      const res = await this.client.get<CoaRedactionRegion[]>(`/api/jobs/${jobId}/redactions`);
+      return res.data || [];
+    } catch (err: any) {
+      if (err?.response?.status === 404) return [];
+      throw err;
+    }
+  }
+
+  /**
+   * Push a locally-approved CoA PDF to SharePoint's default destination.
+   * Distinct from uploadToSharePoint(), which sends the CoA service's own copy and
+   * requires the job to be published there.
+   */
+  async uploadApprovedPdfToSharePoint(
+    jobId: string,
+    pdfBuffer: Buffer,
+    filename: string,
+  ): Promise<SharePointUploadResponse | null> {
+    const FormData = (await import('form-data')).default;
+    const form = new FormData();
+    form.append('job_id', jobId);
+    form.append('file', pdfBuffer, {
+      filename,
+      contentType: 'application/pdf',
+      knownLength: pdfBuffer.length,
+    });
+
+    try {
+      const res = await this.client.post<SharePointUploadResponse>(
+        '/api/sharepoint/upload-file',
+        form,
+        { headers: form.getHeaders() },
+      );
       return res.data;
     } catch (err: any) {
       if (err?.response?.status === 404) return null;

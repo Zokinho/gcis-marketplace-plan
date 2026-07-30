@@ -21,6 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { deleteFile as s3Delete, uploadFile as s3Upload, getSignedFileUrl, isS3Configured } from '../utils/s3';
 import { applyRedactions, generatePageImages } from '../services/coaRedactor';
+import { normalizeLabName } from '../utils/labNormalize';
 import { pushToAirtable } from '../services/airtableService';
 
 const uploadsDir = path.join(__dirname, '../../../uploads');
@@ -96,6 +97,151 @@ router.post('/sync-now', validate(syncNowSchema), async (req: Request, res: Resp
     res.status(500).json({ error: 'Sync failed', details: err?.message });
   }
 });
+
+/**
+ * Store a CoA job's source PDF against a product and create its redaction regions,
+ * so the product can go through the normal Pending Products zone-approval gate.
+ *
+ * Regions come from the per-lab template when one matches — that is what keeps
+ * human review cost proportional to lab layouts rather than CoA volume — and
+ * fall back to the CoA service's AI detections otherwise.
+ *
+ * Best-effort: a failure here leaves the product without redaction data rather
+ * than blocking the confirm, and is logged for follow-up.
+ */
+async function seedRedactionFromCoaJob(
+  productId: string,
+  coaJobId: string,
+  labName: string | null,
+): Promise<void> {
+  try {
+    const coaClient = getCoaClient();
+
+    // The unredacted source — the published/preview PDF has the AI blackouts burned
+    // in, which would leave a reviewer unable to reject a false positive.
+    const pdfBuffer = await coaClient.getJobOriginalPdf(coaJobId);
+    if (!pdfBuffer) {
+      logger.warn({ productId, coaJobId }, '[ADMIN] No source PDF for CoA job — redaction review not set up');
+      return;
+    }
+
+    const originalKey = `products/${productId}/coa/${crypto.randomUUID()}_original.pdf`;
+    if (isS3Configured()) {
+      await s3Upload(originalKey, pdfBuffer, 'application/pdf');
+    } else {
+      const localDir = path.join(uploadsDir, `products/${productId}/coa`);
+      fs.mkdirSync(localDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadsDir, originalKey), pdfBuffer);
+    }
+
+    // Page images for the editor preview
+    const { images, pageCount } = await generatePageImages(pdfBuffer);
+    for (let i = 0; i < images.length; i++) {
+      const pageKey = `products/${productId}/coa/pages/page_${i}.png`;
+      if (isS3Configured()) {
+        await s3Upload(pageKey, images[i], 'image/png');
+      } else {
+        const pagesDir = path.join(uploadsDir, `products/${productId}/coa/pages`);
+        fs.mkdirSync(pagesDir, { recursive: true });
+        fs.writeFileSync(path.join(uploadsDir, pageKey), images[i]);
+      }
+    }
+
+    await prisma.product.update({
+      where: { id: productId },
+      data: { coaOriginalKey: originalKey, coaPageCount: pageCount },
+    });
+
+    // Prefer a learned template for this lab over raw AI output
+    let regions: Array<{
+      page: number; xPct: number; yPct: number; wPct: number; hPct: number;
+      reason: string; confidence: string; source: string;
+    }> = [];
+
+    const normalizedLab = labName ? normalizeLabName(labName) : '';
+    if (normalizedLab) {
+      const template = await prisma.redactionTemplate.findUnique({ where: { labName: normalizedLab } });
+      if (template && (template.pageCount === 0 || template.pageCount === pageCount)) {
+        const saved = template.regions as Array<{
+          page: number; xPct: number; yPct: number; wPct: number; hPct: number; reason: string;
+        }>;
+        regions = saved.map((r) => ({ ...r, confidence: 'high', source: 'template' }));
+        prisma.redactionTemplate
+          .update({ where: { labName: normalizedLab }, data: { useCount: { increment: 1 } } })
+          .catch(() => {});
+        logger.info({ productId, labName: normalizedLab, regionCount: regions.length }, '[ADMIN] Seeded redaction from lab template');
+      }
+    }
+
+    if (regions.length === 0) {
+      const aiRegions = await coaClient.getJobRedactions(coaJobId);
+      regions = aiRegions.map((r) => ({
+        page: r.page,
+        xPct: r.x_pct,
+        yPct: r.y_pct,
+        wPct: r.w_pct,
+        hPct: r.h_pct,
+        reason: r.reason || 'Client info',
+        confidence: r.confidence || 'medium',
+        source: 'ai',
+      }));
+      logger.info({ productId, coaJobId, regionCount: regions.length }, '[ADMIN] Seeded redaction from AI detections');
+    }
+
+    if (regions.length > 0) {
+      await prisma.redactionRegion.createMany({
+        data: regions.map((r) => ({ productId, ...r, approved: true })),
+      });
+    }
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err : { message: String(err) }, productId, coaJobId },
+      '[ADMIN] Redaction seeding failed — product has no zones to review',
+    );
+  }
+}
+
+/**
+ * Send an approved CoA PDF to Zoho and SharePoint.
+ *
+ * Called only after the redaction zones an admin approved have been applied, so
+ * the bytes leaving here are the reviewed ones. Both pushes are independent and
+ * non-critical — a failure is logged, never thrown, and never blocks the other.
+ */
+async function distributeApprovedCoa(
+  product: { id: string; name: string | null; zohoProductId: string | null; coaJobId: string | null },
+  redactedBuffer: Buffer,
+): Promise<void> {
+  const filename = `${product.name || 'coa'}.pdf`;
+
+  if (product.zohoProductId) {
+    try {
+      // Filename is sanitized inside uploadProductFiles — product.name comes from
+      // AI extraction and can contain path separators or quotes.
+      await uploadProductFiles(product.zohoProductId, [], [{
+        buffer: redactedBuffer,
+        originalname: filename,
+        mimetype: 'application/pdf',
+      }]);
+      logger.info({ productId: product.id, zohoProductId: product.zohoProductId }, '[ADMIN] Approved CoA PDF uploaded to Zoho');
+    } catch (err) {
+      logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId: product.id }, '[ADMIN] Approved CoA PDF upload to Zoho failed (non-critical)');
+    }
+  }
+
+  if (product.coaJobId) {
+    try {
+      const result = await getCoaClient().uploadApprovedPdfToSharePoint(
+        product.coaJobId, redactedBuffer, filename,
+      );
+      if (result) {
+        logger.info({ productId: product.id, jobId: product.coaJobId, sharePointId: result.id }, '[ADMIN] Approved CoA PDF uploaded to SharePoint');
+      }
+    } catch (err) {
+      logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId: product.id, jobId: product.coaJobId }, '[ADMIN] Approved CoA PDF upload to SharePoint failed (non-critical)');
+    }
+  }
+}
 
 // ─── CoA Email Queue ───
 
@@ -221,7 +367,11 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       if (!coaProductId) {
         return res.status(400).json({ error: 'CoA product not yet extracted' });
       }
-      const coaProduct = await coaClient.getProductDetail(coaProductId);
+      // /api/products/{id} is gated on published status, which email-ingested CoAs
+      // never reach — fall back to the job endpoint, as the sync path does.
+      const coaProduct =
+        await coaClient.getProductDetail(coaProductId)
+        ?? (syncRecord.coaJobId ? await coaClient.getJobProduct(syncRecord.coaJobId) : null);
       if (!coaProduct) {
         return res.status(404).json({ error: 'CoA product not found in CoA backend' });
       }
@@ -240,7 +390,10 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
 
       logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'coa.confirm_airtable', targetType: 'CoaSyncRecord', targetId: syncRecordId, metadata: { syncRecordId, sellerId }, ip: getRequestIp(req) });
 
-      // Fire-and-forget: push to Airtable with Harvex = false
+      // Fire-and-forget: push to Airtable with Harvex = false.
+      // No CoA PDF and no SharePoint push on this path — it creates no marketplace
+      // product, so there is no redaction review gate, and nothing may leave with
+      // un-reviewed client info on it.
       pushToAirtable({
         mappedFields,
         overrides,
@@ -248,19 +401,6 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         companyName: seller.companyName,
         isHarvex: false,
       });
-
-      // Fire-and-forget: upload CoA PDF to SharePoint
-      if (syncRecord.coaJobId) {
-        coaClient.uploadToSharePoint(syncRecord.coaJobId)
-          .then((result) => {
-            if (result) {
-              logger.info({ syncRecordId, jobId: syncRecord.coaJobId, sharePointId: result.id }, '[ADMIN] CoA PDF uploaded to SharePoint (airtable-only)');
-            }
-          })
-          .catch((err) => {
-            logger.error({ err: err instanceof Error ? err : { message: String(err) }, syncRecordId, jobId: syncRecord.coaJobId }, '[ADMIN] SharePoint upload failed (non-critical)');
-          });
-      }
 
       return res.json({ message: 'Added to Airtable', syncRecordId });
     }
@@ -294,6 +434,13 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     });
 
     logAudit({ actorId: req.user?.id, actorEmail: req.user?.email, action: 'coa.confirm', targetType: 'Product', targetId: product.id, metadata: { syncRecordId, sellerId }, ip: getRequestIp(req) });
+
+    // Seed redaction review so this product goes through the same zone-approval
+    // gate as every other pending product. Without it the RedactionEditor opens
+    // empty and the approve handler's redaction step is skipped entirely.
+    if (syncRecord.coaJobId) {
+      await seedRedactionFromCoaJob(product.id, syncRecord.coaJobId, mappedFields.labName);
+    }
 
     // Fire-and-forget: push product to Zoho CRM
     if (seller.zohoContactId) {
@@ -331,23 +478,9 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
           });
           logger.info({ productId: product.id, zohoProductId }, '[ADMIN] CoA email product pushed to Zoho');
 
-          // Upload CoA PDF to Zoho product record
-          if (product.coaPdfUrl) {
-            try {
-              const pdfResponse = await axios.get(product.coaPdfUrl, { responseType: 'arraybuffer', timeout: 30_000 });
-              const pdfBuffer = Buffer.from(pdfResponse.data);
-              // Filename is sanitized inside uploadProductFiles — product.name comes
-              // from AI extraction and can contain path separators or quotes.
-              await uploadProductFiles(zohoProductId, [], [{
-                buffer: pdfBuffer,
-                originalname: `${product.name || 'coa'}.pdf`,
-                mimetype: 'application/pdf',
-              }]);
-              logger.info({ productId: product.id, zohoProductId }, '[ADMIN] CoA PDF uploaded to Zoho product');
-            } catch (pdfErr) {
-              logger.error({ err: pdfErr instanceof Error ? pdfErr : { message: String(pdfErr) }, productId: product.id }, '[ADMIN] CoA PDF upload to Zoho failed (non-critical)');
-            }
-          }
+          // The CoA PDF is NOT uploaded here. It goes out at approval, once an
+          // admin has approved the redaction zones — see the product approve
+          // handler. Distributing it now would ship un-reviewed client info.
         } catch (err) {
           logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId: product.id }, '[ADMIN] CoA email Zoho push failed (non-critical)');
         }
@@ -365,18 +498,8 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       isHarvex: true,
     });
 
-    // Fire-and-forget: upload CoA PDF to SharePoint
-    if (syncRecord.coaJobId) {
-      coaClient.uploadToSharePoint(syncRecord.coaJobId)
-        .then((result) => {
-          if (result) {
-            logger.info({ productId: product.id, jobId: syncRecord.coaJobId, sharePointId: result.id }, '[ADMIN] CoA PDF uploaded to SharePoint');
-          }
-        })
-        .catch((err) => {
-          logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId: product.id, jobId: syncRecord.coaJobId }, '[ADMIN] SharePoint upload failed (non-critical)');
-        });
-    }
+    // No SharePoint push here either — it happens at approval, from the
+    // human-approved redacted PDF. See distributeApprovedCoa().
 
     res.json({ product });
   } catch (err: any) {
@@ -818,10 +941,20 @@ router.post('/products/:productId/approve', async (req: Request<{ productId: str
           metadata: { regionsApplied: regions.length }, ip: getRequestIp(req),
         });
         logger.info({ productId }, '[ADMIN] CoA redaction completed (background)');
+
+        // Only now that the approved zones are burned in may the PDF leave the
+        // system. Chained here rather than run in parallel — these need the
+        // redacted buffer, so they cannot start before it exists.
+        await distributeApprovedCoa(product, redactedBuffer);
       } catch (err) {
         logger.error({ err: err instanceof Error ? err : { message: String(err) }, productId }, '[ADMIN] Background redaction failed — original CoA used as fallback');
       }
     })();
+  } else if (product.coaJobId) {
+    logger.warn(
+      { productId, coaJobId: product.coaJobId },
+      '[ADMIN] Approved with no coaOriginalKey — CoA PDF not distributed (redaction was never set up)',
+    );
   }
 
   // Zoho writeback: set Product_Active=true, Request_pending=false
