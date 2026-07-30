@@ -53,7 +53,6 @@ function makeInput(overrides?: Partial<AirtablePushInput>): AirtablePushInput {
     coaProductId: 'coa-123',
     companyName: 'Seller Co',
     isHarvex: true,
-    getPdfBuffer: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
 }

@@ -1,6 +1,5 @@
 import axios from 'axios';
 import logger from '../utils/logger';
-import { uploadFile, getSignedFileUrl, deleteFile, isS3Configured } from '../utils/s3';
 import { MappedProductFields } from '../utils/coaMapper';
 
 // ─── Types ───
@@ -15,8 +14,6 @@ export interface AirtablePushInput {
   coaProductId: string | null;
   companyName: string | null;
   isHarvex: boolean;
-  /** PDF download function — returns buffer or null */
-  getPdfBuffer: () => Promise<Buffer | null>;
 }
 
 // ─── Airtable field IDs ───
@@ -29,7 +26,6 @@ const FIELD = {
   TERPENE_PCT: 'fldTLmirHlxhsEixX',
   QUANTITY_KG: 'fldjWwLYAjTTTIFNG',
   PRICE: 'fldd3zHJk5y3iSasd',
-  DOCUMENTATION: 'fldNbhytnGaTaRH2B',
   COMPANY: 'fldQ1PK4FJOpIujtt',
   DATE_UPLOADED: 'fldLwTB4iTcvjHzQe',
   HARVEST_DATE: 'fldvfLVPzv7y0uK1f',
@@ -197,31 +193,10 @@ export async function pushToAirtable(input: AirtablePushInput): Promise<void> {
     return;
   }
 
-  // Staged PDF key, cleaned up once Airtable has copied the attachment
-  let tempPdfKey: string | null = null;
-
   try {
+    // CoA PDFs are deliberately not sent to Airtable — the documents live in
+    // SharePoint and on the Zoho product record.
     const fields = buildAirtableFields(input);
-
-    // Attempt PDF attachment via S3 presigned URL
-    if (input.coaProductId && isS3Configured()) {
-      try {
-        const pdfBuffer = await input.getPdfBuffer();
-        if (pdfBuffer) {
-          const s3Key = `airtable-temp/${input.coaProductId}.pdf`;
-          const uploaded = await uploadFile(s3Key, pdfBuffer, 'application/pdf');
-          if (uploaded) {
-            const presignedUrl = await getSignedFileUrl(s3Key);
-            if (presignedUrl) {
-              fields[FIELD.DOCUMENTATION] = [{ url: presignedUrl }];
-              tempPdfKey = s3Key;
-            }
-          }
-        }
-      } catch (pdfErr) {
-        logger.warn({ err: pdfErr instanceof Error ? pdfErr : { message: String(pdfErr) } }, '[AIRTABLE] PDF attachment failed (non-critical)');
-      }
-    }
 
     const baseId = process.env.AIRTABLE_BASE_ID!;
     const tableId = process.env.AIRTABLE_TABLE_ID!;
@@ -256,13 +231,5 @@ export async function pushToAirtable(input: AirtablePushInput): Promise<void> {
     }
   } catch (err) {
     logger.error({ detail: getAirtableErrorDetail(err), err: err instanceof Error ? err : { message: String(err) } }, '[AIRTABLE] Push failed (non-critical)');
-  } finally {
-    // Airtable copies attachments at record-create time, so the staged object is
-    // no longer needed once the POST has returned either way.
-    if (tempPdfKey) {
-      deleteFile(tempPdfKey).catch((err) => {
-        logger.warn({ err: err instanceof Error ? err : { message: String(err) }, key: tempPdfKey }, '[AIRTABLE] Temp PDF cleanup failed (non-critical)');
-      });
-    }
   }
 }

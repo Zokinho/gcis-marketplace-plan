@@ -194,7 +194,6 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     const isEmailExtracted = syncRecord.sourceType === 'email_body';
 
     let mappedFields: MappedProductFields;
-    let getPdfBuffer: () => Promise<Buffer | null>;
 
     if (isEmailExtracted) {
       // ─── Email-body-extracted: use rawData.mappedFields directly ───
@@ -217,7 +216,6 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         testResults: null,
         certification: emailProduct.certification || (rawData?.mappedFields?.certification as string) || null,
       };
-      getPdfBuffer = async () => null; // no PDF for email-body items
     } else {
       // ─── CoA-extracted: fetch from CoA backend ───
       if (!coaProductId) {
@@ -228,15 +226,6 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         return res.status(404).json({ error: 'CoA product not found in CoA backend' });
       }
       mappedFields = mapCoaToProductFields(coaProduct);
-      getPdfBuffer = async (): Promise<Buffer | null> => {
-        try {
-          const pdfUrl = coaClient.getProductPdfUrl(coaProductId!);
-          const pdfResponse = await axios.get(pdfUrl, { responseType: 'arraybuffer', timeout: 30_000 });
-          return Buffer.from(pdfResponse.data);
-        } catch {
-          return null;
-        }
-      };
     }
 
     if (destination === 'airtable') {
@@ -258,7 +247,6 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
         coaProductId: coaProductId || null,
         companyName: seller.companyName,
         isHarvex: false,
-        getPdfBuffer,
       });
 
       // Fire-and-forget: upload CoA PDF to SharePoint
@@ -375,7 +363,6 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       coaProductId: coaProductId || null,
       companyName: seller.companyName,
       isHarvex: true,
-      getPdfBuffer,
     });
 
     // Fire-and-forget: upload CoA PDF to SharePoint
