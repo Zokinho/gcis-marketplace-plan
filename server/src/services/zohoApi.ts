@@ -1,5 +1,4 @@
 import fs from 'fs';
-import { Readable } from 'stream';
 import FormData from 'form-data';
 import axios from 'axios';
 import { zohoRequest, getAccessToken, ZOHO_API_URL } from './zohoAuth';
@@ -494,38 +493,90 @@ export async function createProductReviewTask(params: {
 
 // ─── File Uploads to Zoho ───
 
+type BufferFile = { buffer: Buffer; originalname: string; mimetype: string };
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Strip path separators, quotes and control characters from an upload filename.
+ * Filenames reach here from client uploads and from AI-extracted product names,
+ * so neither can be trusted to be header-safe.
+ */
+function sanitizeFilename(name: string): string {
+  const base = name
+    .replace(/[/\\]/g, '_')           // path separators
+    .replace(/["']/g, '')             // quotes — would break Content-Disposition
+    .replace(/[\x00-\x1f]/g, '')      // control chars, incl. CR/LF header injection
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);                   // keep well under filesystem limits
+  return base || 'file';
+}
+
+/**
+ * Append a file to a form-data body.
+ * Buffers are appended directly (not wrapped in a stream) so form-data can compute
+ * a known length — otherwise no Content-Length is set and Node falls back to
+ * Transfer-Encoding: chunked, which Zoho's upload endpoints can reject.
+ */
+function appendFileToForm(form: FormData, file: string | BufferFile): void {
+  if (typeof file === 'string') {
+    // Legacy: file path on disk
+    form.append('file', fs.createReadStream(file));
+  } else {
+    form.append('file', file.buffer, {
+      filename: sanitizeFilename(file.originalname),
+      contentType: file.mimetype,
+      knownLength: file.buffer.length,
+    });
+  }
+}
+
+/**
+ * Extract a per-record error from a Zoho write response.
+ * Zoho returns HTTP 200 with the real outcome in `data[0].status`, so a rejected
+ * write looks like a success unless the body is inspected.
+ * Returns an error message, or null if the write succeeded.
+ */
+function getZohoWriteError(responseData: any): string | null {
+  const record = responseData?.data?.[0];
+  if (!record) return 'Zoho returned no record in response';
+  if (record.status === 'success') return null;
+  const details = record.details ? ` ${JSON.stringify(record.details)}` : '';
+  return `${record.code || 'UNKNOWN'}: ${record.message || 'Zoho write failed'}${details}`;
+}
+
 /**
  * Upload a file to Zoho File System (ZFS).
  * Accepts either a file path (string) or a buffer file object.
  * Returns the encrypted file ID for attaching to a record.
  */
-async function uploadToZFS(file: string | { buffer: Buffer; originalname: string; mimetype: string }): Promise<string> {
+async function uploadToZFS(file: string | BufferFile): Promise<string> {
+  if (typeof file !== 'string' && file.buffer.length > MAX_UPLOAD_BYTES) {
+    throw new Error(
+      `File ${file.originalname} is ${file.buffer.length} bytes, exceeds ${MAX_UPLOAD_BYTES} byte limit`,
+    );
+  }
+
   const token = await getAccessToken();
   const form = new FormData();
-
-  if (typeof file === 'string') {
-    // Legacy: file path on disk
-    form.append('file', fs.createReadStream(file));
-  } else {
-    // Buffer-based upload
-    const stream = Readable.from(file.buffer);
-    form.append('file', stream, { filename: file.originalname, contentType: file.mimetype });
-  }
+  appendFileToForm(form, file);
 
   const response = await axios.post(`${ZOHO_API_URL}/files`, form, {
     headers: {
       Authorization: `Zoho-oauthtoken ${token}`,
       ...form.getHeaders(),
     },
-    maxContentLength: 20 * 1024 * 1024,
+    maxBodyLength: MAX_UPLOAD_BYTES,
   });
+
+  const writeError = getZohoWriteError(response.data);
+  if (writeError) throw new Error(`ZFS upload rejected — ${writeError}`);
 
   const fileId = response.data?.data?.[0]?.details?.id;
   if (!fileId) throw new Error('ZFS upload did not return a file ID');
   return fileId;
 }
-
-type BufferFile = { buffer: Buffer; originalname: string; mimetype: string };
 
 /**
  * Upload images and CoA files to a Zoho Product record.
@@ -542,6 +593,7 @@ export async function uploadProductFiles(
   const coaFieldNames = ['CoAs', 'CoAs_2', 'CoAs_3'];
 
   const updatePayload: Record<string, any> = {};
+  const failures: string[] = [];
 
   // Upload images to dedicated file fields (first 4)
   for (let i = 0; i < Math.min(imageFiles.length, imageFieldNames.length); i++) {
@@ -550,6 +602,7 @@ export async function uploadProductFiles(
       updatePayload[imageFieldNames[i]] = [{ file_id: fileId }];
     } catch (err: any) {
       logger.error({ err, field: imageFieldNames[i] }, '[ZOHO] Image upload failed');
+      failures.push(`${imageFieldNames[i]}: ${err?.message || String(err)}`);
     }
   }
 
@@ -560,21 +613,47 @@ export async function uploadProductFiles(
       updatePayload[coaFieldNames[i]] = [{ file_id: fileId }];
     } catch (err: any) {
       logger.error({ err, field: coaFieldNames[i] }, '[ZOHO] CoA upload failed');
+      failures.push(`${coaFieldNames[i]}: ${err?.message || String(err)}`);
     }
   }
 
   // Attach all uploaded files to the product record via v2 API
   // (v7 silently ignores file_id attachments on fileupload fields)
-  if (Object.keys(updatePayload).length > 0) {
-    const token = await getAccessToken();
-    const v2BaseUrl = ZOHO_API_URL.replace('/v7', '/v2');
-    await axios.put(`${v2BaseUrl}/Products/${zohoProductId}`, {
-      data: [updatePayload],
-      trigger: [],
-    }, {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    });
-    logger.info({ count: Object.keys(updatePayload).length, zohoProductId }, '[ZOHO] Uploaded files to product');
+  const attachedFields = Object.keys(updatePayload);
+  if (attachedFields.length > 0) {
+    try {
+      const token = await getAccessToken();
+      const v2BaseUrl = ZOHO_API_URL.replace('/v7', '/v2');
+      const response = await axios.put(`${v2BaseUrl}/Products/${zohoProductId}`, {
+        data: [updatePayload],
+        trigger: [],
+      }, {
+        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      });
+
+      // Zoho returns HTTP 200 even when the record update is rejected — the real
+      // outcome is in the response body. Without this check a failed attach (bad
+      // field name, invalid file_id) is logged as a success.
+      const writeError = getZohoWriteError(response.data);
+      if (writeError) {
+        throw new Error(writeError);
+      }
+
+      logger.info({ count: attachedFields.length, fields: attachedFields, zohoProductId }, '[ZOHO] Uploaded files to product');
+    } catch (err: any) {
+      // The ZFS uploads succeeded but nothing is attached to the record — log the
+      // file IDs so the attach can be retried without re-uploading.
+      logger.error(
+        {
+          err,
+          zohoProductId,
+          fields: attachedFields,
+          fileIds: attachedFields.map((f) => updatePayload[f]?.[0]?.file_id),
+        },
+        '[ZOHO] File attach failed — uploaded files are orphaned in ZFS',
+      );
+      failures.push(`attach: ${err?.message || String(err)}`);
+    }
   }
 
   // Upload overflow files (beyond field capacity) as record-level attachments
@@ -584,27 +663,41 @@ export async function uploadProductFiles(
   ];
   if (overflowFiles.length > 0) {
     const token = await getAccessToken();
+    let uploaded = 0;
     for (const file of overflowFiles) {
+      const label = typeof file === 'string' ? file : file.originalname;
       try {
-        const form = new FormData();
-        if (typeof file === 'string') {
-          form.append('file', fs.createReadStream(file));
-        } else {
-          const stream = Readable.from(file.buffer);
-          form.append('file', stream, { filename: file.originalname, contentType: file.mimetype });
+        if (typeof file !== 'string' && file.buffer.length > MAX_UPLOAD_BYTES) {
+          throw new Error(`${file.buffer.length} bytes exceeds ${MAX_UPLOAD_BYTES} byte limit`);
         }
-        await axios.post(`${ZOHO_API_URL}/Products/${zohoProductId}/Attachments`, form, {
+
+        const form = new FormData();
+        appendFileToForm(form, file);
+
+        const response = await axios.post(`${ZOHO_API_URL}/Products/${zohoProductId}/Attachments`, form, {
           headers: {
             Authorization: `Zoho-oauthtoken ${token}`,
             ...form.getHeaders(),
           },
-          maxContentLength: 20 * 1024 * 1024,
+          maxBodyLength: MAX_UPLOAD_BYTES,
         });
+
+        const writeError = getZohoWriteError(response.data);
+        if (writeError) throw new Error(writeError);
+
+        uploaded++;
       } catch (err: any) {
-        logger.error({ err }, '[ZOHO] Overflow attachment upload failed');
+        logger.error({ err, zohoProductId, file: label }, '[ZOHO] Overflow attachment upload failed');
+        failures.push(`attachment ${label}: ${err?.message || String(err)}`);
       }
     }
-    logger.info({ count: overflowFiles.length, zohoProductId }, '[ZOHO] Uploaded overflow files as attachments');
+    logger.info({ uploaded, total: overflowFiles.length, zohoProductId }, '[ZOHO] Uploaded overflow files as attachments');
+  }
+
+  // Surface partial failures to the caller — every call site is fire-and-forget
+  // with a .catch, so throwing is the only way a dropped file becomes visible.
+  if (failures.length > 0) {
+    throw new Error(`Zoho file upload had ${failures.length} failure(s): ${failures.join('; ')}`);
   }
 }
 

@@ -324,6 +324,8 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
             try {
               const pdfResponse = await axios.get(product.coaPdfUrl, { responseType: 'arraybuffer', timeout: 30_000 });
               const pdfBuffer = Buffer.from(pdfResponse.data);
+              // Filename is sanitized inside uploadProductFiles — product.name comes
+              // from AI extraction and can contain path separators or quotes.
               await uploadProductFiles(zohoProductId, [], [{
                 buffer: pdfBuffer,
                 originalname: `${product.name || 'coa'}.pdf`,
