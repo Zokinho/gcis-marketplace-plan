@@ -67,6 +67,13 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
                   test_date: productDetail.test_date,
                   report_number: productDetail.report_number,
                 },
+                // A flagged job still yields a usable product, but something about
+                // the PDF needs a human — most often it covered several products
+                // and only the first was extracted. Carry the reason through so it
+                // reaches the admin working this queue.
+                ...(job.status === 'flagged' && job.error_message
+                  ? { jobFlag: job.error_message }
+                  : {}),
               };
             }
           }

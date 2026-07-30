@@ -67,6 +67,29 @@ export default function CoaEmailQueue() {
     setQueue((prev) => prev.filter((item) => item.id !== id));
   };
 
+  // Group by source email. One email can produce several records — one per CoA
+  // attachment plus one per product found in the body — and they arrive as
+  // separate, unlinked rows. Grouping them lets an admin see the whole email at
+  // once and reconcile a CoA against the pricing from the same message.
+  const groups = useMemo(() => {
+    const byIngestion = new Map<string, CoaEmailQueueItem[]>();
+    for (const item of queue) {
+      // Records with no ingestion id can't be grouped — key them individually
+      const key = item.emailIngestionId || `ungrouped:${item.id}`;
+      const existing = byIngestion.get(key);
+      if (existing) existing.push(item);
+      else byIngestion.set(key, [item]);
+    }
+    return [...byIngestion.entries()].map(([key, items]) => ({
+      key,
+      items,
+      subject: items.find((i) => i.emailSubject)?.emailSubject || null,
+      sender: items.find((i) => i.emailSender)?.emailSender || null,
+      coaCount: items.filter((i) => i.sourceType !== 'email_body').length,
+      bodyCount: items.filter((i) => i.sourceType === 'email_body').length,
+    }));
+  }, [queue]);
+
   return (
     <Layout>
       <div className="mb-6 flex items-center justify-between">
@@ -103,12 +126,68 @@ export default function CoaEmailQueue() {
         </div>
       )}
 
-      <div className="space-y-4">
-        {queue.map((item) => (
-          <QueueCard key={item.id} item={item} onDismissed={() => handleItemDismissed(item.id)} />
+      <div className="space-y-6">
+        {groups.map((group) => (
+          <section key={group.key}>
+            <EmailGroupHeader
+              subject={group.subject}
+              sender={group.sender}
+              coaCount={group.coaCount}
+              bodyCount={group.bodyCount}
+            />
+            <div className="space-y-4">
+              {group.items.map((item) => (
+                <QueueCard key={item.id} item={item} onDismissed={() => handleItemDismissed(item.id)} />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </Layout>
+  );
+}
+
+function EmailGroupHeader({
+  subject,
+  sender,
+  coaCount,
+  bodyCount,
+}: {
+  subject: string | null;
+  sender: string | null;
+  coaCount: number;
+  bodyCount: number;
+}) {
+  const total = coaCount + bodyCount;
+
+  return (
+    <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-subtle pb-2">
+      <svg className="h-4 w-4 shrink-0 self-center text-faint" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 9.409a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+      </svg>
+      <h2 className="text-sm font-semibold text-primary">
+        {subject || 'Email ingestion'}
+      </h2>
+      {sender && <span className="text-xs text-muted">{sender}</span>}
+      <span className="ml-auto flex items-center gap-2 text-[11px] text-faint">
+        {coaCount > 0 && (
+          <span className="rounded-full border border-brand-teal/30 px-2 py-0.5 text-brand-teal dark:text-brand-sage dark:border-brand-sage/40">
+            {coaCount} from CoA
+          </span>
+        )}
+        {bodyCount > 0 && (
+          <span className="rounded-full border border-brand-blue/30 px-2 py-0.5 text-brand-blue">
+            {bodyCount} from email body
+          </span>
+        )}
+        {/* Both sources present — the CoA rows carry lab data, the body rows carry
+            pricing, and nothing links them automatically. */}
+        {coaCount > 0 && bodyCount > 0 && (
+          <span className="text-amber-600 dark:text-amber-500">check for overlap</span>
+        )}
+        {total > 1 && <span>{total} items</span>}
+      </span>
+    </div>
   );
 }
 
@@ -330,6 +409,22 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
           </span>
         </div>
       </div>
+
+      {/* The CoA pipeline flagged this PDF — usually it covered several products
+          and only the first was extracted, so the rest need a manual re-upload. */}
+      {item.rawData?.jobFlag && (
+        <div className="mb-4 flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/50 dark:bg-amber-900/20">
+          <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-2.998-1.5-3.864 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          <div>
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Needs review</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
+              {item.rawData.jobFlag}
+            </p>
+          </div>
+        </div>
+      )}
 
       {item.matchReason && (
         <p className="mb-3 text-xs text-faint">Match: {item.matchReason}</p>

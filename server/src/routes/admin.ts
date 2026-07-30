@@ -104,13 +104,37 @@ router.post('/sync-now', validate(syncNowSchema), async (req: Request, res: Resp
  * List pending CoaSyncRecords from email ingestion.
  */
 router.get('/coa-email-queue', async (_req: Request, res: Response) => {
+  const PENDING_STATUSES = ['ready', 'pending', 'processing'];
+
   const records = await prisma.coaSyncRecord.findMany({
     where: {
-      status: { in: ['ready', 'pending', 'processing'] },
+      status: { in: PENDING_STATUSES },
     },
     orderBy: { createdAt: 'desc' },
     take: 50,
   });
+
+  // One email produces several records (one per CoA attachment, one per product
+  // found in the body) and the UI groups them by email. Pull in any siblings the
+  // row cap left out, otherwise a group renders with an understated count.
+  const ingestionIds = [...new Set(records.map((r) => r.emailIngestionId).filter((id): id is string => !!id))];
+  if (ingestionIds.length > 0) {
+    const siblings = await prisma.coaSyncRecord.findMany({
+      where: {
+        status: { in: PENDING_STATUSES },
+        emailIngestionId: { in: ingestionIds },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const seen = new Set(records.map((r) => r.id));
+    for (const sibling of siblings) {
+      if (!seen.has(sibling.id)) {
+        seen.add(sibling.id);
+        records.push(sibling);
+      }
+    }
+    records.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
 
   // Enrich with suggested seller info
   const enriched = await Promise.all(

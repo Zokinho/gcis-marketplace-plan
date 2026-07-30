@@ -47,7 +47,9 @@ vi.mock('../index', () => ({
     },
     coaSyncRecord: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
+      create: vi.fn(),
       update: vi.fn(),
     },
     match: {

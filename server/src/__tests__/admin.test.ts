@@ -458,6 +458,50 @@ describe('GET /coa-email-queue', () => {
     // user.findUnique should not be called since suggestedSellerId is null
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
+
+  it('pulls in same-email siblings the row cap left out', async () => {
+    // The UI groups records by email, so a group split across the 50-row cap
+    // would render with an understated count.
+    const firstPage = [
+      { id: 'coa-1', status: 'ready', suggestedSellerId: null, emailIngestionId: 'ing-1', createdAt: new Date('2026-07-30T12:00:00Z') },
+    ];
+    const siblings = [
+      { id: 'coa-1', status: 'ready', suggestedSellerId: null, emailIngestionId: 'ing-1', createdAt: new Date('2026-07-30T12:00:00Z') },
+      { id: 'coa-2', status: 'ready', suggestedSellerId: null, emailIngestionId: 'ing-1', createdAt: new Date('2026-07-30T11:00:00Z') },
+    ];
+
+    vi.mocked(prisma.coaSyncRecord.findMany)
+      .mockResolvedValueOnce(firstPage as any)
+      .mockResolvedValueOnce(siblings as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app).get('/coa-email-queue');
+
+    expect(res.status).toBe(200);
+    // coa-1 appears once despite being in both result sets
+    expect(res.body.queue).toHaveLength(2);
+    expect(res.body.queue.map((r: any) => r.id)).toEqual(['coa-1', 'coa-2']);
+
+    expect(prisma.coaSyncRecord.findMany).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(prisma.coaSyncRecord.findMany).mock.calls[1][0]).toMatchObject({
+      where: { emailIngestionId: { in: ['ing-1'] } },
+    });
+  });
+
+  it('skips the sibling query when no record has an ingestion id', async () => {
+    const records = [
+      { id: 'coa-1', status: 'ready', suggestedSellerId: null, emailIngestionId: null, createdAt: new Date() },
+    ];
+
+    vi.mocked(prisma.coaSyncRecord.findMany).mockResolvedValue(records as any);
+
+    const app = createTestApp(adminRouter);
+    const res = await request(app).get('/coa-email-queue');
+
+    expect(res.status).toBe(200);
+    expect(res.body.queue).toHaveLength(1);
+    expect(prisma.coaSyncRecord.findMany).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('POST /coa-email-confirm — Zoho push', () => {
