@@ -99,6 +99,18 @@ router.post('/sync-now', validate(syncNowSchema), async (req: Request, res: Resp
 });
 
 /**
+ * Parse an AI-extracted harvest date into a Date, or null if absent/unparseable.
+ * The value arrives as free text from an email body, so it cannot be trusted to
+ * be a valid ISO date.
+ */
+function parseHarvestDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  const parsed = new Date(String(value));
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
  * Store a CoA job's source PDF against a product and create its redaction regions,
  * so the product can go through the normal Pending Products zone-approval gate.
  *
@@ -340,11 +352,26 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     const isEmailExtracted = syncRecord.sourceType === 'email_body';
 
     let mappedFields: MappedProductFields;
+    // Extracted values that MappedProductFields has no slot for — commercial
+    // fields live on Product but not in the CoA mapping. Seeded as defaults
+    // beneath overrides so they are not lost: the queue card displays them, but
+    // buildOverrides() only sends fields the admin actually edited, so agreeing
+    // with what is on screen used to mean discarding it.
+    let extractedDefaults: Record<string, any> = {};
 
     if (isEmailExtracted) {
       // ─── Email-body-extracted: use rawData.mappedFields directly ───
       const rawData = syncRecord.rawData as any;
       const emailProduct = rawData?.rawEmailProduct || {};
+      // Read from rawData.mappedFields — the exact object the card renders — so
+      // what gets stored always matches what the admin saw.
+      const emailMapped = rawData?.mappedFields || {};
+      extractedDefaults = {
+        category: emailMapped.category ?? emailProduct.category ?? null,
+        pricePerUnit: emailMapped.pricePerUnit ?? emailProduct.price_per_gram ?? null,
+        gramsAvailable: emailMapped.gramsAvailable ?? emailProduct.quantity_grams ?? null,
+        harvestDate: parseHarvestDate(emailMapped.harvestDate ?? emailProduct.harvest_date),
+      };
       mappedFields = {
         name: emailProduct.product_name || syncRecord.coaProductName || 'Unnamed Product',
         labName: null,
@@ -378,6 +405,11 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       mappedFields = mapCoaToProductFields(coaProduct);
     }
 
+    // Admin edits win over what was extracted. Both the Product create and the
+    // Airtable field mapping read commercial values from here, so a value the
+    // admin left untouched reaches both destinations instead of neither.
+    const effectiveOverrides = { ...extractedDefaults, ...overrides };
+
     if (destination === 'airtable') {
       // ─── Airtable-only path: no marketplace product ───
       await prisma.coaSyncRecord.update({
@@ -396,7 +428,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
       // un-reviewed client info on it.
       pushToAirtable({
         mappedFields,
-        overrides,
+        overrides: effectiveOverrides,
         coaProductId: coaProductId || null,
         companyName: seller.companyName,
         isHarvex: false,
@@ -409,7 +441,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     const product = await prisma.product.create({
       data: {
         ...mappedFields,
-        ...overrides,
+        ...effectiveOverrides,
         testResults: mappedFields.testResults ?? Prisma.JsonNull,
         coaJobId: syncRecord.coaJobId || null,
         coaPdfUrl: coaProductId ? coaClient.getProductPdfUrl(coaProductId) : null,
@@ -492,7 +524,7 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
     // Fire-and-forget: push to Airtable with Harvex = true
     pushToAirtable({
       mappedFields,
-      overrides,
+      overrides: effectiveOverrides,
       coaProductId: coaProductId || null,
       companyName: seller.companyName,
       isHarvex: true,
