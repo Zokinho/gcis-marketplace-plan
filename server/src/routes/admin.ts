@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import logger from '../utils/logger';
 import { Prisma } from '@prisma/client';
-import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema, adminBidsQuerySchema, rejectEditSchema } from '../utils/validation';
+import { validate, validateQuery, approveUserSchema, adminCoaConfirmSchema, adminCoaDismissSchema, adminCoaMergeSchema, syncNowSchema, adminUsersQuerySchema, auditLogQuerySchema, adminBidsQuerySchema, rejectEditSchema } from '../utils/validation';
 import { prisma } from '../index';
 import { runFullSync, syncProducts, syncContacts, syncProductsDelta, clearSellerCache } from '../services/zohoSync';
 import { getCoaClient } from '../services/coaClient';
@@ -262,7 +262,9 @@ async function distributeApprovedCoa(
  * List pending CoaSyncRecords from email ingestion.
  */
 router.get('/coa-email-queue', async (_req: Request, res: Response) => {
-  const PENDING_STATUSES = ['ready', 'pending', 'processing'];
+  // 'merged' is included so an absorbed record stays visible in its group,
+  // labelled with what it went into, rather than silently disappearing.
+  const PENDING_STATUSES = ['ready', 'pending', 'processing', 'merged'];
 
   const records = await prisma.coaSyncRecord.findMany({
     where: {
@@ -537,6 +539,165 @@ router.post('/coa-email-confirm', validate(adminCoaConfirmSchema), async (req: R
   } catch (err: any) {
     logger.error({ err: err instanceof Error ? err : { message: String(err) } }, '[ADMIN] CoA email confirm failed');
     res.status(500).json({ error: 'Failed to create product', details: err?.message });
+  }
+});
+
+/**
+ * POST /api/admin/coa-email-merge
+ * Combine several queue records from one email into a single record.
+ *
+ * One email routinely yields separate records for the same product — one per CoA
+ * attachment plus one per product found in the body — carrying different halves
+ * of the picture: lab data on one, price and quantity on the other. Nothing links
+ * them automatically, and joining on lot number would risk welding one product's
+ * price to another's CoA, so the admin decides.
+ *
+ * The record selected first is primary and its values win. Secondaries only fill
+ * fields the primary left empty, which lets a later email correct or extend what
+ * the CoA said. The CoA linkage (job + product id) is inherited from whichever
+ * record has it regardless of selection order — otherwise choosing a body record
+ * as primary would forfeit the PDF and the redaction review gate with it.
+ */
+router.post('/coa-email-merge', validate(adminCoaMergeSchema), async (req: Request, res: Response) => {
+  const { primarySyncRecordId, mergeSyncRecordIds } = req.body as {
+    primarySyncRecordId: string; mergeSyncRecordIds: string[];
+  };
+
+  const secondaryIds = [...new Set(mergeSyncRecordIds)].filter((id) => id !== primarySyncRecordId);
+  if (secondaryIds.length === 0) {
+    return res.status(400).json({ error: 'Nothing to merge — only the primary record was supplied' });
+  }
+
+  const records = await prisma.coaSyncRecord.findMany({
+    where: { id: { in: [primarySyncRecordId, ...secondaryIds] } },
+  });
+
+  const primary = records.find((r) => r.id === primarySyncRecordId);
+  if (!primary) {
+    return res.status(404).json({ error: 'Primary record not found' });
+  }
+
+  const secondaries = secondaryIds.map((id) => records.find((r) => r.id === id));
+  const missing = secondaryIds.filter((id, i) => !secondaries[i]);
+  if (missing.length > 0) {
+    return res.status(404).json({ error: `Records not found: ${missing.join(', ')}` });
+  }
+  const resolved = secondaries as typeof records;
+
+  // A merge must not silently undo work that already left the system
+  for (const record of [primary, ...resolved]) {
+    if (record.status === 'dismissed') {
+      return res.status(400).json({ error: `Record ${record.id} has been dismissed` });
+    }
+    if (record.status === 'merged') {
+      return res.status(400).json({ error: `Record ${record.id} was already merged into another record` });
+    }
+    if (record.sentToMarketplace || record.sentToAirtable) {
+      return res.status(400).json({ error: `Record ${record.id} has already been sent — merge it before confirming` });
+    }
+  }
+
+  // Same-email only: cross-email merging needs a different selection model
+  if (!primary.emailIngestionId) {
+    return res.status(400).json({ error: 'Primary record is not linked to an email ingestion' });
+  }
+  const foreign = resolved.filter((r) => r.emailIngestionId !== primary.emailIngestionId);
+  if (foreign.length > 0) {
+    return res.status(400).json({ error: 'Records can only be merged with others from the same email' });
+  }
+
+  // Field precedence: primary first, secondaries in selection order fill the gaps.
+  // "Primary wins" means where it actually has a value — a null on the primary
+  // must not mask a real value from a secondary.
+  const chain = [primary, ...resolved];
+  const mergedMappedFields: Record<string, any> = {};
+  for (const record of chain) {
+    const fields = ((record.rawData as any)?.mappedFields || {}) as Record<string, any>;
+    for (const [key, value] of Object.entries(fields)) {
+      if (mergedMappedFields[key] == null && value != null) {
+        mergedMappedFields[key] = value;
+      }
+    }
+  }
+
+  // Inherit CoA linkage from whichever record has it, primary first
+  const coaSource = chain.find((r) => r.coaJobId) || null;
+  const productSource = chain.find((r) => r.coaProductId) || null;
+  const extraCoaRecords = chain.filter((r) => r.coaJobId && r !== coaSource);
+
+  const mergedFrom = resolved.map((r) => ({
+    id: r.id,
+    coaProductName: r.coaProductName,
+    sourceType: r.sourceType,
+  }));
+
+  const primaryRaw = (primary.rawData as any) || {};
+  const mergedRawData = {
+    ...primaryRaw,
+    mappedFields: mergedMappedFields,
+    // Keep the absorbed records' originals so a merge stays auditable
+    mergedFrom: [
+      ...(primaryRaw.mergedFrom || []),
+      ...resolved.map((r) => ({
+        id: r.id,
+        coaProductName: r.coaProductName,
+        sourceType: r.sourceType,
+        rawData: r.rawData,
+      })),
+    ],
+  };
+
+  try {
+    // coaJobId is unique, so a secondary must release it before the primary can
+    // take it — sequential inside one transaction.
+    const updated = await prisma.$transaction(async (tx) => {
+      for (const record of resolved) {
+        await tx.coaSyncRecord.update({
+          where: { id: record.id },
+          data: {
+            status: 'merged',
+            mergedIntoId: primary.id,
+            // coaJobId is unique — release it here so the primary can take it below
+            ...(coaSource?.id === record.id ? { coaJobId: null } : {}),
+          },
+        });
+      }
+
+      return tx.coaSyncRecord.update({
+        where: { id: primary.id },
+        data: {
+          coaJobId: coaSource?.coaJobId ?? primary.coaJobId,
+          coaProductId: productSource?.coaProductId ?? primary.coaProductId,
+          sourceType: coaSource ? 'coa_pdf' : primary.sourceType,
+          rawData: JSON.parse(JSON.stringify(mergedRawData)) as Prisma.InputJsonValue,
+        },
+      });
+    });
+
+    logAudit({
+      actorId: req.user?.id, actorEmail: req.user?.email,
+      action: 'coa.merge', targetType: 'CoaSyncRecord', targetId: primary.id,
+      metadata: { mergedIds: secondaryIds, inheritedCoaJobId: coaSource?.coaJobId ?? null },
+      ip: getRequestIp(req),
+    });
+
+    if (extraCoaRecords.length > 0) {
+      logger.warn(
+        { primaryId: primary.id, droppedJobIds: extraCoaRecords.map((r) => r.coaJobId) },
+        '[ADMIN] Merge absorbed more than one CoA — only the first PDF carries over',
+      );
+    }
+
+    logger.info({ primaryId: primary.id, mergedIds: secondaryIds }, '[ADMIN] CoA queue records merged');
+    res.json({
+      syncRecord: updated,
+      mergedFrom,
+      // Surfaced so the UI can warn rather than silently losing a second PDF
+      droppedCoaJobIds: extraCoaRecords.map((r) => r.coaJobId),
+    });
+  } catch (err: any) {
+    logger.error({ err: err instanceof Error ? err : { message: String(err) }, primarySyncRecordId }, '[ADMIN] CoA merge failed');
+    res.status(500).json({ error: 'Failed to merge records', details: err?.message });
   }
 });
 

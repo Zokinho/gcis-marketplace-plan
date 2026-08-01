@@ -434,7 +434,8 @@ model CoaSyncRecord {
   emailIngestionId     String?
   marketplaceProductId String?
   sourceType           String   @default("coa_pdf") // "coa_pdf" | "email_body"
-  status               String   @default("pending") // "pending" | "processing" | "ready" | "confirmed" | "dismissed"
+  status               String   @default("pending") // "pending" | "processing" | "ready" | "confirmed" | "dismissed" | "merged"
+  mergedIntoId         String?  // Set on records absorbed by a merge — points at the surviving record
   suggestedSellerId    String?
   confirmedSellerId    String?
   suggestedSellerName  String?
@@ -448,6 +449,9 @@ model CoaSyncRecord {
   sentToMarketplace    Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  @@index([mergedIntoId])
+  @@index([emailIngestionId])
 }
 
 // ─── Shortlist Items (buyer product saves) ───

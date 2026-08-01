@@ -7,6 +7,7 @@ import {
   fetchCoaEmailQueue,
   confirmCoaEmail,
   dismissCoaEmail,
+  mergeCoaEmailRecords,
   triggerCoaEmailPoll,
   type CoaEmailQueueItem,
 } from '../lib/api';
@@ -65,6 +66,39 @@ export default function CoaEmailQueue() {
 
   const handleItemDismissed = (id: string) => {
     setQueue((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Selection is an ordered list, not a set — the first record picked becomes the
+  // merge primary and its values win, so which one came first is the whole point.
+  const [selection, setSelection] = useState<string[]>([]);
+  const [merging, setMerging] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [mergeNotice, setMergeNotice] = useState<string | null>(null);
+
+  const toggleSelected = (id: string) => {
+    setMergeError(null);
+    setSelection((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const handleMerge = async () => {
+    if (selection.length < 2) return;
+    const [primaryId, ...rest] = selection;
+    setMerging(true);
+    setMergeError(null);
+    setMergeNotice(null);
+    try {
+      const result = await mergeCoaEmailRecords(primaryId, rest);
+      if (result.droppedCoaJobIds?.length > 0) {
+        setMergeNotice(
+          `Merged. Note: the selection had more than one CoA PDF — only the first is kept on the merged record.`,
+        );
+      }
+      setSelection([]);
+      loadQueue();
+    } catch (err: any) {
+      setMergeError(err?.response?.data?.error || 'Failed to merge records');
+    }
+    setMerging(false);
   };
 
   // Group by source email. One email can produce several records — one per CoA
@@ -126,24 +160,111 @@ export default function CoaEmailQueue() {
         </div>
       )}
 
+      {mergeError && (
+        <div className="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-700">{mergeError}</div>
+      )}
+      {mergeNotice && (
+        <div className="mb-4 rounded-lg border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-300">{mergeNotice}</div>
+      )}
+
       <div className="space-y-6">
-        {groups.map((group) => (
-          <section key={group.key}>
-            <EmailGroupHeader
-              subject={group.subject}
-              sender={group.sender}
-              coaCount={group.coaCount}
-              bodyCount={group.bodyCount}
-            />
-            <div className="space-y-4">
-              {group.items.map((item) => (
-                <QueueCard key={item.id} item={item} onDismissed={() => handleItemDismissed(item.id)} />
-              ))}
-            </div>
-          </section>
-        ))}
+        {groups.map((group) => {
+          // Merging is same-email only, so a selection spanning groups can't be
+          // acted on from here — each group owns its own merge bar.
+          const groupIds = group.items.map((i) => i.id);
+          const groupSelection = selection.filter((id) => groupIds.includes(id));
+          const primaryId = groupSelection[0] ?? null;
+          const primaryItem = group.items.find((i) => i.id === primaryId) || null;
+
+          return (
+            <section key={group.key}>
+              <EmailGroupHeader
+                subject={group.subject}
+                sender={group.sender}
+                coaCount={group.coaCount}
+                bodyCount={group.bodyCount}
+              />
+
+              {groupSelection.length > 0 && (
+                <MergeBar
+                  count={groupSelection.length}
+                  primaryName={primaryItem?.coaProductName || 'the first selected item'}
+                  busy={merging}
+                  onMerge={handleMerge}
+                  onClear={() => setSelection((prev) => prev.filter((id) => !groupIds.includes(id)))}
+                />
+              )}
+
+              <div className="space-y-4">
+                {group.items.map((item) => {
+                  const order = groupSelection.indexOf(item.id);
+                  return (
+                    <QueueCard
+                      key={item.id}
+                      item={item}
+                      mergedIntoName={
+                        item.mergedIntoId
+                          ? group.items.find((i) => i.id === item.mergedIntoId)?.coaProductName ?? 'another item'
+                          : null
+                      }
+                      selectionOrder={order === -1 ? null : order}
+                      primaryName={order > 0 ? (primaryItem?.coaProductName || 'the primary item') : null}
+                      onToggleSelected={() => toggleSelected(item.id)}
+                      onDismissed={() => handleItemDismissed(item.id)}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </Layout>
+  );
+}
+
+function MergeBar({
+  count,
+  primaryName,
+  busy,
+  onMerge,
+  onClear,
+}: {
+  count: number;
+  primaryName: string;
+  busy: boolean;
+  onMerge: () => void;
+  onClear: () => void;
+}) {
+  const ready = count >= 2;
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-brand-blue/40 bg-brand-blue/5 px-3 py-2 dark:bg-brand-blue/10">
+      <span className="text-xs font-medium text-primary">
+        {count} selected
+      </span>
+      <span className="text-[11px] text-muted">
+        {ready
+          ? <>Merging into <span className="font-semibold text-primary">{primaryName}</span> — its values win, the rest fill any gaps it left empty.</>
+          : 'Select at least one more item from this email to merge.'}
+      </span>
+      <div className="ml-auto flex gap-2">
+        <button
+          onClick={onClear}
+          disabled={busy}
+          className="rounded-lg border border-subtle px-3 py-1 text-xs text-secondary hover-surface-muted disabled:opacity-50"
+        >
+          Clear
+        </button>
+        <button
+          onClick={onMerge}
+          disabled={!ready || busy}
+          className="rounded-lg bg-brand-blue px-3 py-1 text-xs font-medium text-white hover:bg-brand-blue/90 disabled:opacity-50"
+        >
+          {busy ? 'Merging...' : `Merge ${count} items`}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -243,7 +364,24 @@ function SelectField({
   );
 }
 
-function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed: () => void }) {
+function QueueCard({
+  item,
+  mergedIntoName,
+  selectionOrder,
+  primaryName,
+  onToggleSelected,
+  onDismissed,
+}: {
+  item: CoaEmailQueueItem;
+  /** Name of the record this one was absorbed into, when it has been merged away */
+  mergedIntoName: string | null;
+  /** Position in the current selection — 0 is the merge primary */
+  selectionOrder: number | null;
+  /** Name of the primary this card would merge into, when it isn't the primary */
+  primaryName: string | null;
+  onToggleSelected: () => void;
+  onDismissed: () => void;
+}) {
   const [sellerId, setSellerId] = useState<string | null>(item.suggestedSellerId);
   const [confirming, setConfirming] = useState(false);
   const [addingToAirtable, setAddingToAirtable] = useState(false);
@@ -325,6 +463,12 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
   const busy = confirming || addingToAirtable || dismissing;
   const isEmailExtracted = item.sourceType === 'email_body' || item.rawData?.emailExtracted;
 
+  const isMerged = item.status === 'merged';
+  const isSelected = selectionOrder !== null;
+  const isPrimary = selectionOrder === 0;
+  const mergedFrom: Array<{ coaProductName?: string | null }> = item.rawData?.mergedFrom || [];
+  const mergedFromCount = mergedFrom.length;
+
   const handleConfirm = async () => {
     if (!sellerId) return;
     setConfirming(true);
@@ -371,14 +515,58 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
   }[item.confidence || ''] || 'surface-muted text-secondary';
 
   return (
-    <div className={`rounded-lg border card-blue border-l-4 shadow-md p-5 ${isEmailExtracted ? 'border-l-brand-blue' : 'border-l-brand-teal'}`}>
+    <div
+      className={`rounded-lg border card-blue border-l-4 shadow-md p-5 ${
+        isEmailExtracted ? 'border-l-brand-blue' : 'border-l-brand-teal'
+      } ${isMerged ? 'opacity-60' : ''} ${
+        isPrimary ? 'ring-2 ring-brand-blue' : isSelected ? 'ring-1 ring-brand-blue/50' : ''
+      }`}
+    >
+      {/* Absorbed by a merge — kept visible so the merge is legible, but inert */}
+      {isMerged && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-subtle surface-muted px-3 py-2">
+          <svg className="h-4 w-4 shrink-0 text-faint" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h-.75A2.25 2.25 0 0 0 4.5 9.75v7.5a2.25 2.25 0 0 0 2.25 2.25h7.5a2.25 2.25 0 0 0 2.25-2.25v-.75m0-9 3.75-3.75M21 3h-5.25M21 3v5.25" />
+          </svg>
+          <span className="text-xs text-secondary">
+            Merged into <span className="font-semibold text-primary">{mergedIntoName}</span>
+          </span>
+        </div>
+      )}
+
       <div className="mb-3 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
+        <div className="flex items-start gap-3">
+          {!isMerged && (
+            <label className="mt-1 flex cursor-pointer items-center" title="Select to merge">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onToggleSelected}
+                className="h-4 w-4 cursor-pointer accent-[#207AD5]"
+              />
+            </label>
+          )}
+          <div>
+          <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold text-primary">{item.coaProductName || 'Untitled Product'}</h3>
             {isEmailExtracted && (
               <span className="rounded-full bg-brand-blue/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-blue">
                 Email
+              </span>
+            )}
+            {isPrimary && (
+              <span className="rounded-full bg-brand-blue px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                Primary — values win
+              </span>
+            )}
+            {isSelected && !isPrimary && (
+              <span className="rounded-full border border-brand-blue/40 px-2 py-0.5 text-[10px] font-medium text-brand-blue">
+                Merges into {primaryName}
+              </span>
+            )}
+            {mergedFromCount > 0 && (
+              <span className="rounded-full bg-brand-sage/25 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-teal dark:text-brand-sage">
+                Merged from {mergedFromCount}
               </span>
             )}
           </div>
@@ -389,6 +577,13 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
           {isEmailExtracted && (
             <p className="mt-1 text-[11px] text-faint">Extracted from email body — no CoA PDF attached</p>
           )}
+          {/* Name what this record absorbed, so a merged item is self-explanatory */}
+          {mergedFrom.length > 0 && (
+            <p className="mt-1 text-[11px] text-brand-teal dark:text-brand-sage">
+              Combined with: {mergedFrom.map((m: any) => m.coaProductName || 'unnamed item').join(', ')}
+            </p>
+          )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {localSentToAirtable && (
@@ -569,6 +764,9 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
         </div>
       )}
 
+      {/* A merged-away record is inert — its content now lives on the primary */}
+      {isMerged ? null : (
+      <>
       {/* Seller picker */}
       <div className="mb-4">
         <SellerPicker
@@ -606,6 +804,8 @@ function QueueCard({ item, onDismissed }: { item: CoaEmailQueueItem; onDismissed
           {dismissing ? 'Dismissing...' : 'Dismiss'}
         </button>
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -434,7 +434,10 @@ export interface CoaEmailQueueItem {
   coaProductId: string | null;
   emailIngestionId: string | null;
   sourceType: string;
+  /** "ready" | "pending" | "processing" | "dismissed" | "merged" */
   status: string;
+  /** Set when this record was absorbed by a merge — points at the survivor */
+  mergedIntoId: string | null;
   suggestedSellerId: string | null;
   suggestedSellerName: string | null;
   confidence: string | null;
@@ -565,6 +568,28 @@ export async function confirmCoaEmail(
 
 export async function dismissCoaEmail(syncRecordId: string): Promise<void> {
   await api.post('/admin/coa-email-dismiss', { syncRecordId });
+}
+
+export interface CoaMergeResult {
+  syncRecord: CoaEmailQueueItem;
+  mergedFrom: Array<{ id: string; coaProductName: string | null; sourceType: string }>;
+  /** Second and later CoA PDFs in the selection — only the first carries over */
+  droppedCoaJobIds: string[];
+}
+
+/**
+ * Merge queue records from one email into the primary (first-selected) record.
+ * The primary's values win; the others only fill fields it left empty.
+ */
+export async function mergeCoaEmailRecords(
+  primarySyncRecordId: string,
+  mergeSyncRecordIds: string[],
+): Promise<CoaMergeResult> {
+  const res = await api.post<CoaMergeResult>('/admin/coa-email-merge', {
+    primarySyncRecordId,
+    mergeSyncRecordIds,
+  });
+  return res.data;
 }
 
 export async function fetchSellers(): Promise<SellerOption[]> {

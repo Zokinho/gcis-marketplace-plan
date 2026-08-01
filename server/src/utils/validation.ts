@@ -109,6 +109,15 @@ export const adminCoaDismissSchema = z.object({
   syncRecordId: z.string().min(1, 'syncRecordId is required'),
 });
 
+export const adminCoaMergeSchema = z.object({
+  // The record the admin selected first — its values win on every conflict
+  primarySyncRecordId: z.string().min(1, 'primarySyncRecordId is required'),
+  mergeSyncRecordIds: z
+    .array(z.string().min(1))
+    .min(1, 'at least one record to merge is required')
+    .max(20, 'cannot merge more than 20 records at once'),
+});
+
 export const syncNowSchema = z.object({
   type: z.enum(['products', 'products-delta', 'contacts']).optional(),
 });
