@@ -264,7 +264,9 @@ async function distributeApprovedCoa(
 router.get('/coa-email-queue', async (_req: Request, res: Response) => {
   // 'merged' is included so an absorbed record stays visible in its group,
   // labelled with what it went into, rather than silently disappearing.
-  const PENDING_STATUSES = ['ready', 'pending', 'processing', 'merged'];
+  // 'error' surfaces a CoA whose processing failed, so a dropped PDF is visible
+  // here rather than only in the CoA admin.
+  const PENDING_STATUSES = ['ready', 'pending', 'processing', 'merged', 'error'];
 
   const records = await prisma.coaSyncRecord.findMany({
     where: {

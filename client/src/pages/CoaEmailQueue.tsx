@@ -464,6 +464,8 @@ function QueueCard({
   const isEmailExtracted = item.sourceType === 'email_body' || item.rawData?.emailExtracted;
 
   const isMerged = item.status === 'merged';
+  // CoA processing failed — there is no product to confirm, so only Dismiss applies
+  const isErrored = item.status === 'error';
   const isSelected = selectionOrder !== null;
   const isPrimary = selectionOrder === 0;
   const mergedFrom: Array<{ coaProductName?: string | null }> = item.rawData?.mergedFrom || [];
@@ -784,14 +786,14 @@ function QueueCard({
       <div className="flex gap-3">
         <button
           onClick={handleConfirm}
-          disabled={!sellerId || busy || localSentToMarketplace}
+          disabled={!sellerId || busy || isErrored || localSentToMarketplace}
           className="rounded-lg bg-brand-teal px-4 py-2 text-sm font-medium text-white hover:bg-brand-teal/90 disabled:opacity-50"
         >
           {confirming ? 'Creating...' : localSentToMarketplace ? 'Sent to Pending' : 'Approve & Send to Pending'}
         </button>
         <button
           onClick={handleAirtableOnly}
-          disabled={!sellerId || busy || localSentToAirtable}
+          disabled={!sellerId || busy || isErrored || localSentToAirtable}
           className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-medium text-white hover:bg-brand-blue/90 disabled:opacity-50"
         >
           {addingToAirtable ? 'Adding...' : localSentToAirtable ? 'Sent to Airtable' : 'Add to Airtable Only'}

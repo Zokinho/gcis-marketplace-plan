@@ -121,6 +121,62 @@ describe('pollEmailIngestions — multi-product flag propagation', () => {
     expect(prisma.coaSyncRecord.create).not.toHaveBeenCalled();
   });
 
+  it('does not record a job that is still processing', async () => {
+    // The ingestion goes to "review" seconds after the email arrives, but
+    // extraction takes minutes. The dedup is keyed on coaJobId and skips, so a
+    // row written now would never gain a product — a permanently blank card.
+    mockCoaClient.listEmailIngestions.mockResolvedValue([ingestion()]);
+    mockCoaClient.getJobStatus.mockResolvedValue({
+      id: 'job-1', status: 'processing', product_id: null, error_message: null,
+    });
+
+    const result = await pollEmailIngestions();
+
+    expect(result.processed).toBe(0);
+    expect(prisma.coaSyncRecord.create).not.toHaveBeenCalled();
+  });
+
+  it('does not record a job still queued', async () => {
+    mockCoaClient.listEmailIngestions.mockResolvedValue([ingestion()]);
+    mockCoaClient.getJobStatus.mockResolvedValue({
+      id: 'job-1', status: 'queued', product_id: null, error_message: null,
+    });
+
+    await pollEmailIngestions();
+
+    expect(prisma.coaSyncRecord.create).not.toHaveBeenCalled();
+  });
+
+  it('records the job once extraction has produced a product', async () => {
+    // Same job on a later poll — this is what the skip above defers to
+    mockCoaClient.listEmailIngestions.mockResolvedValue([ingestion()]);
+    mockCoaClient.getJobStatus.mockResolvedValue({
+      id: 'job-1', status: 'review', product_id: 'cprod-1', error_message: null,
+    });
+
+    const result = await pollEmailIngestions();
+
+    expect(result.processed).toBe(1);
+    const created = vi.mocked(prisma.coaSyncRecord.create).mock.calls[0][0] as any;
+    expect(created.data.status).toBe('ready');
+    expect(created.data.coaProductId).toBe('cprod-1');
+  });
+
+  it('surfaces a failed job so the PDF does not vanish silently', async () => {
+    mockCoaClient.listEmailIngestions.mockResolvedValue([ingestion()]);
+    mockCoaClient.getJobStatus.mockResolvedValue({
+      id: 'job-1', status: 'error', product_id: null,
+      error_message: 'PDF unlock failed',
+    });
+
+    const result = await pollEmailIngestions();
+
+    expect(result.processed).toBe(1);
+    const created = vi.mocked(prisma.coaSyncRecord.create).mock.calls[0][0] as any;
+    expect(created.data.status).toBe('error');
+    expect(created.data.rawData.jobFlag).toBe('PDF unlock failed');
+  });
+
   it('does not re-create a record for a job already synced', async () => {
     vi.mocked(prisma.coaSyncRecord.findUnique).mockResolvedValue({ id: 'existing' } as any);
     mockCoaClient.listEmailIngestions.mockResolvedValue([ingestion()]);

@@ -40,12 +40,48 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
           const job = await coaClient.getJobStatus(attachment.job_id);
           if (!job) continue;
 
-          // Get extracted product data if available
+          // Nothing extracted yet. Do NOT record the job now: the dedup above is
+          // keyed on coaJobId, so a row written here would be skipped by every
+          // later poll and stay in the queue forever with no product behind it —
+          // a blank card that confirm rejects with "CoA product not yet
+          // extracted". Leaving it alone lets a later poll record it properly.
+          if (!job.product_id) {
+            if (job.status === 'error') {
+              // Terminal failure — record it so a PDF that failed is visible here
+              // rather than only in the CoA admin.
+              await prisma.coaSyncRecord.create({
+                data: {
+                  coaJobId: attachment.job_id,
+                  emailIngestionId: ingestion.id,
+                  status: 'error',
+                  emailSender: ingestion.sender,
+                  emailSubject: ingestion.subject,
+                  coaProductName: attachment.original_filename,
+                  rawData: {
+                    jobFlag: job.error_message || 'CoA processing failed with no error message',
+                  },
+                },
+              });
+              logger.warn(
+                { jobId: attachment.job_id, ingestionId: ingestion.id, error: job.error_message },
+                '[COA-EMAIL] CoA job failed — surfaced in the queue',
+              );
+              processed++;
+            } else {
+              logger.info(
+                { jobId: attachment.job_id, jobStatus: job.status },
+                '[COA-EMAIL] CoA still processing — will record it on a later poll',
+              );
+            }
+            continue;
+          }
+
+          // Get extracted product data
           let coaProductName: string | null = null;
           let producerName: string | null = null;
           let rawData: Record<string, any> | null = null;
 
-          if (job.product_id) {
+          {
             // Try published product endpoint first, fall back to job product endpoint
             // (review-status products are only accessible via /jobs/{id}/product)
             const productDetail =
@@ -91,7 +127,8 @@ async function pollEmailIngestions(): Promise<{ processed: number; errors: numbe
               coaJobId: attachment.job_id,
               coaProductId: job.product_id,
               emailIngestionId: ingestion.id,
-              status: job.product_id ? 'ready' : 'processing',
+              // Only reached once the job has a product, so this is always ready
+              status: 'ready',
               suggestedSellerId: sellerMatch?.userId || null,
               suggestedSellerName: sellerMatch ? undefined : null,
               confidence: sellerMatch?.confidence || null,
