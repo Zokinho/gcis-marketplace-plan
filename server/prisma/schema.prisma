@@ -454,6 +454,21 @@ model CoaSyncRecord {
   @@index([emailIngestionId])
 }
 
+// ─── Cron Locks (mutual exclusion for scheduled jobs) ───
+//
+// A lock row rather than a PostgreSQL advisory lock. Advisory locks are scoped to
+// the session that took them, and Prisma hands out pooled connections, so the
+// unlock frequently ran on a different session than the lock — where it returns
+// false instead of raising, leaking the lock until the connection was recycled.
+// A row is unaffected by which connection observes it, and is inspectable.
+model CronLock {
+  job      String   @id           // Job name, e.g. "CoaEmailSync"
+  lockedAt DateTime               // When the current holder took it
+  lockedBy String                 // Per-acquisition token; only the holder may release
+
+  @@index([lockedAt])
+}
+
 // ─── Shortlist Items (buyer product saves) ───
 
 model ShortlistItem {

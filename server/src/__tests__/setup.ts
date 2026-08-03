@@ -117,6 +117,14 @@ vi.mock('../index', () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    cronLock: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     redactionTemplate: {
       findUnique: vi.fn(),
       findMany: vi.fn(),

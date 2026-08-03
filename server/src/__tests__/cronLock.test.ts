@@ -29,14 +29,12 @@ describe('LOCK_IDS', () => {
 describe('withCronLock', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: lock acquired cleanly, released cleanly
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ inserted: true }] as any);
+    vi.mocked(prisma.cronLock.deleteMany).mockResolvedValue({ count: 1 } as any);
   });
 
-  // 1. Runs fn when lock acquired
-  it('executes the job function when lock is acquired', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: true }])   // lock acquired
-      .mockResolvedValueOnce(undefined as any);       // lock released
-
+  it('executes the job function when the lock is acquired', async () => {
     const jobFn = vi.fn().mockResolvedValue('done');
 
     await withCronLock(100001, 'test-job', jobFn);
@@ -44,97 +42,108 @@ describe('withCronLock', () => {
     expect(jobFn).toHaveBeenCalledTimes(1);
   });
 
-  // 2. Skips fn when lock not acquired
-  it('skips the job function when lock is not acquired', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }])  // lock not acquired
-      .mockResolvedValueOnce([]);                     // no stale sessions
-
-    const jobFn = vi.fn().mockResolvedValue('done');
+  it('skips the job function when another run holds the lock', async () => {
+    // Conditional upsert wrote nothing — someone else holds a fresh lock
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([] as any);
+    const jobFn = vi.fn();
 
     await withCronLock(100001, 'test-job', jobFn);
 
     expect(jobFn).not.toHaveBeenCalled();
-  });
-
-  // 3. Releases lock after fn completes
-  it('releases the lock after the job function completes', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: true }])
-      .mockResolvedValueOnce(undefined as any);
-
-    const jobFn = vi.fn().mockResolvedValue('done');
-
-    await withCronLock(100001, 'test-job', jobFn);
-
-    // $queryRaw called twice: once for lock, once for unlock
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
-  });
-
-  // 4. Releases lock even if fn throws
-  it('releases the lock even when the job function throws', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: true }])
-      .mockResolvedValueOnce(undefined as any);
-
-    const jobFn = vi.fn().mockRejectedValue(new Error('Job failed'));
-
-    await expect(withCronLock(100001, 'test-job', jobFn)).rejects.toThrow('Job failed');
-
-    // Lock should still be released (2 calls to $queryRaw)
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
-  });
-
-  // 5. Returns undefined in both cases
-  it('returns undefined when lock is acquired and job succeeds', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: true }])
-      .mockResolvedValueOnce(undefined as any);
-
-    const jobFn = vi.fn().mockResolvedValue('some-value');
-
-    const result = await withCronLock(100001, 'test-job', jobFn);
-
-    expect(result).toBeUndefined();
-  });
-
-  it('returns undefined when lock is not acquired', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }])  // lock not acquired
-      .mockResolvedValueOnce([]);                     // no stale sessions
-
-    const jobFn = vi.fn();
-
-    const result = await withCronLock(100001, 'test-job', jobFn);
-
-    expect(result).toBeUndefined();
-  });
-
-  // 7. Logs skip message when lock held
-  it('logs an info message when skipping due to held lock', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }])  // lock not acquired
-      .mockResolvedValueOnce([]);                     // no stale sessions
-
-    const jobFn = vi.fn();
-
-    await withCronLock(100001, 'test-job', jobFn);
-
     expect(logger.info).toHaveBeenCalledWith(
       { job: 'test-job', lockId: 100001 },
       expect.stringContaining('Skipping'),
     );
   });
 
-  // 8. Handles lock release error gracefully
-  it('catches and logs lock release errors without throwing', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: true }])
-      .mockRejectedValueOnce(new Error('Release failed'));
+  it('releases the lock after the job completes', async () => {
+    await withCronLock(100001, 'test-job', vi.fn().mockResolvedValue('done'));
 
+    expect(prisma.cronLock.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the lock even when the job throws', async () => {
+    const jobFn = vi.fn().mockRejectedValue(new Error('Job failed'));
+
+    await expect(withCronLock(100001, 'test-job', jobFn)).rejects.toThrow('Job failed');
+
+    expect(prisma.cronLock.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not attempt a release when the lock was not acquired', async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([] as any);
+
+    await withCronLock(100001, 'test-job', vi.fn());
+
+    expect(prisma.cronLock.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('releases only the row this run holds, never another holder\'s', async () => {
+    await withCronLock(100001, 'test-job', vi.fn().mockResolvedValue('done'));
+
+    // Scoping the delete on lockedBy is what stops an overrunning run from
+    // releasing a lock that a different instance legitimately took over
+    const where = (vi.mocked(prisma.cronLock.deleteMany).mock.calls[0][0] as any).where;
+    expect(where.job).toBe('test-job');
+    expect(typeof where.lockedBy).toBe('string');
+    expect(where.lockedBy.length).toBeGreaterThan(0);
+  });
+
+  it('uses a distinct token per acquisition', async () => {
+    await withCronLock(100001, 'test-job', vi.fn());
+    await withCronLock(100001, 'test-job', vi.fn());
+
+    const calls = vi.mocked(prisma.cronLock.deleteMany).mock.calls;
+    const first = (calls[0][0] as any).where.lockedBy;
+    const second = (calls[1][0] as any).where.lockedBy;
+    // A leaked row from an earlier run must not be releasable by a later one
+    expect(first).not.toBe(second);
+  });
+
+  it('warns when the release matched no row', async () => {
+    // The silent version of this was the bug: pg_advisory_unlock returned false
+    // on a pooled connection that did not hold the lock, and nothing checked it
+    vi.mocked(prisma.cronLock.deleteMany).mockResolvedValue({ count: 0 } as any);
+
+    await withCronLock(100001, 'test-job', vi.fn().mockResolvedValue('done'));
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ job: 'test-job', lockId: 100001 }),
+      expect.stringContaining('not held at release'),
+    );
+  });
+
+  it('warns when it takes over a stale lock', async () => {
+    // xmax non-zero => the row was updated, i.e. an abandoned holder was displaced
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ inserted: false }] as any);
     const jobFn = vi.fn().mockResolvedValue('done');
 
-    // Should NOT throw even though the unlock query fails
+    await withCronLock(100001, 'test-job', jobFn);
+
+    expect(jobFn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ job: 'test-job' }),
+      expect.stringContaining('stale lock'),
+    );
+  });
+
+  it('skips the run rather than throwing when acquisition errors', async () => {
+    vi.mocked(prisma.$queryRaw).mockRejectedValue(new Error('db down'));
+    const jobFn = vi.fn();
+
+    await expect(withCronLock(100001, 'test-job', jobFn)).resolves.toBeUndefined();
+
+    expect(jobFn).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ job: 'test-job' }),
+      expect.stringContaining('Failed to acquire'),
+    );
+  });
+
+  it('does not throw when the release query itself fails', async () => {
+    vi.mocked(prisma.cronLock.deleteMany).mockRejectedValue(new Error('Release failed'));
+    const jobFn = vi.fn().mockResolvedValue('done');
+
     await expect(withCronLock(100001, 'test-job', jobFn)).resolves.toBeUndefined();
 
     expect(jobFn).toHaveBeenCalledTimes(1);
@@ -144,35 +153,9 @@ describe('withCronLock', () => {
     );
   });
 
-  // 9. Does not release lock when lock was never acquired
-  it('does not call unlock when lock was not acquired', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }])  // lock not acquired
-      .mockResolvedValueOnce([]);                     // no stale sessions
-
-    await withCronLock(100001, 'test-job', vi.fn());
-
-    // 2 calls: lock attempt + stale check, no unlock call
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
-  });
-
-  // 10. Recovers from stale lock by terminating the stale session
-  it('terminates stale session and retries lock acquisition', async () => {
-    vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([{ acquired: false }])                        // lock not acquired
-      .mockResolvedValueOnce([{ pid: 12345, held_ms: 3600000 }])           // stale session (1h)
-      .mockResolvedValueOnce(undefined as any)                             // pg_terminate_backend
-      .mockResolvedValueOnce([{ acquired: true }])                         // retry lock acquired
-      .mockResolvedValueOnce(undefined as any);                            // unlock
-
-    const jobFn = vi.fn().mockResolvedValue('done');
-
-    await withCronLock(100001, 'test-job', jobFn);
-
-    expect(jobFn).toHaveBeenCalledTimes(1);
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ stalePid: 12345 }),
-      expect.stringContaining('stale session'),
-    );
+  it('returns undefined in both the acquired and skipped cases', async () => {
+    await expect(withCronLock(100001, 'a', vi.fn())).resolves.toBeUndefined();
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([] as any);
+    await expect(withCronLock(100001, 'b', vi.fn())).resolves.toBeUndefined();
   });
 });
